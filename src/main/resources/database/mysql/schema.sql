@@ -1,6 +1,6 @@
-create table local.ticker
+create table if not exists local.TICKER
 (
-    id                int                                not null,
+    id                int                                not null auto_increment,
     base              varchar(6)                         not null,
     target            varchar(6)                         not null,
     exchange_name     varchar(200) charset utf8          not null,
@@ -17,7 +17,8 @@ create table local.ticker
     constraint ticker_id_uindex
         unique (id)
 )
+    auto_increment = 100,
     comment 'Basic entity for ticker market data';
 
-alter table local.ticker
+alter table local.TICKER
     add primary key (id);
