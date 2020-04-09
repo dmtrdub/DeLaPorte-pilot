@@ -1,53 +1,68 @@
 package my.dub.dlp_pilot.service.impl;
 
+import com.litesoftwares.coingecko.domain.Exchanges.ExchangesTickersById;
 import com.litesoftwares.coingecko.impl.CoinGeckoApiClientImpl;
 import lombok.extern.slf4j.Slf4j;
+import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.Ticker;
-import my.dub.dlp_pilot.repository.ExchangeRepository;
 import my.dub.dlp_pilot.repository.TickerRepository;
 import my.dub.dlp_pilot.service.MarketDataService;
+import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Scope;
-import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.Assert;
 
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import static my.dub.dlp_pilot.util.NumberUtils.*;
 
 @Slf4j
 @Service
-// TODO: remove when init methods will be added
-@Scope(proxyMode = ScopedProxyMode.TARGET_CLASS)
 @Transactional
 public class MarketDataServiceImpl implements MarketDataService {
+
     private final CoinGeckoApiClientImpl marketDataApiClient;
     private final TickerRepository tickRepository;
-    private final ExchangeRepository exchangeRepository;
 
     @Autowired
-    public MarketDataServiceImpl(CoinGeckoApiClientImpl marketDataApiClient, TickerRepository tickerRepository, ExchangeRepository exchangeRepository) {
+    public MarketDataServiceImpl(CoinGeckoApiClientImpl marketDataApiClient, TickerRepository tickerRepository) {
         this.marketDataApiClient = marketDataApiClient;
         this.tickRepository = tickerRepository;
-        this.exchangeRepository = exchangeRepository;
     }
 
-    public void fetchMarketData() {
-        List<Ticker> tickers = (List<Ticker>) tickRepository.findAll();
-        log.info("Total tickers count: " + tickers.size());
-        Ticker ticker = new Ticker();
-        ticker.setBase("base");
-        ticker.setTarget("target");
-        ticker.setExchange(tickers.get(0).getExchange());
-        ticker.setPrice(1.0);
-        ticker.setPriceBtc(1.0);
-        ticker.setPriceUsd(1.0);
-        ticker.setVolume(100.0);
-        ticker.setVolumeBtc(100.0);
-        ticker.setVolumeUsd(100.0);
-        ticker.setSpreadPercentage(0.5);
-        ticker.setTime(LocalDateTime.now());
-        tickRepository.save(ticker);
-        log.info("Total tickers count after save: " + ((List<Ticker>) tickRepository.findAll()).size());
+    public void fetchMarketData(Exchange exchange) {
+        Assert.notNull(exchange, "Exchange cannot be null!");
+        try {
+            ExchangesTickersById tickersById = marketDataApiClient.getExchangesTickersById(exchange.getApiName());
+            List<Ticker> tickers = convertToTicker(exchange, tickersById);
+            tickRepository.saveAll(tickers);
+        } catch (Exception e) {
+            log.error(e.getMessage());
+        }
+    }
+
+    private List<Ticker> convertToTicker(Exchange exchange, ExchangesTickersById tickersById) {
+        return tickersById.getTickers().parallelStream().map(externalTicker -> {
+            Ticker ticker = new Ticker();
+            ticker.setExchange(exchange);
+            ticker.setBase(externalTicker.getBase());
+            ticker.setTarget(externalTicker.getTarget());
+            ticker.setVolume(getVolumeDecimal(externalTicker.getVolume()));
+            Map<String, String> convertedVolume = externalTicker.getConvertedVolume();
+            ticker.setVolumeBtc(getVolumeDecimal(convertedVolume.get("btc")));
+            ticker.setVolumeUsd(getVolumeDecimal(convertedVolume.get("usd")));
+            ticker.setPrice(getPriceDecimal(externalTicker.getLast()));
+            Map<String, String> convertedPrice = externalTicker.getConvertedLast();
+            ticker.setPriceBtc(getPriceDecimal(convertedPrice.get("btc")));
+            ticker.setPriceUsd(getPriceDecimal(convertedPrice.get("usd")));
+            ticker.setSpreadPercentage(getPercentageDecimal(externalTicker.getBidAskSpreadPercentage()));
+            ticker.setTime(DateUtils.getUTCLocalDateTimeFromString(externalTicker.getTimestamp()));
+            ticker.setAnomaly(externalTicker.isAnomaly());
+            ticker.setStale(externalTicker.isStale());
+            return ticker;
+        }).collect(Collectors.toList());
     }
 }

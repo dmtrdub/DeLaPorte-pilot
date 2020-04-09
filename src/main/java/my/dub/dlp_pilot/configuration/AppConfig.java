@@ -27,6 +27,7 @@ import java.util.Properties;
 @EnableJpaRepositories(basePackages = "my.dub.dlp_pilot.repository")
 @ComponentScan(basePackages = "my.dub.dlp_pilot")
 @PropertySource("classpath:database/hibernate.properties")
+@PropertySource("classpath:application.properties")
 public class AppConfig {
 
     private final Environment environment;
