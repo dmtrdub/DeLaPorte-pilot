@@ -1,15 +1,17 @@
 create table if not exists exchange
 (
     id                   int auto_increment,
-    deposit_fee          decimal(11, 6) not null,
-    withdraw_fee         decimal(11, 6) not null,
-    taker_fee_percentage decimal(6, 3)  not null,
-    name                 varchar(200)   not null,
-    api_name             varchar(200)   not null,
-    constraint exchange_id_uindex
-        unique (id),
+    deposit_fee          decimal(11, 6)     not null,
+    withdraw_fee         decimal(11, 6)     not null,
+    taker_fee_percentage decimal(6, 3)      not null,
+    name                 varchar(200)       not null,
+    api_name             varchar(200)       not null,
+    pairs_count          smallint default 0 not null,
+    trust_score          smallint default 1 not null,
     constraint exchange_api_name_uindex
         unique (api_name),
+    constraint exchange_id_uindex
+        unique (id),
     constraint exchange_name_uindex
         unique (name)
 );
@@ -17,7 +19,7 @@ create table if not exists exchange
 alter table exchange
     add primary key (id);
 
-create table if not exists local.ticker
+create table if not exists ticker
 (
     id                int auto_increment,
     base              varchar(16)                        not null,

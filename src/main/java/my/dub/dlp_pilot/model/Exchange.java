@@ -19,7 +19,8 @@ import static my.dub.dlp_pilot.Constants.PERCENTAGE_SCALE;
 @Data
 @NoArgsConstructor
 @Entity
-@Table(name = "exchange", uniqueConstraints = {@UniqueConstraint(name = "exchange_api_name_uindex", columnNames = "api_name"),
+@Table(name = "exchange", uniqueConstraints = {
+        @UniqueConstraint(name = "exchange_api_name_uindex", columnNames = "api_name"),
         @UniqueConstraint(name = "exchange_name_uindex", columnNames = "name")})
 public class Exchange {
 
@@ -46,8 +47,17 @@ public class Exchange {
     @Max(value = 100)
     private BigDecimal takerFeePercentage;
 
+    @Column(name = "pairs_count", nullable = false, columnDefinition = "default 0")
+    private Integer pairsCount;
+
+    @Column(name = "trust_score", nullable = false, columnDefinition = "default 1")
+    private Integer trustScore;
+
     @EqualsAndHashCode.Exclude
     @ToString.Exclude
     @OneToMany(fetch = FetchType.LAZY, mappedBy = "exchange")
     private Set<Ticker> tickers = new HashSet<>();
+
+    @Transient
+    private int pagesRequestPerMin = 1;
 }

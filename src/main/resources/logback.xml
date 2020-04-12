@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <charset>UTF-8</charset>
+            <pattern>%d{HH:mm:ss.SSS} %highlight(%-5level) - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="my.dub.dlp_pilot" level="debug"/>
+
+    <root level="info">
+        <appender-ref ref="console"/>
+    </root>
+
+    <logger name="org.hibernate" level="DEBUG"/>
+</configuration>
