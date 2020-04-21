@@ -1,10 +1,12 @@
 package my.dub.dlp_pilot.util;
 
+import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.Constants;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
+@Slf4j
 public final class NumberUtils {
     private NumberUtils() {
     }
@@ -37,5 +39,10 @@ public final class NumberUtils {
 
     public static BigDecimal getPercentageDecimal(double value) {
         return getDecimal(value, Constants.PERCENTAGE_SCALE);
+    }
+
+    public static int integerDigits(BigDecimal decimal) {
+        BigDecimal noTrailZerosDecimal = decimal.stripTrailingZeros();
+        return noTrailZerosDecimal.precision() - noTrailZerosDecimal.scale();
     }
 }

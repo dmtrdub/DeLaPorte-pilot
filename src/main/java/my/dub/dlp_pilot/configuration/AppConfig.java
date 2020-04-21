@@ -47,8 +47,7 @@ public class AppConfig {
     @Bean
     public DataSource dataSource() {
         HikariConfig config = new HikariConfig("/database/datasource.properties");
-        HikariDataSource dataSource = new HikariDataSource(config);
-        return dataSource;
+        return new HikariDataSource(config);
     }
 
     @Bean

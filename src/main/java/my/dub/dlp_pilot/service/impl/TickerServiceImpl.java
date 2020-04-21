@@ -7,7 +7,7 @@ import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.Ticker;
 import my.dub.dlp_pilot.repository.TickerRepository;
 import my.dub.dlp_pilot.repository.container.TickerContainer;
-import my.dub.dlp_pilot.service.MarketDataService;
+import my.dub.dlp_pilot.service.TickerService;
 import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -15,29 +15,42 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static my.dub.dlp_pilot.util.NumberUtils.*;
 
 @Slf4j
 @Service
-@Transactional
-public class MarketDataServiceImpl implements MarketDataService {
+public class TickerServiceImpl implements TickerService {
 
     private final CoinGeckoApiClientImpl marketDataApiClient;
-    private final TickerRepository tickRepository;
+    private final TickerRepository tickerRepository;
     private final TickerContainer tickerContainer;
 
     @Autowired
-    public MarketDataServiceImpl(CoinGeckoApiClientImpl marketDataApiClient, TickerRepository tickerRepository,
-                                 TickerContainer tickerContainer) {
+    public TickerServiceImpl(CoinGeckoApiClientImpl marketDataApiClient, TickerRepository tickerRepository,
+                             TickerContainer tickerContainer) {
         this.marketDataApiClient = marketDataApiClient;
-        this.tickRepository = tickerRepository;
+        this.tickerRepository = tickerRepository;
         this.tickerContainer = tickerContainer;
+    }
+
+    @Transactional
+    public void save(Collection<Ticker> tickers) {
+        if (CollectionUtils.isEmpty(tickers)) {
+            return;
+        }
+        tickerRepository.saveAll(tickers);
+    }
+
+    @Transactional
+    public void saveAndUpdateLocal(Collection<Ticker> tickers, long exchangeId) {
+        if (CollectionUtils.isEmpty(tickers)) {
+            return;
+        }
+        tickerRepository.saveAll(tickers);
+        updateLocalContainer(exchangeId, tickers);
     }
 
     public void fetchMarketData(Exchange exchange) {
@@ -45,12 +58,12 @@ public class MarketDataServiceImpl implements MarketDataService {
         try {
             List<ExchangesTickersById> tickersByIds = new ArrayList<>();
             for (int page = 1; page < exchange.getPagesRequestPerMin() + 1; page++) {
+                //TODO: add handling of client errors
                 tickersByIds.add(marketDataApiClient.getExchangesTickersById(exchange.getApiName(), null, page, null));
             }
             Long exchangeId = exchange.getId();
             List<Ticker> tickers = getUniqueTickers(exchangeId, convertToTickers(exchange, tickersByIds));
-            tickRepository.saveAll(tickers);
-            updateLocalContainer(exchangeId, tickers);
+            saveAndUpdateLocal(tickers, exchangeId);
         }
         catch (Exception e) {
             log.error(e.getMessage());
@@ -71,7 +84,7 @@ public class MarketDataServiceImpl implements MarketDataService {
         return result;
     }
 
-    private void updateLocalContainer(Long exchangeId, List<Ticker> tickers) {
+    private void updateLocalContainer(Long exchangeId, Collection<Ticker> tickers) {
         tickerContainer.updateTickers(exchangeId, tickers);
     }
 

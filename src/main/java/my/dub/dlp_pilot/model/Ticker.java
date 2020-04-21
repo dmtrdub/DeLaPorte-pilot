@@ -45,16 +45,16 @@ public class Ticker {
     @Digits(integer = 16, fraction = VOLUME_SCALE)
     private BigDecimal volumeUsd;
 
-    @Column(nullable = false, precision = 16, scale = PRICE_SCALE)
-    @Digits(integer = 8, fraction = PRICE_SCALE)
+    @Column(nullable = false, precision = 20, scale = PRICE_SCALE)
+    @Digits(integer = 13, fraction = PRICE_SCALE)
     private BigDecimal price;
 
-    @Column(name = "price_btc", nullable = false, precision = 16, scale = PRICE_SCALE)
-    @Digits(integer = 8, fraction = PRICE_SCALE)
+    @Column(name = "price_btc", nullable = false, precision = 20, scale = PRICE_SCALE)
+    @Digits(integer = 13, fraction = PRICE_SCALE)
     private BigDecimal priceBtc;
 
-    @Column(name = "price_usd", nullable = false, precision = 16, scale = PRICE_SCALE)
-    @Digits(integer = 8, fraction = PRICE_SCALE)
+    @Column(name = "price_usd", nullable = false, precision = 20, scale = PRICE_SCALE)
+    @Digits(integer = 13, fraction = PRICE_SCALE)
     private BigDecimal priceUsd;
 
     @Column(name = "spread_percentage", nullable = false, precision = 6, scale = PERCENTAGE_SCALE)

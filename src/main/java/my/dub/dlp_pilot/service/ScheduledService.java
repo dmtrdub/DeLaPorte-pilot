@@ -13,13 +13,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Set;
 
 @Slf4j
 @Component
 @Scope(proxyMode = ScopedProxyMode.TARGET_CLASS)
-public class ScheduledMarketDataRetriever implements InitializingBean {
+public class ScheduledService implements InitializingBean {
 
     @Value("${market_data_api_limit_per_min}")
     private int apiLimitPerMin;
@@ -28,12 +29,15 @@ public class ScheduledMarketDataRetriever implements InitializingBean {
     private int apiRequestPageSize;
 
     private final ExchangeService exchangeService;
-    private final MarketDataService marketDataService;
+    private final TickerService tickerService;
+    private final TradeService tradeService;
 
     @Autowired
-    public ScheduledMarketDataRetriever(ExchangeService exchangeService, MarketDataService marketDataService) {
+    public ScheduledService(ExchangeService exchangeService, TickerService tickerService,
+                            TradeService tradeService) {
         this.exchangeService = exchangeService;
-        this.marketDataService = marketDataService;
+        this.tickerService = tickerService;
+        this.tradeService = tradeService;
     }
 
     @Override
@@ -51,14 +55,16 @@ public class ScheduledMarketDataRetriever implements InitializingBean {
                  apiLimitPerMin);
         int exchangesCount = exchanges.size();
         ThreadPoolTaskScheduler taskScheduler = new ThreadPoolTaskScheduler();
-        taskScheduler.setPoolSize(exchangesCount);
-        taskScheduler.setThreadNamePrefix("exchangeFetcher-");
+        taskScheduler.setPoolSize(exchangesCount + 1);
+        taskScheduler.setThreadNamePrefix("trade_schedule-");
         taskScheduler.setErrorHandler(TaskUtils.LOG_AND_SUPPRESS_ERROR_HANDLER);
         taskScheduler.initialize();
         for (Exchange exchange : exchanges) {
             taskScheduler
-                    .scheduleWithFixedDelay(() -> marketDataService.fetchMarketData(exchange), Duration.ofSeconds(60));
+                    .scheduleWithFixedDelay(() -> tickerService.fetchMarketData(exchange), Duration.ofSeconds(60));
         }
+        taskScheduler
+                .scheduleWithFixedDelay(tradeService::trade, Instant.now().plusMillis(5000), Duration.ofSeconds(60));
     }
 
     private int setPagesRequestPerMin(Collection<Exchange> exchanges) {
