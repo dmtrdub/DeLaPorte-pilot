@@ -8,7 +8,7 @@ import javax.persistence.*;
 import javax.validation.constraints.Digits;
 import javax.validation.constraints.Max;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 
 import static my.dub.dlp_pilot.Constants.*;
 
@@ -30,7 +30,7 @@ public class Ticker {
     private String target;
 
     @ManyToOne(optional = false)
-    @JoinColumn(name = "exchange_id", nullable = false)
+    @JoinColumn(name = "exchange_id")
     private Exchange exchange;
 
     @Column(nullable = false, precision = 19, scale = VOLUME_SCALE)
@@ -63,7 +63,7 @@ public class Ticker {
     private BigDecimal spreadPercentage;
 
     @Column(columnDefinition = "default CURRENT_TIMESTAMP")
-    private LocalDateTime time;
+    private ZonedDateTime time;
 
     @Column(columnDefinition = "default 0")
     private boolean anomaly;

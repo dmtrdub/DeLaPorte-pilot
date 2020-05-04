@@ -34,13 +34,13 @@ public class Exchange {
     @Column(unique = true, nullable = false, length = 200)
     private String name;
 
-    @Column(name = "deposit_fee", nullable = false, precision = 11, scale = FEE_SCALE)
+    @Column(name = "deposit_fee_usd", nullable = false, precision = 11, scale = FEE_SCALE)
     @Digits(integer = 5, fraction = FEE_SCALE)
-    private BigDecimal depositFee;
+    private BigDecimal depositFeeUsd;
 
-    @Column(name = "withdraw_fee", nullable = false, precision = 11, scale = FEE_SCALE)
+    @Column(name = "withdraw_fee_usd", nullable = false, precision = 11, scale = FEE_SCALE)
     @Digits(integer = 5, fraction = FEE_SCALE)
-    private BigDecimal withdrawFee;
+    private BigDecimal withdrawFeeUsd;
 
     @Column(name = "taker_fee_percentage", nullable = false, precision = 6, scale = PERCENTAGE_SCALE)
     @Digits(integer = 3, fraction = PERCENTAGE_SCALE)

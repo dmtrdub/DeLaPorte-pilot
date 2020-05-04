@@ -35,8 +35,8 @@ create table if not exists ticker
     spread_percentage decimal(6, 3)                      not null,
     anomaly           tinyint  default 0                 not null,
     stale             tinyint  default 0                 not null,
-    exchange_id       int                                not null
-        primary key (id),
+    exchange_id       int                                not null,
+    primary key (id),
     constraint ticker_id_uindex
         unique (id),
     constraint ticker_exchange_fk
@@ -50,27 +50,24 @@ create unique index ticker_id_uindex
 create table if not exists trade
 (
     id                int auto_increment,
-    pair              varchar(33)                        not null,
+    amount            decimal(26, 7)                     not null,
     pnl_usd           decimal(26, 7)                     not null,
     pnl_currency      decimal(26, 7)                     not null,
-    pnl_min_usd       decimal(26, 7)                     not null,
-    pnl_min_currency  decimal(26, 7)                     not null,
+    pnl_min_currency  decimal(26, 7)                     null,
+    pnl_min_usd       decimal(26, 7)                     null,
+    expenses_usd      decimal(20, 7)                     not null,
     time_start        datetime default CURRENT_TIMESTAMP not null,
     time_end          datetime default CURRENT_TIMESTAMP not null,
-    expenses_usd      decimal(20, 7)                     not null,
-    expenses_currency decimal(20, 7)                     not null,
-    open_price_1      decimal(20, 7)                     not null,
-    close_price_1     decimal(20, 7)                     null,
-    open_price_2      decimal(20, 7)                     not null,
-    close_price_2     decimal(20, 7)                     null,
-    exchange_1        int                                null,
-    exchange_2        int                                null,
+    result_type       tinyint  default 0                 not null,
+    total_income      decimal(26, 7)                     not null,
+    position_short_id int                                null,
+    position_long_id  int                                null,
     primary key (id),
-    constraint exchange_1_fk
-        foreign key (exchange_1) references exchange (id)
+    constraint trade_position_long_fk
+        foreign key (position_long_id) references local.position (id)
             on update cascade on delete set null,
-    constraint exchange_2_fk
-        foreign key (exchange_2) references exchange (id)
+    constraint trade_position_short_fk
+        foreign key (position_short_id) references local.position (id)
             on update cascade on delete set null
 );
 create unique index trade_id_uindex
@@ -78,23 +75,60 @@ create unique index trade_id_uindex
 
 create table if not exists transfer
 (
-    id                 int auto_increment,
-    pair               varchar(33)                        not null,
-    sum                decimal(26, 7)                     not null,
-    time_begin         datetime default CURRENT_TIMESTAMP not null,
-    time_end           datetime                           null,
-    exchange_sender    int                                null,
-    exchange_recipient int                                null,
-    status             tinyint  default 0                 not null,
+    id                   int auto_increment,
+    sum_each             decimal(26, 7)                     not null,
+    base_1               varchar(16)                        not null,
+    base_2               varchar(16)                        not null,
+    target_1             varchar(16)                        not null,
+    target_2             varchar(16)                        not null,
+    time_begin           datetime default CURRENT_TIMESTAMP not null,
+    time_end             datetime                           null,
+    exchange_sender_1    int                                null,
+    exchange_sender_2    int                                null,
+    exchange_recipient_1 int                                null,
+    exchange_recipient_2 int                                null,
+    status               tinyint  default 0                 not null,
     primary key (id),
-    constraint transfer_recipient_exchange_fk
-        foreign key (exchange_recipient) references exchange (id)
+    constraint transfer_recipient_exchange_1_fk
+        foreign key (exchange_recipient_1) references local.exchange (id)
             on update cascade on delete set null,
-    constraint transfer_sender_exchange_fk
-        foreign key (exchange_sender) references exchange (id)
+    constraint transfer_recipient_exchange_2_fk
+        foreign key (exchange_recipient_2) references local.exchange (id)
+            on update cascade on delete set null,
+    constraint transfer_sender_exchange_1_fk
+        foreign key (exchange_sender_1) references local.exchange (id)
+            on update cascade on delete set null,
+    constraint transfer_sender_exchange_2_fk
+        foreign key (exchange_sender_2) references local.exchange (id)
             on update cascade on delete set null
 )
-    comment 'table representing cryptocurrency transfers between exchanges';
+    comment 'table representing cryptocurrency transfers between exchanges (2 recipients and 2 senders)';
 
 create unique index transfer_id_uindex
     on transfer (id);
+
+create table if not exists position
+(
+    id               int auto_increment,
+    base             varchar(16)              not null,
+    target           varchar(16)              not null,
+    side             tinyint                  not null,
+    pnl_usd          decimal(26, 7) default 0 not null,
+    pnl_currency     decimal(26, 7) default 0 not null,
+    pnl_min_usd      decimal(26, 7) default 0 not null,
+    pnl_min_currency decimal(26, 7) default 0 not null,
+    expenses_usd     decimal(20, 7) default 0 not null,
+    open_price       decimal(20, 7)           not null,
+    close_price_usd  decimal(20, 7)           null,
+    close_price      decimal(20, 7)           null,
+    open_price_usd   decimal(20, 7)           not null,
+    exchange_id      int                      null,
+    primary key (id),
+    constraint position_exchange_fk
+        foreign key (exchange_id) references exchange (id)
+            on update cascade on delete set null
+)
+    comment 'exchange-specific position';
+
+create unique index position_id_uindex
+    on position (id);

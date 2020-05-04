@@ -3,6 +3,7 @@ package my.dub.dlp_pilot.service.impl;
 import com.litesoftwares.coingecko.domain.Exchanges.ExchangesTickersById;
 import com.litesoftwares.coingecko.impl.CoinGeckoApiClientImpl;
 import lombok.extern.slf4j.Slf4j;
+import my.dub.dlp_pilot.Constants;
 import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.Ticker;
 import my.dub.dlp_pilot.repository.TickerRepository;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -37,11 +39,11 @@ public class TickerServiceImpl implements TickerService {
     }
 
     @Transactional
-    public void save(Collection<Ticker> tickers) {
+    public Iterable<Ticker> save(Collection<Ticker> tickers) {
         if (CollectionUtils.isEmpty(tickers)) {
-            return;
+            return Collections.emptyList();
         }
-        tickerRepository.saveAll(tickers);
+        return tickerRepository.saveAll(tickers);
     }
 
     @Transactional
@@ -68,6 +70,37 @@ public class TickerServiceImpl implements TickerService {
         catch (Exception e) {
             log.error(e.getMessage());
         }
+    }
+
+    @Override
+    public boolean isPairEquivalent(String baseOriginal, String targetOriginal, String baseCompared,
+                                    String targetCompared) {
+        if (StringUtils.isEmpty(baseOriginal) || StringUtils.isEmpty(targetOriginal) ||
+                StringUtils.isEmpty(baseCompared) || StringUtils.isEmpty(targetCompared)) {
+            return false;
+        }
+        List<String> baseSynonyms = getSymbolSynonyms(baseOriginal);
+        List<String> targetSynonyms = getSymbolSynonyms(targetOriginal);
+        return baseSynonyms.contains(baseCompared) && targetSynonyms.contains(targetCompared);
+    }
+
+    private List<String> getSymbolSynonyms(String symbol) {
+        if (Constants.BITCOIN_SYMBOLS.contains(symbol)) {
+            return Constants.BITCOIN_SYMBOLS;
+        }
+        if (Constants.USD_SYMBOLS.contains(symbol)) {
+            return Constants.USD_SYMBOLS;
+        }
+        if (Constants.BITCOIN_CASH_SYMBOLS.contains(symbol)) {
+            return Constants.BITCOIN_CASH_SYMBOLS;
+        }
+        if (Constants.BITCOIN_SV_SYMBOLS.contains(symbol)) {
+            return Constants.BITCOIN_SV_SYMBOLS;
+        }
+        if (Constants.STELLAR_SYMBOLS.contains(symbol)) {
+            return Constants.STELLAR_SYMBOLS;
+        }
+        return List.of(symbol);
     }
 
     private List<Ticker> getUniqueTickers(Long exchangeId, List<Ticker> tickers) {
@@ -106,7 +139,7 @@ public class TickerServiceImpl implements TickerService {
             ticker.setPriceBtc(getPriceDecimal(convertedPrice.get("btc")));
             ticker.setPriceUsd(getPriceDecimal(convertedPrice.get("usd")));
             ticker.setSpreadPercentage(getPercentageDecimal(externalTicker.getBidAskSpreadPercentage()));
-            ticker.setTime(DateUtils.getUTCLocalDateTimeFromString(externalTicker.getTimestamp()));
+            ticker.setTime(DateUtils.getDateTime(externalTicker.getTimestamp()));
             ticker.setAnomaly(externalTicker.isAnomaly());
             ticker.setStale(externalTicker.isStale());
             return ticker;

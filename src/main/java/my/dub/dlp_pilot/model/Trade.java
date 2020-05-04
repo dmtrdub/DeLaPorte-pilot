@@ -7,8 +7,9 @@ import lombok.NoArgsConstructor;
 import javax.persistence.*;
 import javax.validation.constraints.Digits;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 
+import static my.dub.dlp_pilot.Constants.AMOUNT_SCALE;
 import static my.dub.dlp_pilot.Constants.PRICE_SCALE;
 
 @Data
@@ -22,8 +23,9 @@ public class Trade {
     @EqualsAndHashCode.Exclude
     private Long id;
 
-    @Column(nullable = false, length = 33)
-    private String pair;
+    @Column(precision = 26, scale = AMOUNT_SCALE, columnDefinition = "default 0")
+    @Digits(integer = 19, fraction = AMOUNT_SCALE)
+    private BigDecimal amount;
 
     @Column(name = "pnl_currency", nullable = false, precision = 26, scale = PRICE_SCALE)
     @Digits(integer = 19, fraction = PRICE_SCALE)
@@ -33,49 +35,57 @@ public class Trade {
     @Digits(integer = 19, fraction = PRICE_SCALE)
     private BigDecimal pnlUsd;
 
-    @Column(name = "pnl_min_currency", nullable = false, precision = 26, scale = PRICE_SCALE)
+    @Column(name = "pnl_min_currency", precision = 26, scale = PRICE_SCALE)
     @Digits(integer = 19, fraction = PRICE_SCALE)
     private BigDecimal pnlMin;
 
-    @Column(name = "pnl_min_usd", nullable = false, precision = 26, scale = PRICE_SCALE)
+    @Column(name = "pnl_min_usd", precision = 26, scale = PRICE_SCALE)
     @Digits(integer = 19, fraction = PRICE_SCALE)
     private BigDecimal pnlMinUsd;
-
-    @Column(name = "time_start", columnDefinition = "default CURRENT_TIMESTAMP")
-    private LocalDateTime startTime;
-
-    @Column(name = "time_end", columnDefinition = "default CURRENT_TIMESTAMP")
-    private LocalDateTime endTime;
-
-    @Column(name = "expenses_currency", nullable = false, precision = 20, scale = PRICE_SCALE)
-    @Digits(integer = 12, fraction = PRICE_SCALE)
-    private BigDecimal expenses;
 
     @Column(name = "expenses_usd", nullable = false, precision = 20, scale = PRICE_SCALE)
     @Digits(integer = 13, fraction = PRICE_SCALE)
     private BigDecimal expensesUsd;
 
-    @Column(name = "open_price_1", nullable = false, precision = 20, scale = PRICE_SCALE)
-    @Digits(integer = 13, fraction = PRICE_SCALE)
-    private BigDecimal openPrice1;
+    @Column(name = "time_start", columnDefinition = "default CURRENT_TIMESTAMP")
+    private ZonedDateTime startTime;
 
-    @Column(name = "open_price_2", nullable = false, precision = 20, scale = PRICE_SCALE)
-    @Digits(integer = 13, fraction = PRICE_SCALE)
-    private BigDecimal openPrice2;
+    @Column(name = "time_end", columnDefinition = "default CURRENT_TIMESTAMP")
+    private ZonedDateTime endTime;
 
-    @Column(name = "close_price_1", precision = 20, scale = PRICE_SCALE)
-    @Digits(integer = 13, fraction = PRICE_SCALE)
-    private BigDecimal closePrice1;
+    @Enumerated(EnumType.ORDINAL)
+    @Column(name = "result_type", nullable = false, columnDefinition = "default 0")
+    private TradeResultType resultType;
 
-    @Column(name = "close_price_2", precision = 20, scale = PRICE_SCALE)
-    @Digits(integer = 13, fraction = PRICE_SCALE)
-    private BigDecimal closePrice2;
+    //pnlUsd-expensesUsd at the end of trade
+    @Column(name = "total_income", nullable = false, precision = 26, scale = PRICE_SCALE)
+    @Digits(integer = 19, fraction = PRICE_SCALE)
+    private BigDecimal totalIncome;
 
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "exchange_1", nullable = false)
-    private Exchange exchange1;
+    @OneToOne(optional = false)
+    @JoinColumn(name = "position_short_id")
+    private Position positionShort;
 
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "exchange_2", nullable = false)
-    private Exchange exchange2;
+    @OneToOne(optional = false)
+    @JoinColumn(name = "position_long_id")
+    private Position positionLong;
+
+    public void setPositions(Position shortPosition, Position longPosition) {
+        positionShort = shortPosition;
+        positionLong = longPosition;
+    }
+
+    public void addExpensesUsd(BigDecimal addedExpenses) {
+        if (expensesUsd == null || addedExpenses == null) {
+            return;
+        }
+        expensesUsd = expensesUsd.add(addedExpenses);
+    }
+
+    public BigDecimal getWithdrawFeesTotal() {
+        if (positionShort == null || positionLong == null) {
+            return BigDecimal.ZERO;
+        }
+        return positionShort.getExchange().getWithdrawFeeUsd().add(positionLong.getExchange().getWithdrawFeeUsd());
+    }
 }

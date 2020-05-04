@@ -45,4 +45,19 @@ public final class NumberUtils {
         BigDecimal noTrailZerosDecimal = decimal.stripTrailingZeros();
         return noTrailZerosDecimal.precision() - noTrailZerosDecimal.scale();
     }
+
+    public static BigDecimal getPercentResult(double target, BigDecimal percentage) {
+        if (target == 0 || percentage == null) {
+            return BigDecimal.ZERO;
+        }
+        return percentage.divide(BigDecimal.valueOf(100)).multiply(BigDecimal.valueOf(target));
+    }
+
+    public static BigDecimal getPercentResult(double target, double percentage) {
+        return BigDecimal.valueOf(percentage).divide(BigDecimal.valueOf(100)).multiply(BigDecimal.valueOf(target));
+    }
+
+    public static BigDecimal getPercentResult(BigDecimal target, BigDecimal percentage) {
+        return percentage.divide(BigDecimal.valueOf(100)).multiply(target);
+    }
 }

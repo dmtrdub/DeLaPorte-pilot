@@ -8,7 +8,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Scope;
 import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
-import org.springframework.scheduling.support.TaskUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
@@ -30,13 +29,15 @@ public class ScheduledService implements InitializingBean {
 
     private final ExchangeService exchangeService;
     private final TickerService tickerService;
+    private final TransferService transferService;
     private final TradeService tradeService;
 
     @Autowired
     public ScheduledService(ExchangeService exchangeService, TickerService tickerService,
-                            TradeService tradeService) {
+                            TransferService transferService, TradeService tradeService) {
         this.exchangeService = exchangeService;
         this.tickerService = tickerService;
+        this.transferService = transferService;
         this.tradeService = tradeService;
     }
 
@@ -57,14 +58,18 @@ public class ScheduledService implements InitializingBean {
         ThreadPoolTaskScheduler taskScheduler = new ThreadPoolTaskScheduler();
         taskScheduler.setPoolSize(exchangesCount + 1);
         taskScheduler.setThreadNamePrefix("trade_schedule-");
-        taskScheduler.setErrorHandler(TaskUtils.LOG_AND_SUPPRESS_ERROR_HANDLER);
+        //FIXME disabled for debugging purposes
+        //taskScheduler.setErrorHandler(TaskUtils.LOG_AND_SUPPRESS_ERROR_HANDLER);
         taskScheduler.initialize();
         for (Exchange exchange : exchanges) {
             taskScheduler
                     .scheduleWithFixedDelay(() -> tickerService.fetchMarketData(exchange), Duration.ofSeconds(60));
         }
         taskScheduler
-                .scheduleWithFixedDelay(tradeService::trade, Instant.now().plusMillis(5000), Duration.ofSeconds(60));
+                .scheduleWithFixedDelay(() -> {
+                    transferService.handleTradeOpportunities();
+                    tradeService.trade();
+                }, Instant.now().plusMillis(5000), Duration.ofSeconds(60));
     }
 
     private int setPagesRequestPerMin(Collection<Exchange> exchanges) {
