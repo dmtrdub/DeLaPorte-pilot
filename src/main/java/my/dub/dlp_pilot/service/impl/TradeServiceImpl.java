@@ -3,7 +3,7 @@ package my.dub.dlp_pilot.service.impl;
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.model.*;
 import my.dub.dlp_pilot.repository.TradeRepository;
-import my.dub.dlp_pilot.repository.container.TickerContainer;
+import my.dub.dlp_pilot.service.TickerService;
 import my.dub.dlp_pilot.service.TradeService;
 import my.dub.dlp_pilot.service.TransferService;
 import my.dub.dlp_pilot.util.DateUtils;
@@ -41,14 +41,14 @@ public class TradeServiceImpl implements TradeService, InitializingBean {
     private BigDecimal exitSumUsd;
 
     private final TradeRepository repository;
-    private final TickerContainer container;
+    private final TickerService tickerService;
     private final TransferService transferService;
 
     @Autowired
-    public TradeServiceImpl(TradeRepository repository, TickerContainer container,
-                            TransferService transferService) {
+    public TradeServiceImpl(TradeRepository repository,
+                            TickerService tickerService, TransferService transferService) {
         this.repository = repository;
-        this.container = container;
+        this.tickerService = tickerService;
         this.transferService = transferService;
     }
 
@@ -105,14 +105,15 @@ public class TradeServiceImpl implements TradeService, InitializingBean {
             Trade trade = new Trade();
             ZonedDateTime currentDateTime = DateUtils.currentDateTime();
             trade.setStartTime(currentDateTime);
-            Ticker ticker1 = container.getTicker(recipient1.getId(), transfer.getBase1(), transfer.getTarget1())
+            Ticker ticker1 = tickerService.getTicker(recipient1.getId(), transfer.getBase1(), transfer.getTarget1())
                     .orElseThrow(() -> new AssertionError("Ticker in container is null!"));
-            Ticker ticker2 = container.getTicker(recipient2.getId(), transfer.getBase2(), transfer.getTarget2())
+            Ticker ticker2 = tickerService.getTicker(recipient2.getId(), transfer.getBase2(), transfer.getTarget2())
                     .orElseThrow(() -> new AssertionError("Ticker in container is null!"));
             BigDecimal priceUsd1 = ticker1.getPriceUsd();
             BigDecimal priceUsd2 = ticker2.getPriceUsd();
             BigDecimal amount = calculateAmount(priceUsd1, priceUsd2, exchangeDepositSumUsd);
-            if (isEntryProfitable(ticker1, ticker2, amount, exchangeDepositSumUsd, entrySumUsd)) {
+            if (isEntryProfitable(ticker1, ticker2, amount, exchangeDepositSumUsd, entrySumUsd) &&
+                    tickersSafe(ticker1, ticker2)) {
                 BigDecimal expenses =
                         calculateInitialTradeFeesUsd(recipient1, recipient2, exchangeDepositSumUsd);
                 trade.setExpensesUsd(expenses);
@@ -139,6 +140,11 @@ public class TradeServiceImpl implements TradeService, InitializingBean {
         }
         transferService.save(endingTransfers);
         save(newTrades);
+    }
+
+    private boolean tickersSafe(Ticker ticker1, Ticker ticker2) {
+        return ticker1 != null && !(ticker1.isStale() && ticker1.isAnomaly()) && ticker2 != null &&
+                !(ticker2.isStale() && ticker2.isAnomaly());
     }
 
     private boolean canExitTrade(Trade trade) {
@@ -170,9 +176,9 @@ public class TradeServiceImpl implements TradeService, InitializingBean {
     private void closeTrade(Trade trade, TradeResultType resultType) {
         Position positionShort = trade.getPositionShort();
         Position positionLong = trade.getPositionLong();
-        Ticker tickerShort = container
+        Ticker tickerShort = tickerService
                 .getTicker(positionShort).orElseThrow(() -> new AssertionError("Ticker in container is null!"));
-        Ticker tickerLong = container
+        Ticker tickerLong = tickerService
                 .getTicker(positionLong).orElseThrow(() -> new AssertionError("Ticker in container is null!"));
         recalculatePnl(trade, tickerShort, tickerLong);
         BigDecimal priceShort = tickerShort.getPrice();
@@ -204,10 +210,10 @@ public class TradeServiceImpl implements TradeService, InitializingBean {
     }
 
     private void recalculatePnl(Trade trade) {
-        Ticker tickerShort = container
+        Ticker tickerShort = tickerService
                 .getTicker(trade, PositionSide.SHORT)
                 .orElseThrow(() -> new AssertionError("Ticker in container is null!"));
-        Ticker tickerLong = container
+        Ticker tickerLong = tickerService
                 .getTicker(trade, PositionSide.LONG)
                 .orElseThrow(() -> new AssertionError("Ticker in container is null!"));
         recalculatePnl(trade, tickerShort, tickerLong);

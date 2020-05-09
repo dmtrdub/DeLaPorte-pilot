@@ -4,8 +4,7 @@ import com.litesoftwares.coingecko.domain.Exchanges.ExchangesTickersById;
 import com.litesoftwares.coingecko.impl.CoinGeckoApiClientImpl;
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.Constants;
-import my.dub.dlp_pilot.model.Exchange;
-import my.dub.dlp_pilot.model.Ticker;
+import my.dub.dlp_pilot.model.*;
 import my.dub.dlp_pilot.repository.TickerRepository;
 import my.dub.dlp_pilot.repository.container.TickerContainer;
 import my.dub.dlp_pilot.service.TickerService;
@@ -39,6 +38,7 @@ public class TickerServiceImpl implements TickerService {
     }
 
     @Transactional
+    @Override
     public Iterable<Ticker> save(Collection<Ticker> tickers) {
         if (CollectionUtils.isEmpty(tickers)) {
             return Collections.emptyList();
@@ -47,14 +47,16 @@ public class TickerServiceImpl implements TickerService {
     }
 
     @Transactional
+    @Override
     public void saveAndUpdateLocal(Collection<Ticker> tickers, long exchangeId) {
         if (CollectionUtils.isEmpty(tickers)) {
             return;
         }
         tickerRepository.saveAll(tickers);
-        updateLocalContainer(exchangeId, tickers);
+        tickerContainer.updateTickers(exchangeId, tickers);
     }
 
+    @Override
     public void fetchMarketData(Exchange exchange) {
         Assert.notNull(exchange, "Exchange cannot be null!");
         try {
@@ -84,6 +86,31 @@ public class TickerServiceImpl implements TickerService {
         return baseSynonyms.contains(baseCompared) && targetSynonyms.contains(targetCompared);
     }
 
+    @Override
+    public Set<Ticker> getTickers(Long exchangeId) {
+        return tickerContainer.getTickers(exchangeId);
+    }
+
+    @Override
+    public Optional<Ticker> getTicker(Long exchangeId, String base, String target) {
+        return tickerContainer.getTicker(exchangeId, base, target);
+    }
+
+    @Override
+    public Optional<Ticker> getTicker(Trade trade, PositionSide side) {
+        return tickerContainer.getTicker(trade, side);
+    }
+
+    @Override
+    public Optional<Ticker> getTicker(Position position) {
+        return tickerContainer.getTicker(position);
+    }
+
+    @Override
+    public Map<Long, Set<Ticker>> getExchangeIDTickersMap() {
+        return tickerContainer.getExchangeIDTickersMap();
+    }
+
     private List<String> getSymbolSynonyms(String symbol) {
         if (Constants.BITCOIN_SYMBOLS.contains(symbol)) {
             return Constants.BITCOIN_SYMBOLS;
@@ -107,7 +134,7 @@ public class TickerServiceImpl implements TickerService {
         if (CollectionUtils.isEmpty(tickers)) {
             return Collections.emptyList();
         }
-        List<Ticker> cachedTickers = tickerContainer.getTickers(exchangeId);
+        Set<Ticker> cachedTickers = tickerContainer.getTickers(exchangeId);
         if (CollectionUtils.isEmpty(cachedTickers)) {
             tickerContainer.addTickers(exchangeId, tickers);
             return tickers;
@@ -116,11 +143,6 @@ public class TickerServiceImpl implements TickerService {
         result.removeAll(cachedTickers);
         return result;
     }
-
-    private void updateLocalContainer(Long exchangeId, Collection<Ticker> tickers) {
-        tickerContainer.updateTickers(exchangeId, tickers);
-    }
-
 
     private List<Ticker> convertToTickers(Exchange exchange, List<ExchangesTickersById> tickersById) {
         List<com.litesoftwares.coingecko.domain.Shared.Ticker> rawTickers =

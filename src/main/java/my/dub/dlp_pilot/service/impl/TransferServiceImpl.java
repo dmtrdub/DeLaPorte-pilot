@@ -4,10 +4,10 @@ import my.dub.dlp_pilot.model.Ticker;
 import my.dub.dlp_pilot.model.Transfer;
 import my.dub.dlp_pilot.model.TransferStatus;
 import my.dub.dlp_pilot.repository.TransferRepository;
-import my.dub.dlp_pilot.repository.container.TickerContainer;
 import my.dub.dlp_pilot.service.TickerService;
 import my.dub.dlp_pilot.service.TransferService;
 import my.dub.dlp_pilot.util.Calculations;
+import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,18 +30,18 @@ public class TransferServiceImpl implements TransferService, InitializingBean {
     private double exchangeDepositSumUsd;
     @Value("${trade_entry_diff_percentage}")
     private double entryPercentage;
+    @Value("${trade_ticker_max_difference_seconds}")
+    private int tickersTimeMaxDifferenceSeconds;
 
     private BigDecimal entrySumUsd;
 
     private final TransferRepository repository;
-    private final TickerContainer container;
     private final TickerService tickerService;
 
     @Autowired
     public TransferServiceImpl(TransferRepository repository,
-                               TickerContainer container, TickerService tickerService) {
+                               TickerService tickerService) {
         this.repository = repository;
-        this.container = container;
         this.tickerService = tickerService;
     }
 
@@ -89,13 +89,13 @@ public class TransferServiceImpl implements TransferService, InitializingBean {
     }
 
     @Override
-    public void handleTradeOpportunities() {
-        Map<Long, List<Ticker>> tickersMap = container.getExchangeIDTickersMap();
-        Iterator<List<Ticker>> iterator = tickersMap.values().iterator();
+    public void createTransfers() {
+        Map<Long, Set<Ticker>> tickersMap = tickerService.getExchangeIDTickersMap();
+        Iterator<Set<Ticker>> iterator = tickersMap.values().iterator();
         Set<Transfer> transfers = new HashSet<>();
         while (iterator.hasNext()) {
-            List<Ticker> next = iterator.next();
-            for (List<Ticker> value : tickersMap.values()) {
+            Set<Ticker> next = iterator.next();
+            for (Set<Ticker> value : tickersMap.values()) {
                 if (next.equals(value)) {
                     continue;
                 }
@@ -105,13 +105,27 @@ public class TransferServiceImpl implements TransferService, InitializingBean {
         save(transfers);
     }
 
+    //TODO: fix concurrency exception
     private List<Transfer> compareExchangeTickers(Collection<Ticker> tickersExchange1,
                                                   Collection<Ticker> tickersExchange2) {
         List<Transfer> transfers = new ArrayList<>();
-        tickersExchange1.forEach(ticker -> tickersExchange2.stream().filter(ticker2 -> tickerService
-                .isPairEquivalent(ticker.getBase(), ticker.getTarget(), ticker2.getBase(), ticker2.getTarget()) &&
-                Calculations.isEntryProfitable(ticker, ticker2, exchangeDepositSumUsd, entrySumUsd))
-                .forEach(result2 -> transfers.add(create(ticker, result2))));
+        for (Ticker ticker : tickersExchange1) {
+            tickersExchange2.stream().filter(ticker2 -> canBeCompared(ticker, ticker2))
+                    .forEach(result2 -> transfers.add(create(ticker, result2)));
+        }
         return transfers;
+    }
+
+    private boolean canBeCompared(Ticker ticker, Ticker ticker2) {
+        return tickerService
+                .isPairEquivalent(ticker.getBase(), ticker.getTarget(), ticker2.getBase(), ticker2.getTarget()) &&
+                tickersSafe(ticker, ticker2) &&
+                Calculations.isEntryProfitable(ticker, ticker2, exchangeDepositSumUsd, entrySumUsd) && DateUtils
+                .durationSeconds(ticker.getTime(), ticker2.getTime()) <= tickersTimeMaxDifferenceSeconds;
+    }
+
+    private boolean tickersSafe(Ticker ticker1, Ticker ticker2) {
+        return ticker1 != null && !(ticker1.isStale() && ticker1.isAnomaly()) && ticker2 != null &&
+                !(ticker2.isStale() && ticker2.isAnomaly());
     }
 }

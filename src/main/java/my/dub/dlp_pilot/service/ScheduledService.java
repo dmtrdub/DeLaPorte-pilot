@@ -67,7 +67,7 @@ public class ScheduledService implements InitializingBean {
         }
         taskScheduler
                 .scheduleWithFixedDelay(() -> {
-                    transferService.handleTradeOpportunities();
+                    transferService.createTransfers();
                     tradeService.trade();
                 }, Instant.now().plusMillis(5000), Duration.ofSeconds(60));
     }

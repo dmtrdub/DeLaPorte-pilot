@@ -15,25 +15,25 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component
 public class TickerContainer {
-    private Map<Long, List<Ticker>> tickersMap = new ConcurrentHashMap<>();
+    private Map<Long, Set<Ticker>> tickersMap = new ConcurrentHashMap<>();
 
-    public List<Ticker> getAll() {
-        return tickersMap.values().stream().flatMap(Collection::stream).collect(Collectors.toList());
+    public Set<Ticker> getAll() {
+        return tickersMap.values().stream().flatMap(Collection::stream).collect(Collectors.toSet());
     }
 
-    public Map<Long, List<Ticker>> getExchangeIDTickersMap() {
+    public Map<Long, Set<Ticker>> getExchangeIDTickersMap() {
         return new ConcurrentHashMap<>(tickersMap);
     }
 
-    public List<Ticker> getTickers(Long exchangeId) {
+    public Set<Ticker> getTickers(Long exchangeId) {
         if (exchangeId == null) {
-            return Collections.emptyList();
+            return Collections.emptySet();
         }
-        return tickersMap.getOrDefault(exchangeId, Collections.emptyList());
+        return tickersMap.getOrDefault(exchangeId, Collections.emptySet());
     }
 
     public Optional<Ticker> getTicker(Long exchangeId, String base, String target) {
-        List<Ticker> tickers = tickersMap.get(exchangeId);
+        Set<Ticker> tickers = tickersMap.get(exchangeId);
         if (CollectionUtils.isEmpty(tickers)) {
             return Optional.empty();
         }
@@ -53,7 +53,7 @@ public class TickerContainer {
         if (position == null) {
             return Optional.empty();
         }
-        List<Ticker> tickers = tickersMap.get(position.getExchange().getId());
+        Set<Ticker> tickers = tickersMap.get(position.getExchange().getId());
         if (CollectionUtils.isEmpty(tickers)) {
             return Optional.empty();
         }
@@ -65,11 +65,11 @@ public class TickerContainer {
         if (exchangeId == null || ticker == null) {
             return;
         }
-        List<Ticker> tickerList = tickersMap.get(exchangeId);
+        Set<Ticker> tickerList = tickersMap.get(exchangeId);
         if (tickerList == null) {
-            List<Ticker> newTickerList = new ArrayList<>();
-            newTickerList.add(ticker);
-            tickersMap.put(exchangeId, newTickerList);
+            Set<Ticker> newTickerSet = new HashSet<>();
+            newTickerSet.add(ticker);
+            tickersMap.put(exchangeId, newTickerSet);
         } else {
             tickerList.add(ticker);
         }
@@ -79,9 +79,9 @@ public class TickerContainer {
         if (exchangeId == null || CollectionUtils.isEmpty(tickers)) {
             return;
         }
-        List<Ticker> tickerList = tickersMap.get(exchangeId);
+        Set<Ticker> tickerList = tickersMap.get(exchangeId);
         if (tickerList == null) {
-            tickersMap.put(exchangeId, new ArrayList<>(tickers));
+            tickersMap.put(exchangeId, new HashSet<>(tickers));
         } else {
             tickerList.addAll(tickers);
         }
@@ -91,15 +91,15 @@ public class TickerContainer {
         if (exchangeId == null || CollectionUtils.isEmpty(tickers)) {
             return;
         }
-        List<Ticker> tickerList = tickersMap.get(exchangeId);
-        if (tickerList == null) {
-            tickersMap.put(exchangeId, new ArrayList<>(tickers));
+        Set<Ticker> tickerSet = tickersMap.get(exchangeId);
+        if (tickerSet == null) {
+            tickersMap.put(exchangeId, new HashSet<>(tickers));
         } else {
-            tickers.forEach(ticker -> replaceAllIfAbsent(tickerList, ticker));
+            tickers.forEach(ticker -> replaceAllIfAbsent(tickerSet, ticker));
         }
     }
 
-    private void replaceAllIfAbsent(List<Ticker> tickerList, Ticker ticker) {
+    private void replaceAllIfAbsent(Set<Ticker> tickerList, Ticker ticker) {
         if (!tickerList.contains(ticker)) {
             List<Ticker> toRemove = tickerList.stream().filter(t -> t.getBase().equals(ticker.getBase()) &&
                     t.getTarget().equals(ticker.getTarget())).collect(Collectors.toList());

@@ -26,4 +26,11 @@ public final class DateUtils {
         }
         return Duration.between(start, end).toMinutes();
     }
+
+    public static long durationSeconds(Temporal start, Temporal end) {
+        if (start == null || end == null) {
+            return 0;
+        }
+        return Duration.between(start, end).toSeconds();
+    }
 }

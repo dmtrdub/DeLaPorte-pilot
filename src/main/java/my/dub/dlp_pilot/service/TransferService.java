@@ -13,5 +13,5 @@ public interface TransferService {
 
     Set<Transfer> findEndingTransfers();
 
-    void handleTradeOpportunities();
+    void createTransfers();
 }

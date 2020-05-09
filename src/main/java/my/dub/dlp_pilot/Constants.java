@@ -18,6 +18,4 @@ public final class Constants {
     public static final List<String> BITCOIN_CASH_SYMBOLS = List.of("BCH", "BCC");
     public static final List<String> BITCOIN_SV_SYMBOLS = List.of("BSV", "BCHSV");
 
-    public static final String PAIR_DELIMITER = "/";
-
 }
