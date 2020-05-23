@@ -12,8 +12,16 @@ public final class DateUtils {
 
     private static final ZoneOffset DEFAULT_ZONE_OFFSET = ZoneOffset.UTC;
 
-    public static ZonedDateTime getDateTime(String dateTime) {
+    public static ZonedDateTime getDateTimeFromFormattedString(String dateTime) {
         return ZonedDateTime.ofInstant(Instant.parse(dateTime), DEFAULT_ZONE_OFFSET);
+    }
+
+    public static ZonedDateTime getDateTimeFromEpoch(String epoch) {
+        return ZonedDateTime.ofInstant(Instant.ofEpochMilli(Long.parseLong(epoch)), DEFAULT_ZONE_OFFSET);
+    }
+
+    public static ZonedDateTime getDateTimeFromEpoch(long epoch) {
+        return ZonedDateTime.ofInstant(Instant.ofEpochMilli(epoch), DEFAULT_ZONE_OFFSET);
     }
 
     public static ZonedDateTime currentDateTime() {

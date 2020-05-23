@@ -3,13 +3,15 @@ package my.dub.dlp_pilot.model;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
-import lombok.ToString;
+import my.dub.dlp_pilot.model.client.Ticker;
 
 import javax.persistence.*;
 import javax.validation.constraints.Digits;
 import javax.validation.constraints.Max;
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import static my.dub.dlp_pilot.Constants.FEE_SCALE;
@@ -20,7 +22,7 @@ import static my.dub.dlp_pilot.Constants.PERCENTAGE_SCALE;
 @NoArgsConstructor
 @Entity
 @Table(name = "exchange", uniqueConstraints = {
-        @UniqueConstraint(name = "exchange_api_name_uindex", columnNames = "api_name"),
+        @UniqueConstraint(name = "exchange_base_endpoint_uindex", columnNames = "base_endpoint"),
         @UniqueConstraint(name = "exchange_name_uindex", columnNames = "name")})
 public class Exchange {
 
@@ -28,11 +30,12 @@ public class Exchange {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "api_name", nullable = false, unique = true, length = 200)
-    private String apiName;
+    @Column(name = "base_endpoint", nullable = false, unique = true, length = 400)
+    private String baseEndpoint;
 
+    @Enumerated(EnumType.STRING)
     @Column(unique = true, nullable = false, length = 200)
-    private String name;
+    private ExchangeName name;
 
     @Column(name = "deposit_fee_usd", nullable = false, precision = 11, scale = FEE_SCALE)
     @Digits(integer = 5, fraction = FEE_SCALE)
@@ -47,17 +50,20 @@ public class Exchange {
     @Max(value = 100)
     private BigDecimal takerFeePercentage;
 
-    @Column(name = "pairs_count", nullable = false, columnDefinition = "default 0")
-    private Integer pairsCount;
-
     @Column(name = "trust_score", nullable = false, columnDefinition = "default 1")
     private Integer trustScore;
 
+    @Column(name = "api_request_rate_min", nullable = false, columnDefinition = "default 1")
+    private int apiRequestsPerMin;
+
     @EqualsAndHashCode.Exclude
-    @ToString.Exclude
-    @OneToMany(fetch = FetchType.LAZY, mappedBy = "exchange")
+    @Transient
     private Set<Ticker> tickers = new HashSet<>();
 
     @Transient
-    private int pagesRequestPerMin = 1;
+    private Map<String, String> symbolAdditionalData = new HashMap<>();
+
+    public String getFullName() {
+        return name.getFullName();
+    }
 }

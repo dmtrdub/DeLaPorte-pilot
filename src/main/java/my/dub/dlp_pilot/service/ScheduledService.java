@@ -13,7 +13,6 @@ import org.springframework.util.CollectionUtils;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Collection;
 import java.util.Set;
 
 @Slf4j
@@ -29,21 +28,19 @@ public class ScheduledService implements InitializingBean {
 
     private final ExchangeService exchangeService;
     private final TickerService tickerService;
-    private final TransferService transferService;
     private final TradeService tradeService;
 
     @Autowired
     public ScheduledService(ExchangeService exchangeService, TickerService tickerService,
-                            TransferService transferService, TradeService tradeService) {
+                            TradeService tradeService) {
         this.exchangeService = exchangeService;
         this.tickerService = tickerService;
-        this.transferService = transferService;
         this.tradeService = tradeService;
     }
 
     @Override
     public void afterPropertiesSet() {
-        start();
+        //start();
     }
 
     private void start() {
@@ -51,9 +48,6 @@ public class ScheduledService implements InitializingBean {
         if (CollectionUtils.isEmpty(exchanges)) {
             throw new IllegalArgumentException("There are no exchanges to work with!");
         }
-        int totalRequestsPerMin = setPagesRequestPerMin(exchanges);
-        log.info("Established retriever rate: {} calls/min. API limit: {} calls/min", totalRequestsPerMin,
-                 apiLimitPerMin);
         int exchangesCount = exchanges.size();
         ThreadPoolTaskScheduler taskScheduler = new ThreadPoolTaskScheduler();
         taskScheduler.setPoolSize(exchangesCount + 1);
@@ -66,33 +60,6 @@ public class ScheduledService implements InitializingBean {
                     .scheduleWithFixedDelay(() -> tickerService.fetchMarketData(exchange), Duration.ofSeconds(60));
         }
         taskScheduler
-                .scheduleWithFixedDelay(() -> {
-                    transferService.createTransfers();
-                    tradeService.trade();
-                }, Instant.now().plusMillis(5000), Duration.ofSeconds(60));
-    }
-
-    private int setPagesRequestPerMin(Collection<Exchange> exchanges) {
-        int totalRequests = 0;
-        for (Exchange exchange : exchanges) {
-            double pagesRequestCount = Math.ceil(exchange.getPairsCount() * 1.0d / apiRequestPageSize);
-            totalRequests += pagesRequestCount;
-            exchange.setPagesRequestPerMin((int) pagesRequestCount);
-        }
-        if (totalRequests > apiLimitPerMin) {
-            int countSinglePageRequest = Math.toIntExact(
-                    exchanges.stream().filter(exchange -> exchange.getPagesRequestPerMin() == 1).count());
-            int pageRequests = (apiLimitPerMin - countSinglePageRequest) / (exchanges.size() - countSinglePageRequest);
-            if (pageRequests < 1) {
-                throw new IllegalStateException("Exclude some exchanges to comply with API limit!");
-            }
-            totalRequests = ((exchanges.size() - countSinglePageRequest) * pageRequests) + countSinglePageRequest;
-            exchanges.forEach(exchange -> {
-                if (exchange.getPagesRequestPerMin() != 1) {
-                    exchange.setPagesRequestPerMin(pageRequests);
-                }
-            });
-        }
-        return totalRequests;
+                .scheduleWithFixedDelay(tradeService::trade, Instant.now().plusMillis(5000), Duration.ofSeconds(60));
     }
 }
