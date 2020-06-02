@@ -1,29 +1,30 @@
 package my.dub.dlp_pilot.service;
 
-import my.dub.dlp_pilot.model.*;
+import my.dub.dlp_pilot.model.Exchange;
+import my.dub.dlp_pilot.model.ExchangeName;
+import my.dub.dlp_pilot.model.Position;
+import my.dub.dlp_pilot.model.client.Ticker;
 
+import java.math.BigDecimal;
 import java.util.Collection;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
 public interface TickerService {
 
-    Iterable<Ticker> save(Collection<Ticker> tickers);
+    void fetchAndSave(Exchange exchange);
 
-    void saveAndUpdateLocal(Collection<Ticker> tickers, long exchangeId);
+    void save(ExchangeName exchangeName, Collection<Ticker> tickers);
 
-    void fetchMarketData(Exchange exchange);
+    boolean checkStale(Ticker ticker);
 
-    boolean isPairEquivalent(String baseOriginal, String targetOriginal, String baseCompared, String targetCompared);
+    Set<Ticker> getTickers(ExchangeName exchangeName);
 
-    Set<Ticker> getTickers(Long exchangeId);
-
-    Optional<Ticker> getTicker(Long exchangeId, String base, String target);
-
-    Optional<Ticker> getTicker(Trade trade, PositionSide side);
+    Set<Ticker> getAllTickers();
 
     Optional<Ticker> getTicker(Position position);
 
-    Map<Long, Set<Ticker>> getExchangeIDTickersMap();
+    Ticker findEquivalentTickerFromSet(Ticker originalTicker, Set<Ticker> tickerSet);
+
+    BigDecimal getUsdPrice(String base, ExchangeName exchangeName);
 }

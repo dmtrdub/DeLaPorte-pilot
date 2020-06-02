@@ -3,6 +3,7 @@ package my.dub.dlp_pilot.model;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import my.dub.dlp_pilot.Constants;
 
 import javax.persistence.*;
 import javax.validation.constraints.Digits;
@@ -31,39 +32,40 @@ public class Position {
     @Column(nullable = false)
     private PositionSide side;
 
-    @Column(name = "pnl_currency", nullable = false, precision = 26, scale = PRICE_SCALE, columnDefinition = "default 0")
-    @Digits(integer = 19, fraction = PRICE_SCALE)
-    private BigDecimal pnl;
-
-    @Column(name = "pnl_usd", nullable = false, precision = 26, scale = PRICE_SCALE, columnDefinition = "default 0")
-    @Digits(integer = 19, fraction = PRICE_SCALE)
-    private BigDecimal pnlUsd;
-
-    @Column(name = "pnl_min_currency", nullable = false, precision = 26, scale = PRICE_SCALE, columnDefinition = "default 0")
-    @Digits(integer = 19, fraction = PRICE_SCALE)
-    private BigDecimal pnlMin;
-
-    @Column(name = "pnl_min_usd", nullable = false, precision = 26, scale = PRICE_SCALE, columnDefinition = "default 0")
-    @Digits(integer = 19, fraction = PRICE_SCALE)
-    private BigDecimal pnlMinUsd;
-
-    @Column(name = "open_price", nullable = false, precision = 20, scale = PRICE_SCALE, columnDefinition = "default 0")
+    @Column(name = "open_price", nullable = false, precision = 25, scale = PRICE_SCALE, columnDefinition = "default 0")
     @Digits(integer = 13, fraction = PRICE_SCALE)
     private BigDecimal openPrice;
 
-    @Column(name = "open_price_usd", nullable = false, precision = 20, scale = PRICE_SCALE, columnDefinition = "default 0")
+    @Column(name = "open_price_usd", nullable = false, precision = 25, scale = PRICE_SCALE, columnDefinition = "default 0")
     @Digits(integer = 13, fraction = PRICE_SCALE)
     private BigDecimal openPriceUsd;
 
-    @Column(name = "close_price", precision = 20, scale = PRICE_SCALE, columnDefinition = "default 0")
+    @Column(name = "close_price", precision = 25, scale = PRICE_SCALE, columnDefinition = "default 0")
     @Digits(integer = 13, fraction = PRICE_SCALE)
     private BigDecimal closePrice;
 
-    @Column(name = "close_price_usd", precision = 20, scale = PRICE_SCALE, columnDefinition = "default 0")
+    @Column(name = "close_price_usd", precision = 25, scale = PRICE_SCALE, columnDefinition = "default 0")
     @Digits(integer = 13, fraction = PRICE_SCALE)
     private BigDecimal closePriceUsd;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "exchange_id")
     private Exchange exchange;
+
+    public boolean isSimilar(Position otherPosition) {
+        if (otherPosition == null) return false;
+        if (this == otherPosition) return true;
+        if (!base.equals(otherPosition.base)) return false;
+        if (!target.equals(otherPosition.target)) return false;
+        if(!exchange.getName().equals(otherPosition.exchange.getName())) return false;
+        return side == otherPosition.side;
+    }
+
+    public String toShortString() {
+        String closePrices =
+                closePrice != null ? ", closePrice=" + closePrice + ", closePriceUsd=" + closePriceUsd : "";
+        return "Position{" + "symbol='" + base + Constants.DEFAULT_PAIR_DELIMITER + target + "', openPrice=" +
+                openPrice + ", openPriceUsd=" + openPriceUsd + closePrices + ", exchange=" + exchange.getFullName() +
+                '}';
+    }
 }

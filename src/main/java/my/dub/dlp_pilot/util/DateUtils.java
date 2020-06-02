@@ -35,6 +35,20 @@ public final class DateUtils {
         return Duration.between(start, end).toMinutes();
     }
 
+    public static long durationMinutes(Temporal start) {
+        if (start == null) {
+            return 0;
+        }
+        return Duration.between(start, currentDateTime()).toMinutes();
+    }
+
+    public static long durationSeconds(Temporal start) {
+        if (start == null) {
+            return 0;
+        }
+        return Duration.between(start, currentDateTime()).toSeconds();
+    }
+
     public static long durationSeconds(Temporal start, Temporal end) {
         if (start == null || end == null) {
             return 0;

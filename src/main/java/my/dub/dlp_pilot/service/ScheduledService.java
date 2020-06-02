@@ -20,15 +20,12 @@ import java.util.Set;
 @Scope(proxyMode = ScopedProxyMode.TARGET_CLASS)
 public class ScheduledService implements InitializingBean {
 
-    @Value("${market_data_api_limit_per_min}")
-    private int apiLimitPerMin;
-
-    @Value("${market_data_api_request_page_size}")
-    private int apiRequestPageSize;
-
     private final ExchangeService exchangeService;
     private final TickerService tickerService;
     private final TradeService tradeService;
+
+    @Value("${init_trade_delay_ms}")
+    private long initDelayMs;
 
     @Autowired
     public ScheduledService(ExchangeService exchangeService, TickerService tickerService,
@@ -40,7 +37,7 @@ public class ScheduledService implements InitializingBean {
 
     @Override
     public void afterPropertiesSet() {
-        //start();
+        start();
     }
 
     private void start() {
@@ -50,16 +47,26 @@ public class ScheduledService implements InitializingBean {
         }
         int exchangesCount = exchanges.size();
         ThreadPoolTaskScheduler taskScheduler = new ThreadPoolTaskScheduler();
-        taskScheduler.setPoolSize(exchangesCount + 1);
-        taskScheduler.setThreadNamePrefix("trade_schedule-");
-        //FIXME disabled for debugging purposes
+        taskScheduler.setPoolSize(exchangesCount);
+        taskScheduler.setThreadNamePrefix("scheduled-");
+        //FIXME: disabled for debugging purposes
         //taskScheduler.setErrorHandler(TaskUtils.LOG_AND_SUPPRESS_ERROR_HANDLER);
         taskScheduler.initialize();
-        for (Exchange exchange : exchanges) {
-            taskScheduler
-                    .scheduleWithFixedDelay(() -> tickerService.fetchMarketData(exchange), Duration.ofSeconds(60));
-        }
-        taskScheduler
-                .scheduleWithFixedDelay(tradeService::trade, Instant.now().plusMillis(5000), Duration.ofSeconds(60));
+        exchanges.forEach(exchange -> {
+            int delayMillis = calculateFixedDelayInMillis(exchange);
+            log.info("Fixed Operation delay set to {} ms for {} exchange", delayMillis, exchange.getFullName());
+            taskScheduler.scheduleWithFixedDelay(() -> run(exchange), Instant.now().plusMillis(initDelayMs),
+                                                 Duration.ofMillis(delayMillis));
+        });
+    }
+
+    private void run(Exchange exchange) {
+        tickerService.fetchAndSave(exchange);
+        tradeService.searchForTrades(exchange);
+        tradeService.handleTrades(exchange.getName());
+    }
+
+    private int calculateFixedDelayInMillis(Exchange exchange) {
+        return 60000 / exchange.getApiRequestsPerMin();
     }
 }

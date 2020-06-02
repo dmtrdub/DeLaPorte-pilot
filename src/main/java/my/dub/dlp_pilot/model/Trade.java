@@ -9,8 +9,7 @@ import javax.validation.constraints.Digits;
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 
-import static my.dub.dlp_pilot.Constants.AMOUNT_SCALE;
-import static my.dub.dlp_pilot.Constants.PRICE_SCALE;
+import static my.dub.dlp_pilot.Constants.*;
 
 @Data
 @NoArgsConstructor
@@ -27,23 +26,15 @@ public class Trade {
     @Digits(integer = 19, fraction = AMOUNT_SCALE)
     private BigDecimal amount;
 
-    @Column(name = "pnl_currency", nullable = false, precision = 26, scale = PRICE_SCALE)
+    @Column(name = "pnl_currency", nullable = false, precision = 31, scale = PRICE_SCALE)
     @Digits(integer = 19, fraction = PRICE_SCALE)
     private BigDecimal pnl;
 
-    @Column(name = "pnl_usd", nullable = false, precision = 26, scale = PRICE_SCALE)
+    @Column(name = "pnl_usd", nullable = false, precision = 31, scale = PRICE_SCALE)
     @Digits(integer = 19, fraction = PRICE_SCALE)
     private BigDecimal pnlUsd;
 
-    @Column(name = "pnl_min_currency", precision = 26, scale = PRICE_SCALE)
-    @Digits(integer = 19, fraction = PRICE_SCALE)
-    private BigDecimal pnlMin;
-
-    @Column(name = "pnl_min_usd", precision = 26, scale = PRICE_SCALE)
-    @Digits(integer = 19, fraction = PRICE_SCALE)
-    private BigDecimal pnlMinUsd;
-
-    @Column(name = "expenses_usd", nullable = false, precision = 20, scale = PRICE_SCALE)
+    @Column(name = "expenses_usd", nullable = false, precision = 25, scale = PRICE_SCALE)
     @Digits(integer = 13, fraction = PRICE_SCALE)
     private BigDecimal expensesUsd;
 
@@ -53,20 +44,24 @@ public class Trade {
     @Column(name = "time_end", columnDefinition = "default CURRENT_TIMESTAMP")
     private ZonedDateTime endTime;
 
+    @Column(name = "entry_percentage_diff", nullable = false, precision = 8, scale = PERCENTAGE_SCALE)
+    @Digits(integer = 5, fraction = PERCENTAGE_SCALE)
+    private BigDecimal entryPercentageDiff;
+
     @Enumerated(EnumType.ORDINAL)
     @Column(name = "result_type", nullable = false, columnDefinition = "default 0")
     private TradeResultType resultType;
 
     //pnlUsd-expensesUsd at the end of trade
-    @Column(name = "total_income", nullable = false, precision = 26, scale = PRICE_SCALE)
+    @Column(name = "total_income", nullable = false, precision = 31, scale = PRICE_SCALE)
     @Digits(integer = 19, fraction = PRICE_SCALE)
     private BigDecimal totalIncome;
 
-    @OneToOne(optional = false)
+    @OneToOne(optional = false, cascade = CascadeType.ALL)
     @JoinColumn(name = "position_short_id")
     private Position positionShort;
 
-    @OneToOne(optional = false)
+    @OneToOne(optional = false, cascade = CascadeType.ALL)
     @JoinColumn(name = "position_long_id")
     private Position positionLong;
 
@@ -82,10 +77,14 @@ public class Trade {
         expensesUsd = expensesUsd.add(addedExpenses);
     }
 
-    public BigDecimal getWithdrawFeesTotal() {
-        if (positionShort == null || positionLong == null) {
-            return BigDecimal.ZERO;
+    public String toShortString() {
+        String first =
+                "Trade{" + "expensesUsd=" + expensesUsd + ", startTime=" + startTime + ", entryPercentageDiff=" +
+                        entryPercentageDiff;
+        if (!TradeResultType.IN_PROGRESS.equals(resultType)) {
+            first = first + ", endTime=" + endTime + ", pnl=" + pnl + ", pnlUsd=" + pnlUsd + ", resultType=" + resultType;
         }
-        return positionShort.getExchange().getWithdrawFeeUsd().add(positionLong.getExchange().getWithdrawFeeUsd());
+        return first + ", positionShort=" + positionShort.toShortString() + ", positionLong=" +
+                positionLong.toShortString() + '}';
     }
 }

@@ -8,7 +8,7 @@ import org.springframework.context.support.AbstractApplicationContext;
 @Slf4j
 public class Main {
     public static void main(String[] args) {
-        log.info("Init");
+        log.info("DeLaPorte is starting up!");
         AbstractApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
         context.registerShutdownHook();
     }

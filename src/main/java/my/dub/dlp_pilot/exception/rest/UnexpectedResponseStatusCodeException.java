@@ -1,4 +1,4 @@
-package my.dub.dlp_pilot.service.client.exception;
+package my.dub.dlp_pilot.exception.rest;
 
 import lombok.Getter;
 

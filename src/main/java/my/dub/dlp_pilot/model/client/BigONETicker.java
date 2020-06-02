@@ -5,6 +5,6 @@ import my.dub.dlp_pilot.model.ExchangeName;
 public class BigONETicker extends Ticker {
 
     public BigONETicker() {
-        setExchange(ExchangeName.BIGONE.getFullName());
+        setExchangeName(ExchangeName.BIGONE);
     }
 }

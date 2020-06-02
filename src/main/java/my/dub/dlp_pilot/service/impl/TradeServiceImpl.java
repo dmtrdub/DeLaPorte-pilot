@@ -1,69 +1,67 @@
 package my.dub.dlp_pilot.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
+import my.dub.dlp_pilot.Constants;
+import my.dub.dlp_pilot.exception.rest.NonexistentUSDPriceException;
 import my.dub.dlp_pilot.model.*;
+import my.dub.dlp_pilot.model.client.Ticker;
 import my.dub.dlp_pilot.repository.TradeRepository;
+import my.dub.dlp_pilot.repository.container.CurrentTradeContainer;
+import my.dub.dlp_pilot.service.ExchangeService;
 import my.dub.dlp_pilot.service.TickerService;
 import my.dub.dlp_pilot.service.TradeService;
-import my.dub.dlp_pilot.service.TransferService;
+import my.dub.dlp_pilot.util.Calculations;
 import my.dub.dlp_pilot.util.DateUtils;
+import org.hibernate.exception.LockAcquisitionException;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.Assert;
-import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
-import java.time.ZonedDateTime;
-import java.util.Collection;
-import java.util.HashSet;
 import java.util.Set;
-
-import static my.dub.dlp_pilot.util.Calculations.*;
-import static my.dub.dlp_pilot.util.NumberUtils.getPercentResult;
 
 @Slf4j
 @Service
 public class TradeServiceImpl implements TradeService, InitializingBean {
 
-    @Value("${trade_entry_diff_percentage}")
+    @Value("${trade_entry_min_percentage}")
     private double entryPercentage;
-    @Value("${trade_exit_pnl_percentage}")
-    private double exitPercentage;
+    @Value("${trade_exit_diff_percentage}")
+    private double exitPercentageDiff;
     @Value("${exchange_deposit_sum_usd}")
     private double exchangeDepositSumUsd;
     @Value("${trade_minutes_timeout}")
     private double tradeMinutesTimeout;
 
-    private BigDecimal entrySumUsd;
-    private BigDecimal exitSumUsd;
-
     private final TradeRepository repository;
+    private final CurrentTradeContainer tradeContainer;
     private final TickerService tickerService;
-    private final TransferService transferService;
+    private final ExchangeService exchangeService;
 
     @Autowired
     public TradeServiceImpl(TradeRepository repository,
-                            TickerService tickerService, TransferService transferService) {
+                            CurrentTradeContainer tradeContainer,
+                            TickerService tickerService,
+                            ExchangeService exchangeService) {
         this.repository = repository;
+        this.tradeContainer = tradeContainer;
         this.tickerService = tickerService;
-        this.transferService = transferService;
+        this.exchangeService = exchangeService;
     }
 
     @Override
     public void afterPropertiesSet() {
         validateInputParams();
-        entrySumUsd = getPercentResult(exchangeDepositSumUsd, entryPercentage);
-        exitSumUsd = getPercentResult(exchangeDepositSumUsd, exitPercentage);
     }
 
     private void validateInputParams() {
         if (entryPercentage <= 0.0) {
             throw new IllegalArgumentException("Trade entry percentage cannot be <= 0!");
         }
-        if (exitPercentage >= entryPercentage) {
+        if (exitPercentageDiff >= entryPercentage) {
             throw new IllegalArgumentException("Trade exit percentage cannot be >= entry percentage!");
         }
         if (exchangeDepositSumUsd <= 0) {
@@ -74,176 +72,139 @@ public class TradeServiceImpl implements TradeService, InitializingBean {
         }
     }
 
-    @Transactional
     @Override
-    public void save(Collection<Trade> trades) {
-        if (CollectionUtils.isEmpty(trades)) {
-            return;
-        }
-        repository.saveAll(trades);
-    }
-
-    @Override
-    public Set<Trade> findTradesInProgress() {
-        return repository.findByEndTimeIsNullAndResultTypeEquals(TradeResultType.IN_PROGRESS);
-    }
-
-    @Override
-    public void trade() {
-        handleTransfers();
-        handleTrades();
-    }
-
-    @Transactional
-    @Override
-    public void handleTransfers() {
-        Set<Transfer> endingTransfers = transferService.findEndingTransfers();
-        Set<Trade> newTrades = new HashSet<>();
-        for (Transfer transfer : endingTransfers) {
-            Exchange recipient1 = transfer.getRecipient1();
-            Exchange recipient2 = transfer.getRecipient2();
-            Trade trade = new Trade();
-            ZonedDateTime currentDateTime = DateUtils.currentDateTime();
-            trade.setStartTime(currentDateTime);
-            Ticker ticker1 = tickerService.getTicker(recipient1.getId(), transfer.getBase1(), transfer.getTarget1())
-                    .orElseThrow(() -> new AssertionError("Ticker in container is null!"));
-            Ticker ticker2 = tickerService.getTicker(recipient2.getId(), transfer.getBase2(), transfer.getTarget2())
-                    .orElseThrow(() -> new AssertionError("Ticker in container is null!"));
-            BigDecimal priceUsd1 = ticker1.getPriceUsd();
-            BigDecimal priceUsd2 = ticker2.getPriceUsd();
-            BigDecimal amount = calculateAmount(priceUsd1, priceUsd2, exchangeDepositSumUsd);
-            if (isEntryProfitable(ticker1, ticker2, amount, exchangeDepositSumUsd, entrySumUsd) &&
-                    tickersSafe(ticker1, ticker2)) {
-                BigDecimal expenses =
-                        calculateInitialTradeFeesUsd(recipient1, recipient2, exchangeDepositSumUsd);
-                trade.setExpensesUsd(expenses);
-                trade.setAmount(amount);
-                Position longPos;
-                Position shortPos;
-                if (priceUsd1.compareTo(priceUsd2) > 0) {
-                    shortPos = createPosition(PositionSide.SHORT, ticker1);
-                    longPos = createPosition(PositionSide.LONG, ticker2);
-                } else {
-                    longPos = createPosition(PositionSide.LONG, ticker1);
-                    shortPos = createPosition(PositionSide.SHORT, ticker2);
+    public void searchForTrades(Exchange exchange) {
+        Set<Ticker> allTickers = tickerService.getAllTickers();
+        Set<Ticker> tickersToCompare = tickerService.getTickers(exchange.getName());
+        allTickers.removeAll(tickersToCompare);
+        allTickers.forEach(ticker -> {
+            Ticker equivalentTicker = tickerService.findEquivalentTickerFromSet(ticker, tickersToCompare);
+            if (equivalentTicker != null && !tickerService.checkStale(ticker) &&
+                    !tickerService.checkStale(equivalentTicker)) {
+                BigDecimal currentPercentageDiff =
+                        Calculations.percentageDifference(ticker.getPrice(), equivalentTicker.getPrice());
+                BigDecimal prevPercentageDiff = Calculations
+                        .percentageDifference(ticker.getPreviousPrice(), equivalentTicker.getPreviousPrice());
+                if (currentPercentageDiff.doubleValue() < entryPercentage ||
+                        prevPercentageDiff.doubleValue() >= entryPercentage) {
+                    return;
                 }
-                trade.setPositions(shortPos, longPos);
-                trade.setResultType(TradeResultType.IN_PROGRESS);
-            } else {
-                trade.setExpensesUsd(getDepositWithdrawalFeesUsd(recipient1, recipient2));
-                trade.setResultType(TradeResultType.IRRELEVANT);
-                trade.setEndTime(currentDateTime);
-                trade.setTotalIncome(trade.getPnlUsd().subtract(trade.getExpensesUsd()));
+                try {
+                    Trade trade = createTrade(ticker, equivalentTicker, currentPercentageDiff);
+                    boolean added = tradeContainer.addTrade(trade);
+                    if(added) {
+                        log.debug("New {} created and added to container", trade.toShortString());
+                    }
+                }
+                catch (NonexistentUSDPriceException e) {
+                    log.debug(e.getMessage());
+                }
             }
-            newTrades.add(trade);
-            transfer.setStatus(TransferStatus.DONE);
+        });
+    }
+
+    private Trade createTrade(Ticker ticker1, Ticker ticker2, BigDecimal percentageDiff) {
+        Trade trade = new Trade();
+        trade.setStartTime(DateUtils.currentDateTime());
+        trade.setAmount(BigDecimal.ONE);
+        trade.setEntryPercentageDiff(percentageDiff);
+        BigDecimal price1 = ticker1.getPrice();
+        BigDecimal price2 = ticker2.getPrice();
+        Position longPos;
+        Position shortPos;
+        if (price1.compareTo(price2) > 0) {
+            shortPos = createPosition(PositionSide.SHORT, ticker1);
+            longPos = createPosition(PositionSide.LONG, ticker2);
+        } else {
+            longPos = createPosition(PositionSide.LONG, ticker1);
+            shortPos = createPosition(PositionSide.SHORT, ticker2);
         }
-        transferService.save(endingTransfers);
-        save(newTrades);
+        trade.setPositions(shortPos, longPos);
+        trade.setResultType(TradeResultType.IN_PROGRESS);
+        Exchange exchangeShort = shortPos.getExchange();
+        Exchange exchangeLong = longPos.getExchange();
+        trade.setExpensesUsd(exchangeShort.getDepositFeeUsd().add(exchangeShort.getWithdrawFeeUsd()
+                                                                          .add(exchangeLong.getDepositFeeUsd()
+                                                                                       .add(exchangeLong
+                                                                                                    .getWithdrawFeeUsd()))));
+        return trade;
     }
 
-    private boolean tickersSafe(Ticker ticker1, Ticker ticker2) {
-        return ticker1 != null && !(ticker1.isStale() && ticker1.isAnomaly()) && ticker2 != null &&
-                !(ticker2.isStale() && ticker2.isAnomaly());
+    private boolean canExitTrade(BigDecimal price1, BigDecimal price2, BigDecimal actualEntryPercentageDiff) {
+        BigDecimal percentageDiff = Calculations.percentageDifference(price1, price2);
+        return actualEntryPercentageDiff.subtract(BigDecimal.valueOf(exitPercentageDiff)).compareTo(percentageDiff) > 0;
     }
 
-    private boolean canExitTrade(Trade trade) {
-        if (trade == null) {
-            return false;
-        }
-        return trade.getPnlUsd().subtract(trade.getWithdrawFeesTotal()).compareTo(exitSumUsd) >= 0;
-    }
-
-    @Transactional
     @Override
-    public void handleTrades() {
-        Set<Trade> tradesInProgress = findTradesInProgress();
+    @Transactional
+    @Retryable(LockAcquisitionException.class)
+    public void handleTrades(ExchangeName exchangeName) {
+        Set<Trade> tradesInProgress = tradeContainer.getTrades(exchangeName);
 
-        for (Trade trade : tradesInProgress) {
+        tradesInProgress.forEach(trade -> {
+            Position positionShort = trade.getPositionShort();
+            Position positionLong = trade.getPositionLong();
+            Ticker tickerShort = tickerService
+                    .getTicker(positionShort).orElseThrow(() -> new NullPointerException(
+                            String.format("Ticker for position (%s) in container is null!", positionShort.toString())));
+            Ticker tickerLong = tickerService
+                    .getTicker(positionLong).orElseThrow(() -> new NullPointerException(
+                            String.format("Ticker for position (%s) in container is null!", positionShort.toString())));
             if (tradeMinutesTimeout != 0 &&
-                    DateUtils.durationMinutes(trade.getStartTime(), trade.getEndTime()) > tradeMinutesTimeout) {
-                closeTrade(trade, TradeResultType.TIMED_OUT);
-            } else if (canExitTrade(trade)) {
-                closeTrade(trade, TradeResultType.SUCCESSFUL);
-            } else {
-                recalculatePnl(trade);
+                    DateUtils.durationMinutes(trade.getStartTime()) > tradeMinutesTimeout) {
+                closeAndSaveTrade(trade, tickerShort, tickerLong, TradeResultType.TIMED_OUT);
+            } else if (canExitTrade(tickerShort.getPrice(), tickerLong.getPrice(), trade.getEntryPercentageDiff())) {
+                closeAndSaveTrade(trade, tickerShort, tickerLong, TradeResultType.SUCCESSFUL);
             }
-        }
-        //update trades in db
-        repository.saveAll(tradesInProgress);
+        });
     }
 
-    private void closeTrade(Trade trade, TradeResultType resultType) {
-        Position positionShort = trade.getPositionShort();
-        Position positionLong = trade.getPositionLong();
-        Ticker tickerShort = tickerService
-                .getTicker(positionShort).orElseThrow(() -> new AssertionError("Ticker in container is null!"));
-        Ticker tickerLong = tickerService
-                .getTicker(positionLong).orElseThrow(() -> new AssertionError("Ticker in container is null!"));
-        recalculatePnl(trade, tickerShort, tickerLong);
+    private void closeAndSaveTrade(Trade trade, Ticker tickerShort, Ticker tickerLong,
+                                   TradeResultType resultType) {
+        closeTrade(trade, resultType, tickerShort, tickerLong);
+        tradeContainer.removeTrade(trade);
+        repository.save(trade);
+        log.debug("{} closed. Reason: {}", trade.toShortString(), trade.getResultType());
+    }
+
+    private void closeTrade(Trade trade, TradeResultType resultType, Ticker tickerShort, Ticker tickerLong) {
         BigDecimal priceShort = tickerShort.getPrice();
-        BigDecimal priceUsdShort = tickerShort.getPriceUsd();
-        BigDecimal priceLong = tickerLong.getPrice();
-        BigDecimal priceUsdLong = tickerLong.getPriceUsd();
-
+        Position positionShort = trade.getPositionShort();
         positionShort.setClosePrice(priceShort);
-        positionShort.setClosePriceUsd(priceUsdShort);
-        positionLong.setClosePrice(priceLong);
-        positionLong.setClosePriceUsd(priceUsdLong);
+        BigDecimal usdPriceShort = Constants.USD_SYMBOLS.contains(tickerShort.getTarget()) ? priceShort :
+                tickerService.getUsdPrice(tickerShort.getBase(), positionShort.getExchange().getName());
+        positionShort.setClosePriceUsd(usdPriceShort);
 
-        trade.setPnlMin(positionShort.getPnlMin().add(positionLong.getPnlMin()));
-        trade.setPnlMinUsd(positionShort.getPnlMinUsd().add(positionLong.getPnlMinUsd()));
-        trade.addExpensesUsd(trade.getWithdrawFeesTotal());
-        trade.setTotalIncome(trade.getPnlUsd().subtract(trade.getExpensesUsd()));
+        BigDecimal priceLong = tickerLong.getPrice();
+        Position positionLong = trade.getPositionLong();
+        positionLong.setClosePrice(priceLong);
+        BigDecimal usdPriceLong = Constants.USD_SYMBOLS.contains(tickerLong.getTarget()) ? priceLong :
+                tickerService.getUsdPrice(tickerLong.getBase(), positionLong.getExchange().getName());
+        positionLong.setClosePriceUsd(usdPriceLong);
+
         trade.setEndTime(DateUtils.currentDateTime());
         trade.setResultType(resultType);
-    }
-
-    private void recalculatePnl(Trade trade, Ticker tickerShort, Ticker tickerLong) {
-        Position positionShort = trade.getPositionShort();
-        Position positionLong = trade.getPositionLong();
         BigDecimal amount = trade.getAmount();
-        handlePriceChangeForPosition(positionShort, amount, tickerShort.getPrice(), tickerShort.getPriceUsd());
-        handlePriceChangeForPosition(positionLong, amount, tickerLong.getPrice(), tickerLong.getPriceUsd());
-        trade.setPnl(positionShort.getPnl().add(positionLong.getPnl()));
-        trade.setPnlUsd(positionShort.getPnlUsd().add(positionLong.getPnlUsd()));
+        trade.setPnl(calculatePnl(positionShort, positionLong, amount));
+        trade.setPnlUsd(calculatePnlUsd(positionShort, positionLong, amount));
+        trade.setTotalIncome(BigDecimal.ONE);
     }
 
-    private void recalculatePnl(Trade trade) {
-        Ticker tickerShort = tickerService
-                .getTicker(trade, PositionSide.SHORT)
-                .orElseThrow(() -> new AssertionError("Ticker in container is null!"));
-        Ticker tickerLong = tickerService
-                .getTicker(trade, PositionSide.LONG)
-                .orElseThrow(() -> new AssertionError("Ticker in container is null!"));
-        recalculatePnl(trade, tickerShort, tickerLong);
+    private BigDecimal calculatePnl(Position positionShort, Position positionLong, BigDecimal amount) {
+        BigDecimal pnlShort = Calculations
+                .pnl(positionShort.getSide(), positionShort.getOpenPrice(), positionShort.getClosePrice(), amount);
+        BigDecimal pnlLong = Calculations
+                .pnl(positionLong.getSide(), positionLong.getOpenPrice(), positionLong.getClosePrice(), amount);
+        return pnlShort.add(pnlLong);
     }
 
-    private void handlePriceChangeForPosition(Position position, BigDecimal amount, BigDecimal currentPrice,
-                                              BigDecimal currentPriceUsd) {
-        Assert.state(position.getClosePrice() != null || position.getClosePriceUsd() != null,
-                     "Handled position cannot be already closed!");
-        BigDecimal openPrice = position.getOpenPrice();
-        BigDecimal openPriceUsd = position.getOpenPriceUsd();
-        BigDecimal priceDiff;
-        BigDecimal priceDiffUsd;
-        if (PositionSide.LONG.equals(position.getSide())) {
-            priceDiff = currentPrice.subtract(openPrice);
-            priceDiffUsd = currentPriceUsd.subtract(openPriceUsd);
-        } else {
-            priceDiff = openPrice.subtract(currentPrice);
-            priceDiffUsd = openPriceUsd.subtract(currentPriceUsd);
-        }
-        BigDecimal pnl = amount.multiply(priceDiff);
-        BigDecimal pnlUsd = amount.multiply(priceDiffUsd);
-        position.setPnl(pnl);
-        position.setPnlUsd(pnlUsd);
-        if (pnl.compareTo(position.getPnlMin()) < 0) {
-            position.setPnlMin(pnl);
-        }
-        if (pnlUsd.compareTo(position.getPnlMinUsd()) < 0) {
-            position.setPnlMin(pnl);
-        }
+    private BigDecimal calculatePnlUsd(Position positionShort, Position positionLong, BigDecimal amount) {
+        BigDecimal pnlShort = Calculations
+                .pnl(positionShort.getSide(), positionShort.getOpenPriceUsd(), positionShort.getClosePriceUsd(),
+                     amount);
+        BigDecimal pnlLong = Calculations
+                .pnl(positionLong.getSide(), positionLong.getOpenPriceUsd(), positionLong.getClosePriceUsd(), amount);
+        return pnlShort.add(pnlLong);
     }
 
     private Position createPosition(PositionSide side, Ticker ticker) {
@@ -251,9 +212,16 @@ public class TradeServiceImpl implements TradeService, InitializingBean {
         position.setBase(ticker.getBase());
         position.setTarget(ticker.getTarget());
         position.setSide(side);
-        position.setOpenPrice(ticker.getPrice());
-        position.setOpenPriceUsd(ticker.getPriceUsd());
-        position.setExchange(ticker.getExchange());
+        BigDecimal tickerPrice = ticker.getPrice();
+        position.setOpenPrice(tickerPrice);
+        ExchangeName exchangeName = ticker.getExchangeName();
+        BigDecimal priceUsd = Constants.USD_SYMBOLS.contains(position.getTarget()) ?
+                tickerPrice : tickerService.getUsdPrice(ticker.getBase(), exchangeName);
+        position.setOpenPriceUsd(priceUsd);
+        Exchange exchange = exchangeService.findByName(
+                exchangeName).orElseThrow(
+                () -> new NullPointerException(String.format("Exchange by name %s was not found!", exchangeName)));
+        position.setExchange(exchange);
         return position;
     }
 

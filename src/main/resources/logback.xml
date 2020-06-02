@@ -14,5 +14,5 @@
         <appender-ref ref="console"/>
     </root>
 
-    <logger name="org.hibernate" level="DEBUG"/>
+    <logger name="org.hibernate" level="WARN"/>
 </configuration>

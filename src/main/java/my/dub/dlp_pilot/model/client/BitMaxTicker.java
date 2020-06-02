@@ -6,6 +6,6 @@ import my.dub.dlp_pilot.model.ExchangeName;
 public class BitMaxTicker extends Ticker {
 
     public BitMaxTicker() {
-        setExchange(ExchangeName.BITMAX.getFullName());
+        setExchangeName(ExchangeName.BITMAX);
     }
 }

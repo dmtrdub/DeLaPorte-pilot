@@ -1,18 +1,11 @@
 package my.dub.dlp_pilot.service;
 
-import my.dub.dlp_pilot.model.Trade;
-
-import java.util.Collection;
-import java.util.Set;
+import my.dub.dlp_pilot.model.Exchange;
+import my.dub.dlp_pilot.model.ExchangeName;
 
 public interface TradeService {
-    void save(Collection<Trade> trades);
 
-    Set<Trade> findTradesInProgress();
+    void searchForTrades(Exchange exchange);
 
-    void trade();
-
-    void handleTransfers();
-
-    void handleTrades();
+    void handleTrades(ExchangeName exchangeName);
 }

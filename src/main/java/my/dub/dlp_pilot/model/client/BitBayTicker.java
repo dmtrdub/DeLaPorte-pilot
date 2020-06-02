@@ -6,6 +6,6 @@ import my.dub.dlp_pilot.model.ExchangeName;
 public class BitBayTicker extends Ticker {
 
     public BitBayTicker() {
-        setExchange(ExchangeName.BITBAY.getFullName());
+        setExchangeName(ExchangeName.BITBAY);
     }
 }

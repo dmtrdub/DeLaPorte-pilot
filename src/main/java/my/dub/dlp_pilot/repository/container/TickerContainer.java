@@ -1,39 +1,83 @@
 package my.dub.dlp_pilot.repository.container;
 
 import lombok.extern.slf4j.Slf4j;
+import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.Position;
-import my.dub.dlp_pilot.model.PositionSide;
-import my.dub.dlp_pilot.model.Ticker;
-import my.dub.dlp_pilot.model.Trade;
+import my.dub.dlp_pilot.model.client.Ticker;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
-import java.util.*;
+import java.math.BigDecimal;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Slf4j
 @Component
 public class TickerContainer {
-    private Map<Long, Set<Ticker>> tickersMap = new ConcurrentHashMap<>();
 
-    public Set<Ticker> getAll() {
-        return tickersMap.values().stream().flatMap(Collection::stream).collect(Collectors.toSet());
+    // Exclude possible concurrency exceptions by decentralizing storage
+    private final Set<Ticker> bigONETickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<Ticker> binanceTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<Ticker> bitBayTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<Ticker> bitfinexTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<Ticker> bithumbTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<Ticker> bitmartTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<Ticker> bitmaxTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<Ticker> bittrexTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<Ticker> bwTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
+
+    private Set<Ticker> tickerSet(ExchangeName exchangeName) {
+        switch (exchangeName) {
+            case BIGONE:
+                return bigONETickers;
+            case BINANCE:
+                return binanceTickers;
+            case BITBAY:
+                return bitBayTickers;
+            case BITFINEX:
+                return bitfinexTickers;
+            case BITHUMB:
+                return bithumbTickers;
+            case BITMART:
+                return bitmartTickers;
+            case BITMAX:
+                return bitmaxTickers;
+            case BITTREX:
+                return bittrexTickers;
+            case BW:
+                return bwTickers;
+        }
+        return Collections.emptySet();
     }
 
-    public Map<Long, Set<Ticker>> getExchangeIDTickersMap() {
-        return new ConcurrentHashMap<>(tickersMap);
+    public Set<Ticker> getAll(boolean includeStale) {
+        Stream<Ticker> tickerStream =
+                Stream.of(bigONETickers, binanceTickers, bitBayTickers, bitfinexTickers, bithumbTickers, bitmartTickers,
+                          bitmaxTickers, bittrexTickers, bwTickers).flatMap(Collection::stream);
+        if (!includeStale) {
+            tickerStream = tickerStream.filter(ticker -> !ticker.isStale());
+        }
+        return tickerStream.collect(Collectors.toSet());
     }
 
-    public Set<Ticker> getTickers(Long exchangeId) {
-        if (exchangeId == null) {
+    public Set<Ticker> getTickers(ExchangeName exchangeName, boolean includeStale) {
+        if (exchangeName == null) {
             return Collections.emptySet();
         }
-        return tickersMap.getOrDefault(exchangeId, Collections.emptySet());
+        Set<Ticker> result = tickerSet(exchangeName);
+        if (!includeStale) {
+            return result.stream().filter(ticker -> !ticker.isStale()).collect(Collectors.toSet());
+        }
+        return result;
     }
 
-    public Optional<Ticker> getTicker(Long exchangeId, String base, String target) {
-        Set<Ticker> tickers = tickersMap.get(exchangeId);
+    public Optional<Ticker> getTicker(ExchangeName exchangeName, String base, String target) {
+        Set<Ticker> tickers = tickerSet(exchangeName);
         if (CollectionUtils.isEmpty(tickers)) {
             return Optional.empty();
         }
@@ -41,19 +85,11 @@ public class TickerContainer {
                 .findFirst();
     }
 
-    public Optional<Ticker> getTicker(Trade trade, PositionSide side) {
-        if (trade == null || side == null) {
-            return Optional.empty();
-        }
-        Position position = PositionSide.SHORT.equals(side) ? trade.getPositionShort() : trade.getPositionLong();
-        return getTicker(position);
-    }
-
     public Optional<Ticker> getTicker(Position position) {
         if (position == null) {
             return Optional.empty();
         }
-        Set<Ticker> tickers = tickersMap.get(position.getExchange().getId());
+        Set<Ticker> tickers = tickerSet(position.getExchange().getName());
         if (CollectionUtils.isEmpty(tickers)) {
             return Optional.empty();
         }
@@ -61,50 +97,28 @@ public class TickerContainer {
                 ticker.getTarget().equals(position.getTarget())).findFirst();
     }
 
-    public void addTicker(Long exchangeId, Ticker ticker) {
-        if (exchangeId == null || ticker == null) {
+    public void addTickers(ExchangeName exchangeName, Collection<Ticker> tickers) {
+        if (exchangeName == null || CollectionUtils.isEmpty(tickers)) {
             return;
         }
-        Set<Ticker> tickerList = tickersMap.get(exchangeId);
-        if (tickerList == null) {
-            Set<Ticker> newTickerSet = new HashSet<>();
-            newTickerSet.add(ticker);
-            tickersMap.put(exchangeId, newTickerSet);
-        } else {
-            tickerList.add(ticker);
-        }
+        Set<Ticker> tickerSet = tickerSet(exchangeName);
+        tickers.forEach(newTicker -> {
+            Ticker existingTicker =
+                    tickerSet.stream().filter(exTicker -> exTicker.isSimilar(newTicker)).findFirst().orElse(null);
+            if (existingTicker != null) {
+                BigDecimal existingPrice = existingTicker.getPrice();
+                if (existingPrice.compareTo(newTicker.getPrice()) != 0) {
+                    newTicker.setPreviousPrice(existingPrice);
+                    tickerSet.remove(existingTicker);
+                    tickerSet.add(newTicker);
+                }
+            } else {
+                tickerSet.add(newTicker);
+            }
+        });
     }
 
-    public void addTickers(Long exchangeId, Collection<Ticker> tickers) {
-        if (exchangeId == null || CollectionUtils.isEmpty(tickers)) {
-            return;
-        }
-        Set<Ticker> tickerList = tickersMap.get(exchangeId);
-        if (tickerList == null) {
-            tickersMap.put(exchangeId, new HashSet<>(tickers));
-        } else {
-            tickerList.addAll(tickers);
-        }
-    }
-
-    public void updateTickers(Long exchangeId, Collection<Ticker> tickers) {
-        if (exchangeId == null || CollectionUtils.isEmpty(tickers)) {
-            return;
-        }
-        Set<Ticker> tickerSet = tickersMap.get(exchangeId);
-        if (tickerSet == null) {
-            tickersMap.put(exchangeId, new HashSet<>(tickers));
-        } else {
-            tickers.forEach(ticker -> replaceAllIfAbsent(tickerSet, ticker));
-        }
-    }
-
-    private void replaceAllIfAbsent(Set<Ticker> tickerList, Ticker ticker) {
-        if (!tickerList.contains(ticker)) {
-            List<Ticker> toRemove = tickerList.stream().filter(t -> t.getBase().equals(ticker.getBase()) &&
-                    t.getTarget().equals(ticker.getTarget())).collect(Collectors.toList());
-            tickerList.removeAll(toRemove);
-            tickerList.add(ticker);
-        }
+    public boolean isEmpty(ExchangeName exchangeName) {
+        return CollectionUtils.isEmpty(tickerSet(exchangeName));
     }
 }

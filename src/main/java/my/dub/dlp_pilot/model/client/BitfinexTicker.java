@@ -6,6 +6,6 @@ import my.dub.dlp_pilot.model.ExchangeName;
 public class BitfinexTicker extends Ticker {
 
     public BitfinexTicker() {
-        setExchange(ExchangeName.BITFINEX.getFullName());
+        setExchangeName(ExchangeName.BITFINEX);
     }
 }

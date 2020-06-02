@@ -5,6 +5,6 @@ import my.dub.dlp_pilot.model.ExchangeName;
 public class BinanceTicker extends Ticker {
 
     public BinanceTicker() {
-        setExchange(ExchangeName.BINANCE.getFullName());
+        setExchangeName(ExchangeName.BINANCE);
     }
 }

@@ -5,6 +5,6 @@ import my.dub.dlp_pilot.model.ExchangeName;
 public class BitmartTicker extends Ticker {
 
     public BitmartTicker() {
-        setExchange(ExchangeName.BITMART.getFullName());
+        setExchangeName(ExchangeName.BITMART);
     }
 }

@@ -9,9 +9,7 @@ import javax.persistence.*;
 import javax.validation.constraints.Digits;
 import javax.validation.constraints.Max;
 import java.math.BigDecimal;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 
 import static my.dub.dlp_pilot.Constants.FEE_SCALE;
@@ -59,9 +57,6 @@ public class Exchange {
     @EqualsAndHashCode.Exclude
     @Transient
     private Set<Ticker> tickers = new HashSet<>();
-
-    @Transient
-    private Map<String, String> symbolAdditionalData = new HashMap<>();
 
     public String getFullName() {
         return name.getFullName();

@@ -2,82 +2,87 @@ package my.dub.dlp_pilot.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.Constants;
-import my.dub.dlp_pilot.model.*;
-import my.dub.dlp_pilot.repository.TickerRepository;
+import my.dub.dlp_pilot.exception.rest.NonexistentUSDPriceException;
+import my.dub.dlp_pilot.model.Exchange;
+import my.dub.dlp_pilot.model.ExchangeName;
+import my.dub.dlp_pilot.model.Position;
+import my.dub.dlp_pilot.model.client.Ticker;
 import my.dub.dlp_pilot.repository.container.TickerContainer;
 import my.dub.dlp_pilot.service.TickerService;
+import my.dub.dlp_pilot.service.client.RestClient;
+import my.dub.dlp_pilot.util.DateUtils;
+import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
-import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.util.*;
 
 @Slf4j
 @Service
-public class TickerServiceImpl implements TickerService {
+public class TickerServiceImpl implements TickerService, InitializingBean {
 
-    private final TickerRepository tickerRepository;
     private final TickerContainer tickerContainer;
+    private final RestClient restClient;
+
+    @Value("${trade_ticker_stale_difference_seconds}")
+    private int staleDifferenceSeconds;
+
+    @Value("${usd_price_fallback_exchange_name}")
+    private String fallbackExchangeParam;
+
+    private ExchangeName fallbackExchangeName;
 
     @Autowired
-    public TickerServiceImpl(TickerRepository tickerRepository,
-                             TickerContainer tickerContainer) {
-        this.tickerRepository = tickerRepository;
+    public TickerServiceImpl(TickerContainer tickerContainer, RestClient restClient) {
         this.tickerContainer = tickerContainer;
+        this.restClient = restClient;
     }
 
-    @Transactional
     @Override
-    public Iterable<Ticker> save(Collection<Ticker> tickers) {
-        if (CollectionUtils.isEmpty(tickers)) {
-            return Collections.emptyList();
+    public void afterPropertiesSet() {
+        validateInputParams();
+    }
+
+    private void validateInputParams() {
+        if (staleDifferenceSeconds <= 0) {
+            throw new IllegalArgumentException("Stale difference for ticker cannot be <= 0 seconds!");
         }
-        return tickerRepository.saveAll(tickers);
+        fallbackExchangeName = ExchangeName.valueOf(fallbackExchangeParam);
     }
 
-    @Transactional
     @Override
-    public void saveAndUpdateLocal(Collection<Ticker> tickers, long exchangeId) {
+    public void fetchAndSave(Exchange exchange) {
+        Set<Ticker> tickers = new HashSet<>(restClient.fetchTickers(exchange));
+        save(exchange.getName(), tickers);
+    }
+
+    @Override
+    public void save(ExchangeName exchangeName, Collection<Ticker> tickers) {
         if (CollectionUtils.isEmpty(tickers)) {
             return;
         }
-        tickerRepository.saveAll(tickers);
-        tickerContainer.updateTickers(exchangeId, tickers);
+        tickerContainer.addTickers(exchangeName, tickers);
     }
 
-    @Override
-    public void fetchMarketData(Exchange exchange) {
-        Assert.notNull(exchange, "Exchange cannot be null!");
-    }
-
-    @Override
-    public boolean isPairEquivalent(String baseOriginal, String targetOriginal, String baseCompared,
-                                    String targetCompared) {
-        if (StringUtils.isEmpty(baseOriginal) || StringUtils.isEmpty(targetOriginal) ||
-                StringUtils.isEmpty(baseCompared) || StringUtils.isEmpty(targetCompared)) {
-            return false;
+    public boolean checkStale(Ticker ticker) {
+        if (!ticker.isStale() && DateUtils.durationSeconds(ticker.getDateTime()) > staleDifferenceSeconds) {
+            ticker.setStale(true);
+            return true;
         }
-        List<String> baseSynonyms = getSymbolSynonyms(baseOriginal);
-        List<String> targetSynonyms = getSymbolSynonyms(targetOriginal);
-        return baseSynonyms.contains(baseCompared) && targetSynonyms.contains(targetCompared);
+        return false;
     }
 
     @Override
-    public Set<Ticker> getTickers(Long exchangeId) {
-        return tickerContainer.getTickers(exchangeId);
+    public Set<Ticker> getTickers(ExchangeName exchangeName) {
+        return tickerContainer.getTickers(exchangeName, false);
     }
 
     @Override
-    public Optional<Ticker> getTicker(Long exchangeId, String base, String target) {
-        return tickerContainer.getTicker(exchangeId, base, target);
-    }
-
-    @Override
-    public Optional<Ticker> getTicker(Trade trade, PositionSide side) {
-        return tickerContainer.getTicker(trade, side);
+    public Set<Ticker> getAllTickers() {
+        return tickerContainer.getAll(false);
     }
 
     @Override
@@ -86,16 +91,16 @@ public class TickerServiceImpl implements TickerService {
     }
 
     @Override
-    public Map<Long, Set<Ticker>> getExchangeIDTickersMap() {
-        return tickerContainer.getExchangeIDTickersMap();
+    public Ticker findEquivalentTickerFromSet(Ticker originalTicker, Set<Ticker> tickerSet) {
+        List<String> baseSynonyms = getSymbolSynonyms(originalTicker.getBase());
+        List<String> targetSynonyms = getSymbolSynonyms(originalTicker.getTarget());
+        return tickerSet.stream().filter(ticker -> baseSynonyms.contains(ticker.getBase()) &&
+                targetSynonyms.contains(ticker.getTarget())).findAny().orElse(null);
     }
 
     private List<String> getSymbolSynonyms(String symbol) {
         if (Constants.BITCOIN_SYMBOLS.contains(symbol)) {
             return Constants.BITCOIN_SYMBOLS;
-        }
-        if (Constants.USD_SYMBOLS.contains(symbol)) {
-            return Constants.USD_SYMBOLS;
         }
         if (Constants.BITCOIN_CASH_SYMBOLS.contains(symbol)) {
             return Constants.BITCOIN_CASH_SYMBOLS;
@@ -109,17 +114,22 @@ public class TickerServiceImpl implements TickerService {
         return List.of(symbol);
     }
 
-    private List<Ticker> getUniqueTickers(Long exchangeId, List<Ticker> tickers) {
-        if (CollectionUtils.isEmpty(tickers)) {
-            return Collections.emptyList();
+    @Override
+    public BigDecimal getUsdPrice(String base, ExchangeName exchangeName) {
+        BigDecimal price = findUsdPrice(base, exchangeName);
+        if (price != null) {
+            return price;
         }
-        Set<Ticker> cachedTickers = tickerContainer.getTickers(exchangeId);
-        if (CollectionUtils.isEmpty(cachedTickers)) {
-            tickerContainer.addTickers(exchangeId, tickers);
-            return tickers;
-        }
-        List<Ticker> result = new ArrayList<>(tickers);
-        result.removeAll(cachedTickers);
-        return result;
+        return getSymbolSynonyms(base).stream().map(baseSynonym -> findUsdPrice(baseSynonym, fallbackExchangeName))
+                .filter(
+                        Objects::nonNull).findFirst().orElseThrow(
+                        () -> new NonexistentUSDPriceException(exchangeName.getFullName(),
+                                                               fallbackExchangeName.getFullName(), base));
+    }
+
+    private BigDecimal findUsdPrice(String base, ExchangeName exchangeName) {
+        return Constants.USD_SYMBOLS.stream().map(usdSymbol -> tickerContainer.getTicker(exchangeName, base, usdSymbol))
+                .filter(
+                        Optional::isPresent).map(ticker -> ticker.get().getPrice()).findFirst().orElse(null);
     }
 }

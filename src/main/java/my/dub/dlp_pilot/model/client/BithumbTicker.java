@@ -6,6 +6,6 @@ import my.dub.dlp_pilot.model.ExchangeName;
 public class BithumbTicker extends Ticker {
 
     public BithumbTicker() {
-        setExchange(ExchangeName.BITHUMB.getFullName());
+        setExchangeName(ExchangeName.BITHUMB);
     }
 }

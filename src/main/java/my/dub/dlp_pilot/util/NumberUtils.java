@@ -50,14 +50,15 @@ public final class NumberUtils {
         if (target == 0 || percentage == null) {
             return BigDecimal.ZERO;
         }
-        return percentage.divide(BigDecimal.valueOf(100)).multiply(BigDecimal.valueOf(target));
+        return percentage.divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(target));
     }
 
     public static BigDecimal getPercentResult(double target, double percentage) {
-        return BigDecimal.valueOf(percentage).divide(BigDecimal.valueOf(100)).multiply(BigDecimal.valueOf(target));
+        return BigDecimal.valueOf(percentage).divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP)
+                .multiply(BigDecimal.valueOf(target));
     }
 
     public static BigDecimal getPercentResult(BigDecimal target, BigDecimal percentage) {
-        return percentage.divide(BigDecimal.valueOf(100)).multiply(target);
+        return percentage.divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP).multiply(target);
     }
 }
