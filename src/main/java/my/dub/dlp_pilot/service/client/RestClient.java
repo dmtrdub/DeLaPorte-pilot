@@ -575,8 +575,8 @@ public class RestClient implements InitializingBean {
         String[] symbols;
         try {
             symbols = input.split(splitRegex, 2);
-            ticker.setBase(symbols[0]);
-            ticker.setTarget(symbols[1]);
+            ticker.setBase(findOriginalSymbol(symbols[0].toUpperCase()));
+            ticker.setTarget(findOriginalSymbol(symbols[1].toUpperCase()));
         }
         catch (ArrayIndexOutOfBoundsException e) {
             log.debug("Incorrect pair input ({}) for {} exchange! Expecting to parse with split regex: {}", input,
@@ -584,5 +584,21 @@ public class RestClient implements InitializingBean {
             return false;
         }
         return true;
+    }
+
+    private String findOriginalSymbol(String symbol) {
+        if (Constants.BITCOIN_SYMBOLS.contains(symbol)) {
+            return Constants.BITCOIN_SYMBOLS.get(0);
+        }
+        if (Constants.BITCOIN_CASH_SYMBOLS.contains(symbol)) {
+            return Constants.BITCOIN_CASH_SYMBOLS.get(0);
+        }
+        if (Constants.BITCOIN_SV_SYMBOLS.contains(symbol)) {
+            return Constants.BITCOIN_SV_SYMBOLS.get(0);
+        }
+        if (Constants.STELLAR_SYMBOLS.contains(symbol)) {
+            return Constants.STELLAR_SYMBOLS.get(0);
+        }
+        return symbol;
     }
 }

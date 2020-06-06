@@ -160,30 +160,22 @@ public class TradeServiceImpl implements TradeService, InitializingBean {
                     .getTicker(positionLong).orElseThrow(() -> new NullPointerException(
                             String.format("Ticker for position (%s) in container is null!", positionLong.toString())));
             if (tradeMinutesTimeout != 0 && DateUtils.durationMinutes(trade.getStartTime()) > tradeMinutesTimeout) {
-                Trade tradeCopy = SerializationUtils.clone(trade);
-                closeTrade(tradeCopy, TradeResultType.TIMED_OUT, tickerShort, tickerLong);
-                tradesCompleted.add(trade);
-                tradesToSave.add(tradeCopy);
+                closeAndAddToSets(tradesCompleted, tradesToSave, trade, tickerShort, tickerLong,
+                                  TradeResultType.TIMED_OUT);
             } else {
                 BigDecimal percentageDiff =
                         Calculations.percentageDifference(tickerShort.getPrice(), tickerLong.getPrice());
                 BigDecimal entryPercentageDiff = trade.getEntryPercentageDiff();
-
                 if (entryPercentageDiff.subtract(percentageDiff).compareTo(BigDecimal.valueOf(exitPercentageDiff)) >
                         0) {
-                    Trade tradeCopy = SerializationUtils.clone(trade);
-                    closeTrade(tradeCopy, TradeResultType.SUCCESSFUL, tickerShort, tickerLong);
-                    tradesCompleted.add(trade);
-                    tradesToSave.add(tradeCopy);
+                    closeAndAddToSets(tradesCompleted, tradesToSave, trade, tickerShort, tickerLong,
+                                      TradeResultType.SUCCESSFUL);
                 } else if (percentageDiff.subtract(entryPercentageDiff)
                                          .compareTo(BigDecimal.valueOf(detrimentPercentageDelta)) >= 0) {
-                    Trade tradeCopy = SerializationUtils.clone(trade);
-                    closeTrade(tradeCopy, TradeResultType.DETRIMENTAL, tickerShort, tickerLong);
-                    tradesCompleted.add(trade);
-                    tradesToSave.add(tradeCopy);
+                    closeAndAddToSets(tradesCompleted, tradesToSave, trade, tickerShort, tickerLong,
+                                      TradeResultType.DETRIMENTAL);
                 }
             }
-
         });
         if (!tradesToSave.isEmpty()) {
             repository.saveAll(tradesToSave);
@@ -193,6 +185,14 @@ public class TradeServiceImpl implements TradeService, InitializingBean {
         if (!tradesCompleted.isEmpty()) {
             tradeContainer.removeTrades(tradesCompleted);
         }
+    }
+
+    private void closeAndAddToSets(Set<Trade> tradesCompleted, Set<Trade> tradesToSave, Trade trade, Ticker tickerShort,
+                                   Ticker tickerLong, TradeResultType resultType) {
+        Trade tradeCopy = SerializationUtils.clone(trade);
+        closeTrade(tradeCopy, resultType, tickerShort, tickerLong);
+        tradesCompleted.add(trade);
+        tradesToSave.add(tradeCopy);
     }
 
     private void closeTrade(Trade trade, TradeResultType resultType, Ticker tickerShort, Ticker tickerLong) {

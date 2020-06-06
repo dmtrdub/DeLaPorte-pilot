@@ -6,7 +6,7 @@ public class NonexistentUSDPriceException extends RuntimeException {
     private final String baseSymbol;
 
     public NonexistentUSDPriceException(String exchange, String fallbackExchange, String baseSymbol) {
-        super(String.format("Unable to get USD price for base symbol %s on %s exchange and on fallback exchange %s",
+        super(String.format("Unable to get USD price for base symbol %s on %s exchange and on fallback %s exchange",
                             baseSymbol, exchange, fallbackExchange));
         this.exchange = exchange;
         this.fallbackExchange = fallbackExchange;

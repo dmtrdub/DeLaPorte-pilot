@@ -92,44 +92,23 @@ public class TickerServiceImpl implements TickerService, InitializingBean {
 
     @Override
     public Ticker findEquivalentTickerFromSet(Ticker originalTicker, Set<Ticker> tickerSet) {
-        List<String> baseSynonyms = getSymbolSynonyms(originalTicker.getBase());
-        List<String> targetSynonyms = getSymbolSynonyms(originalTicker.getTarget());
-        return tickerSet.stream().filter(ticker -> baseSynonyms.contains(ticker.getBase()) &&
-                targetSynonyms.contains(ticker.getTarget())).findAny().orElse(null);
-    }
-
-    private List<String> getSymbolSynonyms(String symbol) {
-        if (Constants.BITCOIN_SYMBOLS.contains(symbol)) {
-            return Constants.BITCOIN_SYMBOLS;
-        }
-        if (Constants.BITCOIN_CASH_SYMBOLS.contains(symbol)) {
-            return Constants.BITCOIN_CASH_SYMBOLS;
-        }
-        if (Constants.BITCOIN_SV_SYMBOLS.contains(symbol)) {
-            return Constants.BITCOIN_SV_SYMBOLS;
-        }
-        if (Constants.STELLAR_SYMBOLS.contains(symbol)) {
-            return Constants.STELLAR_SYMBOLS;
-        }
-        return List.of(symbol);
+        Objects.requireNonNull(originalTicker, "Ticker that has to be compared is null!");
+        return tickerSet.stream().filter(ticker -> ticker.getBase().equals(originalTicker.getBase()) &&
+                ticker.getTarget().equals(originalTicker.getTarget())).findAny().orElse(null);
     }
 
     @Override
     public BigDecimal getUsdPrice(String base, ExchangeName exchangeName) {
-        BigDecimal price = findUsdPrice(base, exchangeName);
-        if (price != null) {
-            return price;
-        }
-        return getSymbolSynonyms(base).stream().map(baseSynonym -> findUsdPrice(baseSynonym, fallbackExchangeName))
-                .filter(
-                        Objects::nonNull).findFirst().orElseThrow(
-                        () -> new NonexistentUSDPriceException(exchangeName.getFullName(),
-                                                               fallbackExchangeName.getFullName(), base));
+        Optional<BigDecimal> price =
+                findUsdPrice(base, exchangeName).or(() -> findUsdPrice(base, fallbackExchangeName));
+        return price.orElseThrow(
+                () -> new NonexistentUSDPriceException(exchangeName.getFullName(), fallbackExchangeName.getFullName(),
+                                                       base));
     }
 
-    private BigDecimal findUsdPrice(String base, ExchangeName exchangeName) {
+    private Optional<BigDecimal> findUsdPrice(String base, ExchangeName exchangeName) {
         return Constants.USD_SYMBOLS.stream().map(usdSymbol -> tickerContainer.getTicker(exchangeName, base, usdSymbol))
-                .filter(
-                        Optional::isPresent).map(ticker -> ticker.get().getPrice()).findFirst().orElse(null);
+                                    .filter(
+                                            Optional::isPresent).map(ticker -> ticker.get().getPrice()).findFirst();
     }
 }
