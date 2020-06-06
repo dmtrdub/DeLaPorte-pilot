@@ -8,6 +8,7 @@ import my.dub.dlp_pilot.model.client.Ticker;
 import javax.persistence.*;
 import javax.validation.constraints.Digits;
 import javax.validation.constraints.Max;
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.Set;
@@ -22,7 +23,8 @@ import static my.dub.dlp_pilot.Constants.PERCENTAGE_SCALE;
 @Table(name = "exchange", uniqueConstraints = {
         @UniqueConstraint(name = "exchange_base_endpoint_uindex", columnNames = "base_endpoint"),
         @UniqueConstraint(name = "exchange_name_uindex", columnNames = "name")})
-public class Exchange {
+public class Exchange implements Serializable {
+    private static final long serialVersionUID = 44L;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -56,7 +58,7 @@ public class Exchange {
 
     @EqualsAndHashCode.Exclude
     @Transient
-    private Set<Ticker> tickers = new HashSet<>();
+    private transient Set<Ticker> tickers = new HashSet<>();
 
     public String getFullName() {
         return name.getFullName();

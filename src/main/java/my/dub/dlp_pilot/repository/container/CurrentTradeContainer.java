@@ -4,7 +4,9 @@ import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.Position;
 import my.dub.dlp_pilot.model.Trade;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -46,11 +48,11 @@ public class CurrentTradeContainer {
                         otherTrade.getPositionLong().isSimilar(trade.getPositionLong()));
     }
 
-    public void removeTrade(Trade trade) {
-        if (trade == null) {
+    public void removeTrades(Collection<Trade> trades) {
+        if (CollectionUtils.isEmpty(trades)) {
             return;
         }
-        tradesInProgress.remove(trade);
+        tradesInProgress.removeAll(trades);
     }
 
 }

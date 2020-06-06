@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 
 import javax.persistence.*;
 import javax.validation.constraints.Digits;
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 
@@ -15,7 +16,8 @@ import static my.dub.dlp_pilot.Constants.*;
 @NoArgsConstructor
 @Entity
 @Table(name = "trade")
-public class Trade {
+public class Trade implements Serializable {
+    private static final long serialVersionUID = 40L;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

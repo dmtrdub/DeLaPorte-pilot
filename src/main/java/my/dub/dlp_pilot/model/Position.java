@@ -7,6 +7,7 @@ import my.dub.dlp_pilot.Constants;
 
 import javax.persistence.*;
 import javax.validation.constraints.Digits;
+import java.io.Serializable;
 import java.math.BigDecimal;
 
 import static my.dub.dlp_pilot.Constants.PRICE_SCALE;
@@ -15,7 +16,8 @@ import static my.dub.dlp_pilot.Constants.PRICE_SCALE;
 @NoArgsConstructor
 @Entity
 @Table(name = "position")
-public class Position {
+public class Position implements Serializable {
+    private static final long serialVersionUID = 42L;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
