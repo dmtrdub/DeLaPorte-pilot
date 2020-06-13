@@ -11,6 +11,10 @@ public final class Constants {
     public static final int PERCENTAGE_SCALE = 3;
     public static final int FEE_SCALE = 6;
     public static final int AMOUNT_SCALE = 7;
+    public static final int STRING_PARAM_LENGTH = 50;
+    public static final int FILE_PATH_PARAM_LENGTH = 260;
+
+    public static final int MAX_RESULT_SCALE = 5;
 
     // Use to find usd price, not for trading!
     public static final List<String> USD_SYMBOLS = List.of("USD", "USDT");

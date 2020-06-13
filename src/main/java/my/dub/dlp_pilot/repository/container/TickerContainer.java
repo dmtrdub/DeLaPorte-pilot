@@ -2,10 +2,10 @@ package my.dub.dlp_pilot.repository.container;
 
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.model.ExchangeName;
-import my.dub.dlp_pilot.model.Position;
 import my.dub.dlp_pilot.model.client.Ticker;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.util.Collection;
@@ -77,24 +77,15 @@ public class TickerContainer {
     }
 
     public Optional<Ticker> getTicker(ExchangeName exchangeName, String base, String target) {
+        if (exchangeName == null || StringUtils.isEmpty(base) || StringUtils.isEmpty(target)) {
+            return Optional.empty();
+        }
         Set<Ticker> tickers = tickerSet(exchangeName);
         if (CollectionUtils.isEmpty(tickers)) {
             return Optional.empty();
         }
         return tickers.stream().filter(ticker -> ticker.getBase().equals(base) && ticker.getTarget().equals(target))
-                .findFirst();
-    }
-
-    public Optional<Ticker> getTicker(Position position) {
-        if (position == null) {
-            return Optional.empty();
-        }
-        Set<Ticker> tickers = tickerSet(position.getExchange().getName());
-        if (CollectionUtils.isEmpty(tickers)) {
-            return Optional.empty();
-        }
-        return tickers.stream().filter(ticker -> ticker.getBase().equals(position.getBase()) &&
-                ticker.getTarget().equals(position.getTarget())).findFirst();
+                      .findFirst();
     }
 
     public void addTickers(ExchangeName exchangeName, Collection<Ticker> tickers) {

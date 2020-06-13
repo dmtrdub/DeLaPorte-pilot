@@ -1,10 +1,10 @@
 package my.dub.dlp_pilot.service;
 
 import lombok.extern.slf4j.Slf4j;
+import my.dub.dlp_pilot.configuration.ParametersComponent;
 import my.dub.dlp_pilot.model.Exchange;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Scope;
 import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
@@ -23,16 +23,22 @@ public class ScheduledService implements InitializingBean {
     private final ExchangeService exchangeService;
     private final TickerService tickerService;
     private final TradeService tradeService;
+    private final TestRunService testRunService;
+    private final FileResultService fileResultService;
 
-    @Value("${init_trade_delay_ms}")
-    private long initDelayMs;
+    private final ParametersComponent parameters;
 
     @Autowired
     public ScheduledService(ExchangeService exchangeService, TickerService tickerService,
-                            TradeService tradeService) {
+                            TradeService tradeService, TestRunService testRunService,
+                            FileResultService fileResultService,
+                            ParametersComponent parameters) {
         this.exchangeService = exchangeService;
         this.tickerService = tickerService;
         this.tradeService = tradeService;
+        this.testRunService = testRunService;
+        this.fileResultService = fileResultService;
+        this.parameters = parameters;
     }
 
     @Override
@@ -41,6 +47,8 @@ public class ScheduledService implements InitializingBean {
     }
 
     private void start() {
+        testRunService.createAndSave();
+        fileResultService.init();
         Set<Exchange> exchanges = exchangeService.findAll();
         if (CollectionUtils.isEmpty(exchanges)) {
             throw new IllegalArgumentException("There are no exchanges to work with!");
@@ -55,9 +63,13 @@ public class ScheduledService implements InitializingBean {
         exchanges.forEach(exchange -> {
             int delayMillis = calculateFixedDelayInMillis(exchange);
             log.info("Fixed Operation delay set to {} ms for {} exchange", delayMillis, exchange.getFullName());
-            taskScheduler.scheduleWithFixedDelay(() -> run(exchange), Instant.now().plusMillis(initDelayMs),
-                                                 Duration.ofMillis(delayMillis));
+            taskScheduler
+                    .scheduleWithFixedDelay(() -> run(exchange), Instant.now().plusMillis(parameters.getInitDelayMs()),
+                                            Duration.ofMillis(delayMillis));
         });
+        taskScheduler.scheduleWithFixedDelay(fileResultService::write,
+                                             Instant.now().plusMillis(parameters.getInitDelayMs() * 2),
+                                             Duration.ofSeconds(30));
     }
 
     private void run(Exchange exchange) {

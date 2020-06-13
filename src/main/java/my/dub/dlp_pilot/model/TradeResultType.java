@@ -4,5 +4,6 @@ public enum TradeResultType {
     IN_PROGRESS,
     SUCCESSFUL,
     TIMED_OUT,
-    DETRIMENTAL
+    DETRIMENTAL,
+    FORCE_CLOSE
 }

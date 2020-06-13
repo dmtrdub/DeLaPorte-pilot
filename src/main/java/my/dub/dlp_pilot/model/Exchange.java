@@ -63,4 +63,11 @@ public class Exchange implements Serializable {
     public String getFullName() {
         return name.getFullName();
     }
+
+    public BigDecimal getFixedFeesUsd() {
+        if (depositFeeUsd == null || withdrawFeeUsd == null) {
+            return BigDecimal.ZERO;
+        }
+        return depositFeeUsd.add(withdrawFeeUsd);
+    }
 }

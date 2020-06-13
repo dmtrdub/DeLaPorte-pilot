@@ -28,7 +28,7 @@ public class CurrentTradeContainer {
             return Collections.emptySet();
         }
         return tradesInProgress.stream().filter(trade -> matchExchange(exchangeName, trade))
-                .collect(Collectors.toSet());
+                               .collect(Collectors.toSet());
     }
 
     private boolean matchExchange(ExchangeName exchangeName, Trade trade) {
@@ -43,9 +43,7 @@ public class CurrentTradeContainer {
         if (otherTrade == null) {
             return false;
         }
-        return tradesInProgress.stream().anyMatch(
-                trade -> otherTrade.getPositionShort().isSimilar(trade.getPositionShort()) ||
-                        otherTrade.getPositionLong().isSimilar(trade.getPositionLong()));
+        return tradesInProgress.stream().anyMatch(otherTrade::isSimilar);
     }
 
     public void removeTrades(Collection<Trade> trades) {

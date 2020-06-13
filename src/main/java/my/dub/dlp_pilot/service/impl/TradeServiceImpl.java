@@ -1,87 +1,56 @@
 package my.dub.dlp_pilot.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
-import my.dub.dlp_pilot.Constants;
-import my.dub.dlp_pilot.exception.rest.NonexistentUSDPriceException;
+import my.dub.dlp_pilot.configuration.ParametersComponent;
 import my.dub.dlp_pilot.model.*;
 import my.dub.dlp_pilot.model.client.Ticker;
 import my.dub.dlp_pilot.repository.TradeRepository;
 import my.dub.dlp_pilot.repository.container.CurrentTradeContainer;
 import my.dub.dlp_pilot.service.ExchangeService;
+import my.dub.dlp_pilot.service.TestRunService;
 import my.dub.dlp_pilot.service.TickerService;
 import my.dub.dlp_pilot.service.TradeService;
 import my.dub.dlp_pilot.util.Calculations;
 import my.dub.dlp_pilot.util.DateUtils;
 import org.apache.commons.lang3.SerializationUtils;
 import org.hibernate.exception.LockAcquisitionException;
-import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.Assert;
+import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-public class TradeServiceImpl implements TradeService, InitializingBean {
-
-    @Value("${trade_entry_min_percentage}")
-    private double entryMinPercentage;
-    @Value("${trade_entry_max_percentage}")
-    private double entryMaxPercentage;
-    @Value("${trade_exit_diff_percentage}")
-    private double exitPercentageDiff;
-    @Value("${exchange_deposit_sum_usd}")
-    private double exchangeDepositSumUsd;
-    @Value("${trade_minutes_timeout}")
-    private double tradeMinutesTimeout;
-    @Value("${trade_detrimental_percentage_delta}")
-    private double detrimentPercentageDelta;
+public class TradeServiceImpl implements TradeService {
 
     private final TradeRepository repository;
     private final CurrentTradeContainer tradeContainer;
     private final TickerService tickerService;
     private final ExchangeService exchangeService;
+    private final ParametersComponent parameters;
+    private final TestRunService testRunService;
 
     @Autowired
     public TradeServiceImpl(TradeRepository repository,
                             CurrentTradeContainer tradeContainer,
                             TickerService tickerService,
-                            ExchangeService exchangeService) {
+                            ExchangeService exchangeService,
+                            ParametersComponent parameters, TestRunService testRunService) {
         this.repository = repository;
         this.tradeContainer = tradeContainer;
         this.tickerService = tickerService;
         this.exchangeService = exchangeService;
-    }
-
-    @Override
-    public void afterPropertiesSet() {
-        validateInputParams();
-    }
-
-    private void validateInputParams() {
-        if (entryMinPercentage <= 0.0) {
-            throw new IllegalArgumentException("Trade entry min percentage cannot be <= 0!");
-        }
-        if (entryMaxPercentage <= entryMinPercentage) {
-            throw new IllegalArgumentException("Trade entry max percentage cannot be <= entry min percentage!");
-        }
-        if (exitPercentageDiff >= entryMinPercentage) {
-            throw new IllegalArgumentException("Trade exit percentage cannot be >= entry min percentage!");
-        }
-        if (exchangeDepositSumUsd <= 0) {
-            throw new IllegalArgumentException("Trade sum cannot be <= 0!");
-        }
-        if (tradeMinutesTimeout <= 0) {
-            throw new IllegalArgumentException("Trade timeout minutes cannot be <= 0!");
-        }
-        if (detrimentPercentageDelta <= 0) {
-            throw new IllegalArgumentException("Detrimental percentage delta cannot be <= 0!");
-        }
+        this.parameters = parameters;
+        this.testRunService = testRunService;
     }
 
     @Override
@@ -97,50 +66,21 @@ public class TradeServiceImpl implements TradeService, InitializingBean {
                         Calculations.percentageDifference(ticker.getPrice(), equivalentTicker.getPrice());
                 BigDecimal prevPercentageDiff = Calculations
                         .percentageDifference(ticker.getPreviousPrice(), equivalentTicker.getPreviousPrice());
-                double currentPercentageDiffDouble = currentPercentageDiff.doubleValue();
-                if (currentPercentageDiffDouble < entryMinPercentage ||
-                        prevPercentageDiff.doubleValue() >= entryMinPercentage ||
-                        currentPercentageDiffDouble > entryMaxPercentage) {
+                if (currentPercentageDiff.compareTo(parameters.getEntryMinPercentage()) < 0 ||
+                        prevPercentageDiff.compareTo(parameters.getEntryMinPercentage()) >= 0 ||
+                        currentPercentageDiff.compareTo(parameters.getEntryMaxPercentage()) > 0) {
                     return;
                 }
-                try {
-                    Trade trade = createTrade(ticker, equivalentTicker, currentPercentageDiff);
-                    boolean added = tradeContainer.addTrade(trade);
-                    if (added) {
-                        log.debug("New {} created and added to container", trade.toShortString());
-                    }
-                } catch (NonexistentUSDPriceException e) {
-                    log.debug(e.getMessage());
+                Assert.isTrue(ticker.getBase().equals(equivalentTicker.getBase()) &&
+                                      ticker.getTarget().equals(equivalentTicker.getTarget()),
+                              "Base and target should be equal!");
+                Trade trade = createTrade(ticker, equivalentTicker, currentPercentageDiff);
+                boolean added = tradeContainer.addTrade(trade);
+                if (added) {
+                    log.debug("New {} created and added to container", trade.toShortString());
                 }
             }
         });
-    }
-
-    private Trade createTrade(Ticker ticker1, Ticker ticker2, BigDecimal percentageDiff) {
-        Trade trade = new Trade();
-        trade.setStartTime(DateUtils.currentDateTime());
-        trade.setAmount(BigDecimal.ONE);
-        trade.setEntryPercentageDiff(percentageDiff);
-        BigDecimal price1 = ticker1.getPrice();
-        BigDecimal price2 = ticker2.getPrice();
-        Position longPos;
-        Position shortPos;
-        if (price1.compareTo(price2) > 0) {
-            shortPos = createPosition(PositionSide.SHORT, ticker1);
-            longPos = createPosition(PositionSide.LONG, ticker2);
-        } else {
-            longPos = createPosition(PositionSide.LONG, ticker1);
-            shortPos = createPosition(PositionSide.SHORT, ticker2);
-        }
-        trade.setPositions(shortPos, longPos);
-        trade.setResultType(TradeResultType.IN_PROGRESS);
-        Exchange exchangeShort = shortPos.getExchange();
-        Exchange exchangeLong = longPos.getExchange();
-        trade.setExpensesUsd(exchangeShort.getDepositFeeUsd().add(exchangeShort.getWithdrawFeeUsd()
-                                                                               .add(exchangeLong.getDepositFeeUsd()
-                                                                                                .add(exchangeLong
-                                                                                                             .getWithdrawFeeUsd()))));
-        return trade;
     }
 
     @Override
@@ -154,24 +94,26 @@ public class TradeServiceImpl implements TradeService, InitializingBean {
             Position positionShort = trade.getPositionShort();
             Position positionLong = trade.getPositionLong();
             Ticker tickerShort = tickerService
-                    .getTicker(positionShort).orElseThrow(() -> new NullPointerException(
+                    .getTicker(positionShort.getExchange().getName(), trade.getBase(), trade.getTarget())
+                    .orElseThrow(() -> new NullPointerException(
                             String.format("Ticker for position (%s) in container is null!", positionShort.toString())));
             Ticker tickerLong = tickerService
-                    .getTicker(positionLong).orElseThrow(() -> new NullPointerException(
+                    .getTicker(positionLong.getExchange().getName(), trade.getBase(), trade.getTarget())
+                    .orElseThrow(() -> new NullPointerException(
                             String.format("Ticker for position (%s) in container is null!", positionLong.toString())));
-            if (tradeMinutesTimeout != 0 && DateUtils.durationMinutes(trade.getStartTime()) > tradeMinutesTimeout) {
+            if (DateUtils.durationMinutes(trade.getStartTime()) > parameters.getTradeMinutesTimeout()) {
                 closeAndAddToSets(tradesCompleted, tradesToSave, trade, tickerShort, tickerLong,
                                   TradeResultType.TIMED_OUT);
             } else {
                 BigDecimal percentageDiff =
                         Calculations.percentageDifference(tickerShort.getPrice(), tickerLong.getPrice());
                 BigDecimal entryPercentageDiff = trade.getEntryPercentageDiff();
-                if (entryPercentageDiff.subtract(percentageDiff).compareTo(BigDecimal.valueOf(exitPercentageDiff)) >
+                if (entryPercentageDiff.subtract(percentageDiff).compareTo(parameters.getExitPercentageDiff()) >
                         0) {
                     closeAndAddToSets(tradesCompleted, tradesToSave, trade, tickerShort, tickerLong,
                                       TradeResultType.SUCCESSFUL);
                 } else if (percentageDiff.subtract(entryPercentageDiff)
-                                         .compareTo(BigDecimal.valueOf(detrimentPercentageDelta)) >= 0) {
+                                         .compareTo(parameters.getDetrimentPercentageDelta()) >= 0) {
                     closeAndAddToSets(tradesCompleted, tradesToSave, trade, tickerShort, tickerLong,
                                       TradeResultType.DETRIMENTAL);
                 }
@@ -199,53 +141,53 @@ public class TradeServiceImpl implements TradeService, InitializingBean {
         BigDecimal priceShort = tickerShort.getPrice();
         Position positionShort = trade.getPositionShort();
         positionShort.setClosePrice(priceShort);
-        BigDecimal usdPriceShort = Constants.USD_SYMBOLS.contains(tickerShort.getTarget()) ? priceShort :
-                tickerService.getUsdPrice(tickerShort.getBase(), positionShort.getExchange().getName());
-        positionShort.setClosePriceUsd(usdPriceShort);
 
         BigDecimal priceLong = tickerLong.getPrice();
         Position positionLong = trade.getPositionLong();
         positionLong.setClosePrice(priceLong);
-        BigDecimal usdPriceLong = Constants.USD_SYMBOLS.contains(tickerLong.getTarget()) ? priceLong :
-                tickerService.getUsdPrice(tickerLong.getBase(), positionLong.getExchange().getName());
-        positionLong.setClosePriceUsd(usdPriceLong);
 
         trade.setEndTime(DateUtils.currentDateTime());
         trade.setResultType(resultType);
-        BigDecimal amount = trade.getAmount();
-        trade.setPnl(calculatePnl(positionShort, positionLong, amount));
-        trade.setPnlUsd(calculatePnlUsd(positionShort, positionLong, amount));
-        trade.setTotalIncome(BigDecimal.ONE);
+        List<TradeDynamicResultData> resultData =
+                parameters.getEntryAmounts().stream()
+                          .map(amount -> createDynamicResultData(trade, positionShort, positionLong, amount))
+                          .collect(Collectors.toList());
+        trade.setResultData(resultData);
     }
 
-    private BigDecimal calculatePnl(Position positionShort, Position positionLong, BigDecimal amount) {
-        BigDecimal pnlShort = Calculations
-                .pnl(positionShort.getSide(), positionShort.getOpenPrice(), positionShort.getClosePrice(), amount);
-        BigDecimal pnlLong = Calculations
-                .pnl(positionLong.getSide(), positionLong.getOpenPrice(), positionLong.getClosePrice(), amount);
-        return pnlShort.add(pnlLong);
-    }
-
-    private BigDecimal calculatePnlUsd(Position positionShort, Position positionLong, BigDecimal amount) {
-        BigDecimal pnlShort = Calculations
-                .pnl(positionShort.getSide(), positionShort.getOpenPriceUsd(), positionShort.getClosePriceUsd(),
-                     amount);
-        BigDecimal pnlLong = Calculations
-                .pnl(positionLong.getSide(), positionLong.getOpenPriceUsd(), positionLong.getClosePriceUsd(), amount);
-        return pnlShort.add(pnlLong);
+    private Trade createTrade(Ticker ticker1, Ticker ticker2, BigDecimal percentageDiff) {
+        Trade trade = new Trade();
+        trade.setBase(ticker1.getBase());
+        trade.setTarget(ticker1.getTarget());
+        trade.setEntryPercentageDiff(percentageDiff);
+        BigDecimal price1 = ticker1.getPrice();
+        BigDecimal price2 = ticker2.getPrice();
+        Position longPos;
+        Position shortPos;
+        if (price1.compareTo(price2) > 0) {
+            shortPos = createPosition(PositionSide.SHORT, ticker1);
+            longPos = createPosition(PositionSide.LONG, ticker2);
+        } else {
+            longPos = createPosition(PositionSide.LONG, ticker1);
+            shortPos = createPosition(PositionSide.SHORT, ticker2);
+        }
+        trade.setPositions(shortPos, longPos);
+        trade.setResultType(TradeResultType.IN_PROGRESS);
+        Exchange exchangeShort = shortPos.getExchange();
+        Exchange exchangeLong = longPos.getExchange();
+        trade.setFixedExpensesUsd(exchangeShort.getFixedFeesUsd().add(exchangeLong.getFixedFeesUsd()));
+        trade.setTestRun(testRunService.getCurrentTestRun());
+        trade.setWrittenToFile(false);
+        trade.setStartTime(DateUtils.currentDateTime());
+        return trade;
     }
 
     private Position createPosition(PositionSide side, Ticker ticker) {
         Position position = new Position();
-        position.setBase(ticker.getBase());
-        position.setTarget(ticker.getTarget());
         position.setSide(side);
         BigDecimal tickerPrice = ticker.getPrice();
         position.setOpenPrice(tickerPrice);
         ExchangeName exchangeName = ticker.getExchangeName();
-        BigDecimal priceUsd = Constants.USD_SYMBOLS.contains(position.getTarget()) ?
-                tickerPrice : tickerService.getUsdPrice(ticker.getBase(), exchangeName);
-        position.setOpenPriceUsd(priceUsd);
         Exchange exchange = exchangeService.findByName(
                 exchangeName).orElseThrow(
                 () -> new NullPointerException(String.format("Exchange by name %s was not found!", exchangeName)));
@@ -253,4 +195,39 @@ public class TradeServiceImpl implements TradeService, InitializingBean {
         return position;
     }
 
+    private TradeDynamicResultData createDynamicResultData(Trade trade, Position positionShort, Position positionLong,
+                                                           Double amount) {
+        TradeDynamicResultData dynamicResultData = new TradeDynamicResultData();
+        BigDecimal amountUsd = BigDecimal.valueOf(amount);
+        dynamicResultData.setAmountUsd(amountUsd);
+        dynamicResultData.setPnlUsdShort(Calculations.pnl(positionShort.getSide(), positionShort.getOpenPrice(),
+                                                          positionShort.getClosePrice(), amountUsd));
+        dynamicResultData.setPnlUsdLong(Calculations.pnl(positionLong.getSide(), positionLong.getOpenPrice(),
+                                                         positionLong.getClosePrice(), amountUsd));
+        BigDecimal variableExpenses = Calculations.originalValueFromPercentSum(amountUsd, positionShort.getExchange()
+                                                                                                       .getTakerFeePercentage(),
+                                                                               amountUsd, positionLong.getExchange()
+                                                                                                      .getTakerFeePercentage());
+        dynamicResultData.setTotalExpensesUsd(trade.getFixedExpensesUsd().add(variableExpenses));
+        dynamicResultData.setIncomeUsd(Calculations.income(dynamicResultData.getPnlUsdShort(),
+                                                           dynamicResultData.getPnlUsdLong(),
+                                                           dynamicResultData.getTotalExpensesUsd()));
+        dynamicResultData.setTrade(trade);
+        return dynamicResultData;
+    }
+
+    @Override
+    @Transactional
+    public Set<Trade> getCompletedTradesNotWrittenToFile() {
+        return repository.findAllByWrittenToFileFalseAndTestRunIdEquals(testRunService.getCurrentTestRun().getId());
+    }
+
+    @Override
+    @Transactional
+    public void updateTradesWrittenToFile(Collection<Trade> trades) {
+        if (CollectionUtils.isEmpty(trades)) {
+            return;
+        }
+        repository.updateTradesSetWrittenToFileTrue(trades.stream().map(Trade::getId).collect(Collectors.toSet()));
+    }
 }
