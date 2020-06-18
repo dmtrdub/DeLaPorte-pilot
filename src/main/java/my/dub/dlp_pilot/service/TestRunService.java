@@ -7,4 +7,10 @@ public interface TestRunService {
     void createAndSave();
 
     TestRun getCurrentTestRun();
+
+    boolean isTradeStopped();
+
+    boolean isTestRunEnd();
+
+    void checkExitFile();
 }

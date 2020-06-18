@@ -16,4 +16,6 @@ public interface TradeService {
     Set<Trade> getCompletedTradesNotWrittenToFile();
 
     void updateTradesWrittenToFile(Collection<Trade> trades);
+
+    boolean allTradesClosed();
 }

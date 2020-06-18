@@ -4,6 +4,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.Constants;
 import my.dub.dlp_pilot.configuration.ParametersComponent;
+import my.dub.dlp_pilot.exception.TestRunEndException;
 import my.dub.dlp_pilot.model.Position;
 import my.dub.dlp_pilot.model.TestRun;
 import my.dub.dlp_pilot.model.Trade;
@@ -70,13 +71,17 @@ public class FileResultService {
         List<String> linesToWrite =
                 completedTrades.stream().map(this::getTradeResultString).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(linesToWrite)) {
+            if (testRunService.isTestRunEnd()) {
+                throw new TestRunEndException();
+            }
             return;
         }
         try {
             Files.write(filePath, linesToWrite, StandardOpenOption.APPEND);
             tradeService.updateTradesWrittenToFile(completedTrades);
+            log.debug("Successfully written {} lines to test result file {}", linesToWrite.size(), filePath);
         } catch (IOException e) {
-            log.error("Error when writing to file {}! Details: {}", filePath.toAbsolutePath(), e.getMessage());
+            log.error("Error when writing to test result file {}! Details: {}", filePath, e.getMessage());
         }
     }
 

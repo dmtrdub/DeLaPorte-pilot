@@ -2,6 +2,7 @@ package my.dub.dlp_pilot.util;
 
 import my.dub.dlp_pilot.Constants;
 import my.dub.dlp_pilot.model.PositionSide;
+import my.dub.dlp_pilot.model.client.Ticker;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -15,14 +16,24 @@ public final class Calculations {
             return BigDecimal.ZERO;
         }
         BigDecimal hundred = BigDecimal.valueOf(100);
-        if (price1.compareTo(price2) > 0) {
+        if (price1.compareTo(price2) > 0 && !isZero(price2)) {
             return price1.multiply(hundred).divide(price2, Constants.PERCENTAGE_SCALE, RoundingMode.HALF_UP)
                          .subtract(hundred);
-        } else if (price2.compareTo(price1) > 0) {
+        } else if (price2.compareTo(price1) > 0 && !isZero(price1)) {
             return price2.multiply(hundred).divide(price1, Constants.PERCENTAGE_SCALE, RoundingMode.HALF_UP)
                          .subtract(hundred);
         }
         return BigDecimal.ZERO;
+    }
+
+    public static BigDecimal percentageDifference(Ticker tickerShort, Ticker tickerLong) {
+        if (tickerLong == null || tickerShort == null || isZero(tickerLong.getPrice())) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal hundred = BigDecimal.valueOf(100);
+        return tickerShort.getPrice().multiply(hundred)
+                          .divide(tickerLong.getPrice(), Constants.PERCENTAGE_SCALE, RoundingMode.HALF_UP)
+                          .subtract(hundred);
     }
 
     public static BigDecimal originalValueFromPercent(BigDecimal target, BigDecimal percentage) {
@@ -54,5 +65,9 @@ public final class Calculations {
     public static BigDecimal getDecimal(double value, int scale) {
         BigDecimal decimal = BigDecimal.valueOf(value);
         return decimal.setScale(scale, RoundingMode.HALF_UP);
+    }
+
+    public static boolean isZero(BigDecimal value) {
+        return value.compareTo(BigDecimal.ZERO) == 0;
     }
 }

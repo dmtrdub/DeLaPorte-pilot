@@ -2,6 +2,7 @@ package my.dub.dlp_pilot.service;
 
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.configuration.ParametersComponent;
+import my.dub.dlp_pilot.exception.TestRunEndException;
 import my.dub.dlp_pilot.model.Exchange;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,10 +56,17 @@ public class ScheduledService implements InitializingBean {
         }
         int exchangesCount = exchanges.size();
         ThreadPoolTaskScheduler taskScheduler = new ThreadPoolTaskScheduler();
-        taskScheduler.setPoolSize(exchangesCount);
+        taskScheduler.setPoolSize(exchangesCount + 2);
         taskScheduler.setThreadNamePrefix("scheduled-");
-        //FIXME: disabled for debugging purposes
-        //taskScheduler.setErrorHandler(TaskUtils.LOG_AND_SUPPRESS_ERROR_HANDLER);
+        taskScheduler.setErrorHandler(t -> {
+            if (t instanceof TestRunEndException && tradeService.allTradesClosed()) {
+                log.info("De La Porte is exiting...");
+                taskScheduler.getScheduledExecutor().shutdownNow();
+                taskScheduler.getScheduledThreadPoolExecutor().shutdownNow();
+            } else {
+                log.error("Unexpected error occurred in scheduled task", t);
+            }
+        });
         taskScheduler.initialize();
         exchanges.forEach(exchange -> {
             int delayMillis = calculateFixedDelayInMillis(exchange);
@@ -70,6 +78,9 @@ public class ScheduledService implements InitializingBean {
         taskScheduler.scheduleWithFixedDelay(fileResultService::write,
                                              Instant.now().plusMillis(parameters.getInitDelayMs() * 2),
                                              Duration.ofSeconds(30));
+        taskScheduler.scheduleWithFixedDelay(testRunService::checkExitFile,
+                                             Instant.now().plusMillis(parameters.getInitDelayMs() * 4),
+                                             Duration.ofSeconds(60));
     }
 
     private void run(Exchange exchange) {

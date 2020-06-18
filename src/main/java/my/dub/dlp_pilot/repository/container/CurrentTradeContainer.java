@@ -53,4 +53,8 @@ public class CurrentTradeContainer {
         tradesInProgress.removeAll(trades);
     }
 
+    public boolean isEmpty() {
+        return tradesInProgress.isEmpty();
+    }
+
 }

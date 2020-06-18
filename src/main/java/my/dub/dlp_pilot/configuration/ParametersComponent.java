@@ -5,10 +5,10 @@ import my.dub.dlp_pilot.Constants;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.util.DateUtils;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -42,6 +42,12 @@ public class ParametersComponent implements InitializingBean {
     private String testRunDurationParam;
     @Value("${test_run_result_csv_dir_path}")
     private String pathToResultDir;
+    @Value("${test_run_forced_exit_file_path}")
+    private String forcedExitFilePath;
+    @Value("${test_run_forced_exit_code}")
+    private String exitCode;
+    @Value("${test_run_max_delay_on_exit_seconds}")
+    private int exitMaxDelaySeconds;
 
     private ExchangeName fallbackExchangeName;
     private BigDecimal entryMinPercentage;
@@ -108,6 +114,12 @@ public class ParametersComponent implements InitializingBean {
             throw new IllegalArgumentException(
                     String.format("Path to result dir parameter cannot be longer than %d chars!",
                                   Constants.FILE_PATH_PARAM_LENGTH));
+        }
+        if (StringUtils.isNotEmpty(forcedExitFilePath) && StringUtils.isBlank(exitCode)) {
+            throw new IllegalArgumentException("Exit code cannot be empty if forced exit is enabled!");
+        }
+        if (exitMaxDelaySeconds < 1) {
+            throw new IllegalArgumentException("Max delay before end of test run cannot be < 1 seconds!");
         }
     }
 }

@@ -5,5 +5,5 @@ public enum TradeResultType {
     SUCCESSFUL,
     TIMED_OUT,
     DETRIMENTAL,
-    FORCE_CLOSE
+    TEST_RUN_END
 }

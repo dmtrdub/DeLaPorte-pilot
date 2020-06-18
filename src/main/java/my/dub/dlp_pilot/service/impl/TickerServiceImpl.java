@@ -6,6 +6,7 @@ import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.client.Ticker;
 import my.dub.dlp_pilot.repository.container.TickerContainer;
+import my.dub.dlp_pilot.service.TestRunService;
 import my.dub.dlp_pilot.service.TickerService;
 import my.dub.dlp_pilot.service.client.RestClient;
 import my.dub.dlp_pilot.util.DateUtils;
@@ -21,18 +22,23 @@ public class TickerServiceImpl implements TickerService {
 
     private final TickerContainer tickerContainer;
     private final RestClient restClient;
+    private final TestRunService testRunService;
     private final ParametersComponent parameters;
 
     @Autowired
     public TickerServiceImpl(TickerContainer tickerContainer, RestClient restClient,
-                             ParametersComponent parameters) {
+                             TestRunService testRunService, ParametersComponent parameters) {
         this.tickerContainer = tickerContainer;
         this.restClient = restClient;
+        this.testRunService = testRunService;
         this.parameters = parameters;
     }
 
     @Override
     public void fetchAndSave(Exchange exchange) {
+        if (testRunService.isTradeStopped()) {
+            return;
+        }
         Set<Ticker> tickers = new HashSet<>(restClient.fetchTickers(exchange));
         save(exchange.getName(), tickers);
     }

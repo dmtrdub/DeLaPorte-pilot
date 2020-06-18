@@ -55,6 +55,9 @@ public class TradeServiceImpl implements TradeService {
 
     @Override
     public void searchForTrades(Exchange exchange) {
+        if (testRunService.isTradeStopped() || testRunService.isTestRunEnd()) {
+            return;
+        }
         Set<Ticker> allTickers = tickerService.getAllTickers();
         Set<Ticker> tickersToCompare = tickerService.getTickers(exchange.getName());
         allTickers.removeAll(tickersToCompare);
@@ -90,6 +93,7 @@ public class TradeServiceImpl implements TradeService {
         Set<Trade> tradesInProgress = tradeContainer.getTrades(exchangeName);
         Set<Trade> tradesCompleted = new HashSet<>();
         Set<Trade> tradesToSave = new HashSet<>();
+        boolean isTestRunEnd = testRunService.isTestRunEnd();
         tradesInProgress.forEach(trade -> {
             Position positionShort = trade.getPositionShort();
             Position positionLong = trade.getPositionLong();
@@ -101,12 +105,15 @@ public class TradeServiceImpl implements TradeService {
                     .getTicker(positionLong.getExchange().getName(), trade.getBase(), trade.getTarget())
                     .orElseThrow(() -> new NullPointerException(
                             String.format("Ticker for position (%s) in container is null!", positionLong.toString())));
-            if (DateUtils.durationMinutes(trade.getStartTime()) > parameters.getTradeMinutesTimeout()) {
+            if (isTestRunEnd) {
+                closeAndAddToSets(tradesCompleted, tradesToSave, trade, tickerShort, tickerLong,
+                                  TradeResultType.TEST_RUN_END);
+            } else if (DateUtils.durationMinutes(trade.getStartTime()) > parameters.getTradeMinutesTimeout()) {
                 closeAndAddToSets(tradesCompleted, tradesToSave, trade, tickerShort, tickerLong,
                                   TradeResultType.TIMED_OUT);
             } else {
                 BigDecimal percentageDiff =
-                        Calculations.percentageDifference(tickerShort.getPrice(), tickerLong.getPrice());
+                        Calculations.percentageDifference(tickerShort, tickerLong);
                 BigDecimal entryPercentageDiff = trade.getEntryPercentageDiff();
                 if (entryPercentageDiff.subtract(percentageDiff).compareTo(parameters.getExitPercentageDiff()) >
                         0) {
@@ -123,6 +130,10 @@ public class TradeServiceImpl implements TradeService {
             repository.saveAll(tradesToSave);
             tradesToSave
                     .forEach(trade -> log.debug("{} closed. Reason: {}", trade.toShortString(), trade.getResultType()));
+            if (isTestRunEnd) {
+                log.info("Closed all opened trades for {} exchange due to the end of Test Run",
+                         exchangeName.getFullName());
+            }
         }
         if (!tradesCompleted.isEmpty()) {
             tradeContainer.removeTrades(tradesCompleted);
@@ -229,5 +240,10 @@ public class TradeServiceImpl implements TradeService {
             return;
         }
         repository.updateTradesSetWrittenToFileTrue(trades.stream().map(Trade::getId).collect(Collectors.toSet()));
+    }
+
+    @Override
+    public boolean allTradesClosed() {
+        return tradeContainer.isEmpty();
     }
 }
