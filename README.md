@@ -1,4 +1,7 @@
 # DeLaPorte-pilot
+
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/3ba6f582f05f4059aaf5888c032b27fd)](https://app.codacy.com/manual/dmytro.dbnsky/DeLaPorte-pilot?utm_source=github.com&utm_medium=referral&utm_content=dmtrdub/DeLaPorte-pilot&utm_campaign=Badge_Grade_Dashboard)
+
 Project dedicated to test cryptocurrency exchange arbitrage possibilities.
 A dedicated exchange API is used to fetch market data.
 
