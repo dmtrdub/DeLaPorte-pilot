@@ -42,6 +42,8 @@ public class ParametersComponent implements InitializingBean {
     private int tradeMinutesTimeout;
     @Value("${trade_detrimental_percentage_delta}")
     private double detrimentPercentageDeltaDouble;
+    @Value("${trade_parallel_number}")
+    private int parallelTradesNumber;
     @Value("${test_run_duration}")
     private String testRunDurationParam;
     @Value("${test_run_result_csv_dir_path}")
@@ -71,9 +73,10 @@ public class ParametersComponent implements InitializingBean {
         entryMaxPercentage = BigDecimal.valueOf(entryMaxPercentageDouble);
         exitPercentageDiff = BigDecimal.valueOf(exitPercentageDiffDouble);
         exitPercentageDiffDecreaseBy = BigDecimal.valueOf(exitPercentageDiffDecreaseByDouble);
-        entryAmounts = Arrays.stream(entryAmountsUsdParam).mapToDouble(Double::parseDouble).boxed().distinct()
+        entryAmounts = Arrays.stream(entryAmountsUsdParam).mapToDouble(Double::parseDouble).boxed().distinct().sorted()
                              .collect(Collectors.toList());
         detrimentPercentageDelta = BigDecimal.valueOf(detrimentPercentageDeltaDouble);
+        parallelTradesNumber = parallelTradesNumber > 0 ? parallelTradesNumber : 0;
         testRunDuration = DateUtils.parseDuration(testRunDurationParam);
     }
 

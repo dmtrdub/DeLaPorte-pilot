@@ -3,6 +3,7 @@ package my.dub.dlp_pilot.repository.container;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.Position;
 import my.dub.dlp_pilot.model.Trade;
+import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
@@ -29,6 +30,23 @@ public class CurrentTradeContainer {
         }
         return tradesInProgress.stream().filter(trade -> matchExchange(exchangeName, trade))
                                .collect(Collectors.toSet());
+    }
+
+    public Pair<Long, Long> tradesCount(ExchangeName exchangeName1, ExchangeName exchangeName2) {
+        if (exchangeName1 == null || exchangeName2 == null) {
+            return Pair.of(0L, 0L);
+        }
+        long exchange1Count = 0;
+        long exchange2Count = 0;
+        for (Trade trade : tradesInProgress) {
+            if (matchExchange(exchangeName1, trade)) {
+                exchange1Count++;
+            }
+            if (matchExchange(exchangeName2, trade)) {
+                exchange2Count++;
+            }
+        }
+        return Pair.of(exchange1Count, exchange2Count);
     }
 
     private boolean matchExchange(ExchangeName exchangeName, Trade trade) {

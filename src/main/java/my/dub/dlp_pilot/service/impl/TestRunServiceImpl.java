@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 @Service
@@ -28,9 +29,10 @@ public class TestRunServiceImpl implements TestRunService {
     private ZonedDateTime tradeStopDateTime;
     private ZonedDateTime testRunEndDateTime;
     private ZonedDateTime tickerDataCaptureEndDateTime;
-    private boolean tradeStop;
-    private boolean testRunEnd;
-    private boolean tickerDataCapture;
+
+    private final AtomicBoolean tradeStop = new AtomicBoolean();
+    private final AtomicBoolean testRunEnd = new AtomicBoolean();
+    private final AtomicBoolean tickerDataCapture = new AtomicBoolean(true);
 
     @Autowired
     public TestRunServiceImpl(TestRunRepository repository, ParametersComponent parameters) {
@@ -66,26 +68,26 @@ public class TestRunServiceImpl implements TestRunService {
 
     @Override
     public boolean isTradeStopped() {
-        if (tradeStopDateTime != null && !tradeStop) {
-            tradeStop = DateUtils.currentDateTime().isAfter(tradeStopDateTime);
+        if (tradeStopDateTime != null && !tradeStop.get()) {
+            tradeStop.set(!DateUtils.currentDateTime().isBefore(tradeStopDateTime));
         }
-        return tradeStop;
+        return tradeStop.get();
     }
 
     @Override
     public boolean isTestRunEnd() {
-        if (testRunEndDateTime != null && !testRunEnd) {
-            testRunEnd = DateUtils.currentDateTime().isAfter(testRunEndDateTime);
+        if (testRunEndDateTime != null && !testRunEnd.get()) {
+            testRunEnd.set(!DateUtils.currentDateTime().isBefore(testRunEndDateTime));
         }
-        return testRunEnd;
+        return testRunEnd.get();
     }
 
     @Override
     public boolean isTickerDataCapture() {
-        if (tickerDataCaptureEndDateTime != null && !tickerDataCapture) {
-            tickerDataCapture = DateUtils.currentDateTime().isBefore(tickerDataCaptureEndDateTime);
+        if (tickerDataCaptureEndDateTime != null && tickerDataCapture.get()) {
+            tickerDataCapture.set(!DateUtils.currentDateTime().isAfter(tickerDataCaptureEndDateTime));
         }
-        return testRunEnd;
+        return tickerDataCapture.get();
     }
 
     @Override

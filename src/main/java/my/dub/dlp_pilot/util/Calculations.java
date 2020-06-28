@@ -8,6 +8,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 
 public final class Calculations {
+
+    private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
+
     private Calculations() {
     }
 
@@ -15,13 +18,12 @@ public final class Calculations {
         if (price1 == null || price2 == null) {
             return BigDecimal.ZERO;
         }
-        BigDecimal hundred = BigDecimal.valueOf(100);
         if (price1.compareTo(price2) > 0 && !isZero(price2)) {
-            return price1.multiply(hundred).divide(price2, Constants.PERCENTAGE_SCALE, RoundingMode.HALF_UP)
-                         .subtract(hundred);
+            return price1.multiply(HUNDRED).divide(price2, Constants.PERCENTAGE_SCALE, RoundingMode.HALF_UP)
+                         .subtract(HUNDRED);
         } else if (price2.compareTo(price1) > 0 && !isZero(price1)) {
-            return price2.multiply(hundred).divide(price1, Constants.PERCENTAGE_SCALE, RoundingMode.HALF_UP)
-                         .subtract(hundred);
+            return price2.multiply(HUNDRED).divide(price1, Constants.PERCENTAGE_SCALE, RoundingMode.HALF_UP)
+                         .subtract(HUNDRED);
         }
         return BigDecimal.ZERO;
     }
@@ -30,14 +32,22 @@ public final class Calculations {
         if (tickerLong == null || tickerShort == null || isZero(tickerLong.getPrice())) {
             return BigDecimal.ZERO;
         }
-        BigDecimal hundred = BigDecimal.valueOf(100);
-        return tickerShort.getPrice().multiply(hundred)
+        return tickerShort.getPrice().multiply(HUNDRED)
                           .divide(tickerLong.getPrice(), Constants.PERCENTAGE_SCALE, RoundingMode.HALF_UP)
-                          .subtract(hundred);
+                          .subtract(HUNDRED);
+    }
+
+    public static BigDecimal expectedClosePriceLong(BigDecimal priceShort, BigDecimal expectedPriceDiffPercentage) {
+        if (priceShort == null || expectedPriceDiffPercentage == null || isZero(priceShort)) {
+            return BigDecimal.ZERO;
+        }
+        return priceShort.multiply(HUNDRED)
+                         .divide(expectedPriceDiffPercentage.add(HUNDRED), Constants.PRICE_SCALE, RoundingMode.HALF_UP);
     }
 
     public static BigDecimal originalValueFromPercent(BigDecimal target, BigDecimal percentage) {
-        return percentage.divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP).multiply(target);
+        return percentage.divide(HUNDRED, Constants.PERCENTAGE_SCALE, RoundingMode.HALF_UP).multiply(target)
+                         .stripTrailingZeros();
     }
 
     public static BigDecimal originalValueFromPercentSum(BigDecimal target1, BigDecimal percentage1, BigDecimal target2,
@@ -46,15 +56,32 @@ public final class Calculations {
     }
 
     public static BigDecimal pnl(PositionSide side, BigDecimal openPrice, BigDecimal closePrice, BigDecimal amountUsd) {
-        BigDecimal amount = amountUsd.divide(openPrice, RoundingMode.HALF_UP);
+        BigDecimal amount = amountUsd.divide(closePrice, Constants.PRICE_SCALE, RoundingMode.HALF_UP);
         if (PositionSide.SHORT.equals(side)) {
-            return openPrice.subtract(closePrice).multiply(amount);
+            return openPrice.subtract(closePrice).multiply(amount).setScale(Constants.PRICE_SCALE, RoundingMode.HALF_UP)
+                            .stripTrailingZeros();
         }
-        return closePrice.subtract(openPrice).multiply(amount);
+        return closePrice.subtract(openPrice).multiply(amount).setScale(Constants.PRICE_SCALE, RoundingMode.HALF_UP)
+                         .stripTrailingZeros();
+    }
+
+    public static BigDecimal expectedPnlLong(BigDecimal openPriceLong, BigDecimal openPriceShort, BigDecimal amountUsd,
+                                             BigDecimal expectedPriceDiffPercentage) {
+        if (openPriceLong == null || openPriceShort == null || isZero(openPriceLong) || isZero(openPriceShort)) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal expectedClosePriceLong = expectedClosePriceLong(openPriceShort, expectedPriceDiffPercentage);
+        return pnl(PositionSide.LONG, openPriceLong, expectedClosePriceLong, amountUsd);
     }
 
     public static BigDecimal income(BigDecimal pnl1, BigDecimal pnl2, BigDecimal totalExpenses) {
         return pnl1.add(pnl2).subtract(totalExpenses);
+    }
+
+    public static BigDecimal expectedIncome(BigDecimal openPriceLong, BigDecimal openPriceShort, BigDecimal amountUsd,
+                                            BigDecimal expectedPriceDiffPercentage, BigDecimal totalExpenses) {
+        return income(expectedPnlLong(openPriceLong, openPriceShort, amountUsd, expectedPriceDiffPercentage),
+                      BigDecimal.ZERO, totalExpenses);
     }
 
     public static BigDecimal getDecimal(String value, int scale) {

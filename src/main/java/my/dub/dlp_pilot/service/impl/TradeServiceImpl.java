@@ -21,6 +21,7 @@ import my.dub.dlp_pilot.util.DateUtils;
 import org.apache.commons.lang3.SerializationUtils;
 import org.hibernate.exception.LockAcquisitionException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.util.Pair;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -69,9 +70,7 @@ public class TradeServiceImpl implements TradeService {
         allTickers.removeAll(tickersToCompare);
         allTickers.forEach(ticker -> {
             Ticker equivalentTicker = tickerService.findEquivalentTickerFromSet(ticker, tickersToCompare);
-            if (equivalentTicker != null && (!ticker.isStale() || !equivalentTicker.isStale()) && !tradeContainer
-                    .isSimilarPresent(ticker.getBase(), ticker.getTarget(), ticker.getExchangeName(),
-                                      equivalentTicker.getExchangeName())) {
+            if (canEnterTrade(ticker, equivalentTicker)) {
                 BigDecimal currentPercentageDiff =
                         Calculations.percentageDifference(ticker.getPrice(), equivalentTicker.getPrice());
                 BigDecimal prevPercentageDiff = Calculations
@@ -79,6 +78,9 @@ public class TradeServiceImpl implements TradeService {
                 if (currentPercentageDiff.compareTo(parameters.getEntryMinPercentage()) < 0 ||
                         prevPercentageDiff.compareTo(parameters.getEntryMinPercentage()) >= 0 ||
                         currentPercentageDiff.compareTo(parameters.getEntryMaxPercentage()) > 0) {
+                    return;
+                }
+                if (!checkProfitability(ticker, equivalentTicker, currentPercentageDiff)) {
                     return;
                 }
                 Assert.isTrue(ticker.getBase().equals(equivalentTicker.getBase()) &&
@@ -91,6 +93,44 @@ public class TradeServiceImpl implements TradeService {
                 }
             }
         });
+    }
+
+    private boolean canEnterTrade(Ticker ticker, Ticker equivalentTicker) {
+        if (equivalentTicker == null) {
+            return false;
+        }
+        if (ticker.isStale() && equivalentTicker.isStale()) {
+            return false;
+        }
+        if (tradeContainer.isSimilarPresent(ticker.getBase(), ticker.getTarget(), ticker.getExchangeName(),
+                                            equivalentTicker.getExchangeName())) {
+            return false;
+        }
+        Pair<Long, Long> tradesCount =
+                tradeContainer.tradesCount(ticker.getExchangeName(), equivalentTicker.getExchangeName());
+        int parallelTradesNumber = parameters.getParallelTradesNumber();
+        return tradesCount.getFirst() <= parallelTradesNumber && tradesCount.getSecond() <=
+                parallelTradesNumber;
+    }
+
+    private boolean checkProfitability(Ticker ticker, Ticker equivalentTicker, BigDecimal currentPercentageDifference) {
+        BigDecimal priceLong;
+        BigDecimal priceShort;
+        if (ticker.getPrice().compareTo(equivalentTicker.getPrice()) > 0) {
+            priceLong = equivalentTicker.getPrice();
+            priceShort = ticker.getPrice();
+        } else {
+            priceLong = ticker.getPrice();
+            priceShort = equivalentTicker.getPrice();
+        }
+        BigDecimal minEntryAmount = BigDecimal.valueOf(parameters.getEntryAmounts().get(0));
+        BigDecimal expenses1 = exchangeService.getTotalExpenses(ticker.getExchangeName(), minEntryAmount);
+        BigDecimal expenses2 = exchangeService.getTotalExpenses(equivalentTicker.getExchangeName(), minEntryAmount);
+        BigDecimal expectedIncome = Calculations.expectedIncome(priceLong, priceShort, minEntryAmount,
+                                                                currentPercentageDifference
+                                                                        .subtract(parameters.getExitPercentageDiff()),
+                                                                expenses1.add(expenses2));
+        return expectedIncome.compareTo(BigDecimal.ZERO) >= 0;
     }
 
     @Override
