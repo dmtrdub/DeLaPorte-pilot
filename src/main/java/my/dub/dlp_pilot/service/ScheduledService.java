@@ -59,10 +59,12 @@ public class ScheduledService implements InitializingBean {
         taskScheduler.setPoolSize(exchangesCount + 2);
         taskScheduler.setThreadNamePrefix("scheduled-");
         taskScheduler.setErrorHandler(t -> {
-            if (t instanceof TestRunEndException && tradeService.allTradesClosed()) {
-                log.info("De La Porte is exiting...");
-                taskScheduler.getScheduledExecutor().shutdownNow();
-                taskScheduler.getScheduledThreadPoolExecutor().shutdownNow();
+            if (t instanceof TestRunEndException) {
+                if (tradeService.allTradesClosed()) {
+                    log.info("De La Porte is exiting...");
+                    taskScheduler.getScheduledExecutor().shutdownNow();
+                    taskScheduler.getScheduledThreadPoolExecutor().shutdownNow();
+                }
             } else {
                 log.error("Unexpected error occurred in scheduled task", t);
             }

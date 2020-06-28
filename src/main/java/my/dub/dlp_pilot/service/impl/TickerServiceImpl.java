@@ -14,7 +14,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -51,23 +55,22 @@ public class TickerServiceImpl implements TickerService {
         tickerContainer.addTickers(exchangeName, tickers);
     }
 
-    public boolean checkStale(Ticker ticker) {
-        if (!ticker.isStale() &&
-                DateUtils.durationSeconds(ticker.getDateTime()) > parameters.getStaleDifferenceSeconds()) {
-            ticker.setStale(true);
-            return true;
-        }
-        return false;
-    }
-
     @Override
     public Set<Ticker> getTickers(ExchangeName exchangeName) {
-        return tickerContainer.getTickers(exchangeName, false);
+        return tickerContainer.getTickers(exchangeName, true);
     }
 
     @Override
-    public Set<Ticker> getAllTickers() {
-        return tickerContainer.getAll(false);
+    public Set<Ticker> getAllTickers(boolean checkStale) {
+        if (checkStale) {
+            tickerContainer.getAllStream().forEach(ticker -> {
+                if (!ticker.isStale() &&
+                        DateUtils.durationSeconds(ticker.getDateTime()) >= parameters.getStaleDifferenceSeconds()) {
+                    ticker.setStale(true);
+                }
+            });
+        }
+        return tickerContainer.getAll(true);
     }
 
     @Override

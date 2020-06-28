@@ -27,6 +27,10 @@ public class TestRunServiceImpl implements TestRunService {
     private TestRun currentTestRun;
     private ZonedDateTime tradeStopDateTime;
     private ZonedDateTime testRunEndDateTime;
+    private ZonedDateTime tickerDataCaptureEndDateTime;
+    private boolean tradeStop;
+    private boolean testRunEnd;
+    private boolean tickerDataCapture;
 
     @Autowired
     public TestRunServiceImpl(TestRunRepository repository, ParametersComponent parameters) {
@@ -46,10 +50,13 @@ public class TestRunServiceImpl implements TestRunService {
         testRun.setDetrimentalPercentageDelta(parameters.getDetrimentPercentageDeltaDouble());
         ZonedDateTime startTime = DateUtils.currentDateTime();
         testRun.setStartTime(startTime);
-        testRun.setEndTime(startTime.plus(parameters.getTestRunDuration()));
+        int tickerDataCaptureDurationSeconds = parameters.getStaleDifferenceSeconds() + 1;
+        testRun.setEndTime(
+                startTime.plus(parameters.getTestRunDuration()).plusSeconds(tickerDataCaptureDurationSeconds));
         currentTestRun = repository.save(testRun);
         tradeStopDateTime = currentTestRun.getEndTime();
         testRunEndDateTime = tradeStopDateTime.plusSeconds(parameters.getExitMaxDelaySeconds());
+        tickerDataCaptureEndDateTime = startTime.plusSeconds(tickerDataCaptureDurationSeconds);
     }
 
     @Override
@@ -59,12 +66,26 @@ public class TestRunServiceImpl implements TestRunService {
 
     @Override
     public boolean isTradeStopped() {
-        return tradeStopDateTime != null && DateUtils.currentDateTime().isAfter(tradeStopDateTime);
+        if (tradeStopDateTime != null && !tradeStop) {
+            tradeStop = DateUtils.currentDateTime().isAfter(tradeStopDateTime);
+        }
+        return tradeStop;
     }
 
     @Override
     public boolean isTestRunEnd() {
-        return testRunEndDateTime != null && DateUtils.currentDateTime().isAfter(testRunEndDateTime);
+        if (testRunEndDateTime != null && !testRunEnd) {
+            testRunEnd = DateUtils.currentDateTime().isAfter(testRunEndDateTime);
+        }
+        return testRunEnd;
+    }
+
+    @Override
+    public boolean isTickerDataCapture() {
+        if (tickerDataCaptureEndDateTime != null && !tickerDataCapture) {
+            tickerDataCapture = DateUtils.currentDateTime().isBefore(tickerDataCaptureEndDateTime);
+        }
+        return testRunEnd;
     }
 
     @Override

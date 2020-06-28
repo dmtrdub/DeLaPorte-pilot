@@ -2,7 +2,13 @@ package my.dub.dlp_pilot.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.configuration.ParametersComponent;
-import my.dub.dlp_pilot.model.*;
+import my.dub.dlp_pilot.model.Exchange;
+import my.dub.dlp_pilot.model.ExchangeName;
+import my.dub.dlp_pilot.model.Position;
+import my.dub.dlp_pilot.model.PositionSide;
+import my.dub.dlp_pilot.model.Trade;
+import my.dub.dlp_pilot.model.TradeDynamicResultData;
+import my.dub.dlp_pilot.model.TradeResultType;
 import my.dub.dlp_pilot.model.client.Ticker;
 import my.dub.dlp_pilot.repository.TradeRepository;
 import my.dub.dlp_pilot.repository.container.CurrentTradeContainer;
@@ -55,16 +61,17 @@ public class TradeServiceImpl implements TradeService {
 
     @Override
     public void searchForTrades(Exchange exchange) {
-        if (testRunService.isTradeStopped() || testRunService.isTestRunEnd()) {
+        if (testRunService.isTickerDataCapture() || testRunService.isTradeStopped() || testRunService.isTestRunEnd()) {
             return;
         }
-        Set<Ticker> allTickers = tickerService.getAllTickers();
+        Set<Ticker> allTickers = tickerService.getAllTickers(true);
         Set<Ticker> tickersToCompare = tickerService.getTickers(exchange.getName());
         allTickers.removeAll(tickersToCompare);
         allTickers.forEach(ticker -> {
             Ticker equivalentTicker = tickerService.findEquivalentTickerFromSet(ticker, tickersToCompare);
-            if (equivalentTicker != null && !tickerService.checkStale(ticker) &&
-                    !tickerService.checkStale(equivalentTicker)) {
+            if (equivalentTicker != null && (!ticker.isStale() || !equivalentTicker.isStale()) && !tradeContainer
+                    .isSimilarPresent(ticker.getBase(), ticker.getTarget(), ticker.getExchangeName(),
+                                      equivalentTicker.getExchangeName())) {
                 BigDecimal currentPercentageDiff =
                         Calculations.percentageDifference(ticker.getPrice(), equivalentTicker.getPrice());
                 BigDecimal prevPercentageDiff = Calculations
@@ -90,6 +97,9 @@ public class TradeServiceImpl implements TradeService {
     @Transactional
     @Retryable(LockAcquisitionException.class)
     public void handleTrades(ExchangeName exchangeName) {
+        if (testRunService.isTickerDataCapture()) {
+            return;
+        }
         Set<Trade> tradesInProgress = tradeContainer.getTrades(exchangeName);
         Set<Trade> tradesCompleted = new HashSet<>();
         Set<Trade> tradesToSave = new HashSet<>();
@@ -112,11 +122,10 @@ public class TradeServiceImpl implements TradeService {
                 closeAndAddToSets(tradesCompleted, tradesToSave, trade, tickerShort, tickerLong,
                                   TradeResultType.TIMED_OUT);
             } else {
-                BigDecimal percentageDiff =
-                        Calculations.percentageDifference(tickerShort, tickerLong);
+                BigDecimal percentageDiff = Calculations.percentageDifference(tickerShort, tickerLong);
                 BigDecimal entryPercentageDiff = trade.getEntryPercentageDiff();
-                if (entryPercentageDiff.subtract(percentageDiff).compareTo(parameters.getExitPercentageDiff()) >
-                        0) {
+                if (entryPercentageDiff.subtract(percentageDiff).compareTo(
+                        parameters.getExitPercentageDiff(DateUtils.durationSeconds(trade.getStartTime()))) >= 0) {
                     closeAndAddToSets(tradesCompleted, tradesToSave, trade, tickerShort, tickerLong,
                                       TradeResultType.SUCCESSFUL);
                 } else if (percentageDiff.subtract(entryPercentageDiff)
@@ -230,7 +239,8 @@ public class TradeServiceImpl implements TradeService {
     @Override
     @Transactional
     public Set<Trade> getCompletedTradesNotWrittenToFile() {
-        return repository.findAllByWrittenToFileFalseAndTestRunIdEquals(testRunService.getCurrentTestRun().getId());
+        return repository
+                .findDistinctByWrittenToFileFalseAndTestRunIdEquals(testRunService.getCurrentTestRun().getId());
     }
 
     @Override

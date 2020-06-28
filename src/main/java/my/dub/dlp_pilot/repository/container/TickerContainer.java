@@ -20,7 +20,7 @@ import java.util.stream.Stream;
 @Component
 public class TickerContainer {
 
-    // Exclude possible concurrency exceptions by decentralizing storage
+    // Exclude concurrency exceptions by decentralizing storage
     private final Set<Ticker> bigONETickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<Ticker> binanceTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<Ticker> bitBayTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -56,13 +56,16 @@ public class TickerContainer {
     }
 
     public Set<Ticker> getAll(boolean includeStale) {
-        Stream<Ticker> tickerStream =
-                Stream.of(bigONETickers, binanceTickers, bitBayTickers, bitfinexTickers, bithumbTickers, bitmartTickers,
-                          bitmaxTickers, bittrexTickers, bwTickers).flatMap(Collection::stream);
+        Stream<Ticker> tickerStream = getAllStream();
         if (!includeStale) {
             tickerStream = tickerStream.filter(ticker -> !ticker.isStale());
         }
         return tickerStream.collect(Collectors.toSet());
+    }
+
+    public Stream<Ticker> getAllStream() {
+        return Stream.of(bigONETickers, binanceTickers, bitBayTickers, bitfinexTickers, bithumbTickers, bitmartTickers,
+                  bitmaxTickers, bittrexTickers, bwTickers).flatMap(Collection::stream);
     }
 
     public Set<Ticker> getTickers(ExchangeName exchangeName, boolean includeStale) {

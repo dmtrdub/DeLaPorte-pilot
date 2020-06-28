@@ -14,11 +14,9 @@ public interface TickerService {
 
     void save(ExchangeName exchangeName, Collection<Ticker> tickers);
 
-    boolean checkStale(Ticker ticker);
-
     Set<Ticker> getTickers(ExchangeName exchangeName);
 
-    Set<Ticker> getAllTickers();
+    Set<Ticker> getAllTickers(boolean checkStale);
 
     Optional<Ticker> getTicker(ExchangeName exchangeName, String base, String target);
 

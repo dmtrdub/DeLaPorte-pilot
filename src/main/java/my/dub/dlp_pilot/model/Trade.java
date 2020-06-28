@@ -12,7 +12,9 @@ import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 import java.util.List;
 
-import static my.dub.dlp_pilot.Constants.*;
+import static my.dub.dlp_pilot.Constants.DEFAULT_PAIR_DELIMITER;
+import static my.dub.dlp_pilot.Constants.PERCENTAGE_SCALE;
+import static my.dub.dlp_pilot.Constants.PRICE_SCALE;
 
 @Data
 @NoArgsConstructor
@@ -81,21 +83,10 @@ public class Trade implements Serializable {
         return base + DEFAULT_PAIR_DELIMITER + target;
     }
 
-    public boolean isSimilar(Trade otherTrade) {
-        if (otherTrade == null) return false;
-        if (this == otherTrade) return true;
-        if (!base.equals(otherTrade.base)) return false;
-        if (!target.equals(otherTrade.target)) return false;
-        if (!resultType.equals(otherTrade.getResultType())) return false;
-        return positionShort.getExchange().getName().equals(otherTrade.getPositionShort().getExchange().getName()) ||
-                positionLong.getExchange().getName().equals(otherTrade.getPositionLong().getExchange().getName());
-    }
-
     public String toShortString() {
         String first =
                 "Trade{pair=" + getPair() + ", fixedExpensesUsd=" + fixedExpensesUsd + ", startTime=" + startTime +
-                        ", entryPercentageDiff=" +
-                        entryPercentageDiff;
+                        ", entryPercentageDiff=" + entryPercentageDiff;
         if (!TradeResultType.IN_PROGRESS.equals(resultType)) {
             first = first + ", endTime=" + endTime + ", resultType=" + resultType;
         }

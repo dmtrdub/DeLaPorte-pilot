@@ -17,7 +17,7 @@ public class CurrentTradeContainer {
     private final Set<Trade> tradesInProgress = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     public boolean addTrade(Trade trade) {
-        if (trade == null || isSimilarPresent(trade)) {
+        if (trade == null) {
             return false;
         }
         return tradesInProgress.add(trade);
@@ -39,11 +39,14 @@ public class CurrentTradeContainer {
                 (positionShort != null && exchangeName.equals(positionShort.getExchange().getName()));
     }
 
-    public boolean isSimilarPresent(Trade otherTrade) {
-        if (otherTrade == null) {
-            return false;
-        }
-        return tradesInProgress.stream().anyMatch(otherTrade::isSimilar);
+    public boolean isSimilarPresent(String base, String target, ExchangeName exchange1, ExchangeName exchange2) {
+        return tradesInProgress.stream().anyMatch(trade -> {
+            ExchangeName exchangeShort = trade.getPositionShort().getExchange().getName();
+            ExchangeName exchangeLong = trade.getPositionLong().getExchange().getName();
+            return trade.getBase().equals(base) && trade.getTarget().equals(target) &&
+                    ((exchangeShort.equals(exchange1) && exchangeLong.equals(exchange2)) ||
+                            (exchangeShort.equals(exchange2) && exchangeLong.equals(exchange1)));
+        });
     }
 
     public void removeTrades(Collection<Trade> trades) {
