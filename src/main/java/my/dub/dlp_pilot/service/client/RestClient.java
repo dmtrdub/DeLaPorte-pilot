@@ -2,7 +2,11 @@ package my.dub.dlp_pilot.service.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.api.client.http.*;
+import com.google.api.client.http.GenericUrl;
+import com.google.api.client.http.HttpRequest;
+import com.google.api.client.http.HttpRequestFactory;
+import com.google.api.client.http.HttpResponse;
+import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.Constants;
@@ -10,7 +14,17 @@ import my.dub.dlp_pilot.exception.rest.UnexpectedEndpointResponseException;
 import my.dub.dlp_pilot.exception.rest.UnexpectedResponseStatusCodeException;
 import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.ExchangeName;
-import my.dub.dlp_pilot.model.client.*;
+import my.dub.dlp_pilot.model.client.BWTicker;
+import my.dub.dlp_pilot.model.client.BigONETicker;
+import my.dub.dlp_pilot.model.client.BinanceTicker;
+import my.dub.dlp_pilot.model.client.BitBayTicker;
+import my.dub.dlp_pilot.model.client.BitMaxTicker;
+import my.dub.dlp_pilot.model.client.BitfinexTicker;
+import my.dub.dlp_pilot.model.client.BithumbTicker;
+import my.dub.dlp_pilot.model.client.BitmartTicker;
+import my.dub.dlp_pilot.model.client.BittrexTicker;
+import my.dub.dlp_pilot.model.client.CoinoneTicker;
+import my.dub.dlp_pilot.model.client.Ticker;
 import my.dub.dlp_pilot.service.ExchangeService;
 import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.beans.factory.InitializingBean;
@@ -20,7 +34,13 @@ import org.springframework.util.StringUtils;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
@@ -56,17 +76,13 @@ public class RestClient implements InitializingBean {
         Set<Exchange> exchanges = exchangeService.findAll();
         pingAll(exchanges);
         fetchAllAdditionalSymbolData(exchanges);
-
-        //TODO: remove
-        //exchanges.forEach(this::fetchTickers);
     }
 
     public void pingAll(Set<Exchange> exchanges) {
         exchanges.forEach(exchange -> {
             try {
                 ping(exchange);
-            }
-            catch (IOException e) {
+            } catch (IOException e) {
                 log.error("Unable test connection with Exchange: {}! Caused by: {}", exchange.getFullName(),
                           e.getMessage());
             }
@@ -87,6 +103,7 @@ public class RestClient implements InitializingBean {
                 break;
             case BITBAY:
             case BITMAX:
+            case COINONE:
                 log.warn("Exchange: {} does not have a dedicated endpoint to check connection!",
                          fullName);
                 return;
@@ -103,8 +120,7 @@ public class RestClient implements InitializingBean {
         exchanges.forEach(exchange -> {
             try {
                 fetchAdditionalSymbolData(exchange);
-            }
-            catch (IOException e) {
+            } catch (IOException e) {
                 log.error("Unable to fetch additional symbol data for Exchange: {}! Caused by: {}",
                           exchange.getFullName(), e.getMessage());
             }
@@ -231,13 +247,14 @@ public class RestClient implements InitializingBean {
                 case BW:
                     result = fetchBWTickers(exchange);
                     break;
+                case COINONE:
+                    result = fetchCoinoneTickers(exchange);
+                    break;
             }
             log.debug("Successfully fetched {} tickers from {} exchange", result.size(), exchange.getFullName());
-        }
-        catch (UnexpectedEndpointResponseException | UnexpectedResponseStatusCodeException e) {
+        } catch (UnexpectedEndpointResponseException | UnexpectedResponseStatusCodeException e) {
             log.error(e.getMessage());
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             log.error("Unable to fetch tickers on {} exchange! Details: {}", exchangeName, e.getMessage());
         }
 
@@ -555,6 +572,39 @@ public class RestClient implements InitializingBean {
         return tickers;
     }
 
+    /**
+     * NOTE: only KRW target symbol is supported!
+     *
+     * @param exchange
+     * @see <a href="https://doc.coinone.co.kr/#operation/public_api_ticker_utc">Coinone REST API - Ticker</a>
+     */
+    private Set<CoinoneTicker> fetchCoinoneTickers(Exchange exchange) throws IOException {
+        String exchangeName = exchange.getFullName();
+        String resp = executeRequest(exchange.getBaseEndpoint(), "ticker_utc?currency=all", exchangeName);
+        JsonNode parentNode = new ObjectMapper().readTree(resp);
+        if (parentNode == null || parentNode.isEmpty()) {
+            throw new UnexpectedEndpointResponseException(exchangeName, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
+        }
+        int code = parentNode.get("errorCode").asInt();
+        if (code != 0) {
+            String errorMsg = parentNode.get("errorMsg").asText();
+            throw new UnexpectedEndpointResponseException(exchangeName, String.valueOf(code), errorMsg);
+        }
+
+        Set<CoinoneTicker> tickers = new HashSet<>();
+        for (JsonNode innerNode : parentNode) {
+            if (innerNode.isTextual()) {
+                continue;
+            }
+            CoinoneTicker ticker = new CoinoneTicker();
+            ticker.setBase(innerNode.get("currency").asText().toUpperCase());
+            ticker.setTarget("KRW");
+            ticker.setPrice(new BigDecimal(innerNode.get("last").asText()));
+            tickers.add(ticker);
+        }
+        return tickers;
+    }
+
 
     private String executeRequest(String baseUrl, String endpointUrl, String exchangeName) throws IOException {
         String fullUrl = baseUrl + endpointUrl;
@@ -577,8 +627,7 @@ public class RestClient implements InitializingBean {
             symbols = input.split(splitRegex, 2);
             ticker.setBase(findOriginalSymbol(symbols[0].toUpperCase()));
             ticker.setTarget(findOriginalSymbol(symbols[1].toUpperCase()));
-        }
-        catch (ArrayIndexOutOfBoundsException e) {
+        } catch (ArrayIndexOutOfBoundsException e) {
             log.debug("Incorrect pair input ({}) for {} exchange! Expecting to parse with split regex: {}", input,
                       ticker.getExchangeName().getFullName(), splitRegex);
             return false;
