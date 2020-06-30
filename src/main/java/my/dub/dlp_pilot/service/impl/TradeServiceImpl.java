@@ -80,7 +80,7 @@ public class TradeServiceImpl implements TradeService {
                         currentPercentageDiff.compareTo(parameters.getEntryMaxPercentage()) > 0) {
                     return;
                 }
-                if (!checkProfitability(ticker, equivalentTicker, currentPercentageDiff)) {
+                if (!checkProfitability(ticker, equivalentTicker)) {
                     return;
                 }
                 Assert.isTrue(ticker.getBase().equals(equivalentTicker.getBase()) &&
@@ -102,6 +102,9 @@ public class TradeServiceImpl implements TradeService {
         if (ticker.isStale() && equivalentTicker.isStale()) {
             return false;
         }
+        if(Calculations.isNotPositive(ticker.getPrice()) || Calculations.isNotPositive(equivalentTicker.getPrice())) {
+            return false;
+        }
         if (tradeContainer.isSimilarPresent(ticker.getBase(), ticker.getTarget(), ticker.getExchangeName(),
                                             equivalentTicker.getExchangeName())) {
             return false;
@@ -113,7 +116,7 @@ public class TradeServiceImpl implements TradeService {
                 parallelTradesNumber;
     }
 
-    private boolean checkProfitability(Ticker ticker, Ticker equivalentTicker, BigDecimal currentPercentageDifference) {
+    private boolean checkProfitability(Ticker ticker, Ticker equivalentTicker) {
         BigDecimal priceLong;
         BigDecimal priceShort;
         if (ticker.getPrice().compareTo(equivalentTicker.getPrice()) > 0) {
@@ -127,8 +130,7 @@ public class TradeServiceImpl implements TradeService {
         BigDecimal expenses1 = exchangeService.getTotalExpenses(ticker.getExchangeName(), minEntryAmount);
         BigDecimal expenses2 = exchangeService.getTotalExpenses(equivalentTicker.getExchangeName(), minEntryAmount);
         BigDecimal expectedIncome = Calculations.expectedIncome(priceLong, priceShort, minEntryAmount,
-                                                                currentPercentageDifference
-                                                                        .subtract(parameters.getExitPercentageDiff()),
+                                                                parameters.getExitPercentageDiff(),
                                                                 expenses1.add(expenses2));
         return expectedIncome.compareTo(BigDecimal.ZERO) >= 0;
     }
@@ -280,7 +282,7 @@ public class TradeServiceImpl implements TradeService {
     @Transactional
     public Set<Trade> getCompletedTradesNotWrittenToFile() {
         return repository
-                .findDistinctByWrittenToFileFalseAndTestRunIdEquals(testRunService.getCurrentTestRun().getId());
+                .findByWrittenToFileFalseAndTestRunIdEquals(testRunService.getCurrentTestRun().getId());
     }
 
     @Override

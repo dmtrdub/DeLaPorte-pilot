@@ -68,8 +68,8 @@ public class FileResultService {
 
     public void write() {
         Set<Trade> completedTrades = tradeService.getCompletedTradesNotWrittenToFile();
-        List<String> linesToWrite =
-                completedTrades.stream().map(this::getTradeResultString).collect(Collectors.toList());
+        Set<String> linesToWrite =
+                completedTrades.stream().map(this::getTradeResultString).collect(Collectors.toSet());
         if (CollectionUtils.isEmpty(linesToWrite)) {
             if (testRunService.isTestRunEnd()) {
                 throw new TestRunEndException();

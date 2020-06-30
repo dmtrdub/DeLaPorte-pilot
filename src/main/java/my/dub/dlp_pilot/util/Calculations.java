@@ -37,12 +37,16 @@ public final class Calculations {
                           .subtract(HUNDRED);
     }
 
-    public static BigDecimal expectedClosePriceLong(BigDecimal priceShort, BigDecimal expectedPriceDiffPercentage) {
-        if (priceShort == null || expectedPriceDiffPercentage == null || isZero(priceShort)) {
+    public static BigDecimal expectedClosePriceLong(BigDecimal priceShort, BigDecimal priceLong,
+                                                    BigDecimal exitPercentageDiff) {
+        if (priceShort == null || priceLong == null || exitPercentageDiff == null || isZero(priceShort) ||
+                isZero(priceLong)) {
             return BigDecimal.ZERO;
         }
-        return priceShort.multiply(HUNDRED)
-                         .divide(expectedPriceDiffPercentage.add(HUNDRED), Constants.PRICE_SCALE, RoundingMode.HALF_UP);
+        BigDecimal shortPriceVar = priceShort.multiply(HUNDRED);
+        BigDecimal denom = shortPriceVar.divide(priceLong, Constants.PRICE_SCALE, RoundingMode.HALF_UP)
+                                        .subtract(exitPercentageDiff);
+        return shortPriceVar.divide(denom, Constants.PRICE_SCALE, RoundingMode.HALF_UP);
     }
 
     public static BigDecimal originalValueFromPercent(BigDecimal target, BigDecimal percentage) {
@@ -66,11 +70,11 @@ public final class Calculations {
     }
 
     public static BigDecimal expectedPnlLong(BigDecimal openPriceLong, BigDecimal openPriceShort, BigDecimal amountUsd,
-                                             BigDecimal expectedPriceDiffPercentage) {
+                                             BigDecimal exitPercentageDiff) {
         if (openPriceLong == null || openPriceShort == null || isZero(openPriceLong) || isZero(openPriceShort)) {
             return BigDecimal.ZERO;
         }
-        BigDecimal expectedClosePriceLong = expectedClosePriceLong(openPriceShort, expectedPriceDiffPercentage);
+        BigDecimal expectedClosePriceLong = expectedClosePriceLong(openPriceShort, openPriceLong, exitPercentageDiff);
         return pnl(PositionSide.LONG, openPriceLong, expectedClosePriceLong, amountUsd);
     }
 
@@ -79,8 +83,8 @@ public final class Calculations {
     }
 
     public static BigDecimal expectedIncome(BigDecimal openPriceLong, BigDecimal openPriceShort, BigDecimal amountUsd,
-                                            BigDecimal expectedPriceDiffPercentage, BigDecimal totalExpenses) {
-        return income(expectedPnlLong(openPriceLong, openPriceShort, amountUsd, expectedPriceDiffPercentage),
+                                            BigDecimal exitPercentageDiff, BigDecimal totalExpenses) {
+        return income(expectedPnlLong(openPriceLong, openPriceShort, amountUsd, exitPercentageDiff),
                       BigDecimal.ZERO, totalExpenses);
     }
 
@@ -96,5 +100,9 @@ public final class Calculations {
 
     public static boolean isZero(BigDecimal value) {
         return value.compareTo(BigDecimal.ZERO) == 0;
+    }
+
+    public static boolean isNotPositive(BigDecimal value) {
+        return value.compareTo(BigDecimal.ZERO) <= 0;
     }
 }

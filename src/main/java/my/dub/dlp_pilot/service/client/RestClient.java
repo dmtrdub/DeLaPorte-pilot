@@ -34,6 +34,7 @@ import org.springframework.util.StringUtils;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -364,7 +365,10 @@ public class RestClient implements InitializingBean {
                 continue;
             }
             ticker.setPrice(new BigDecimal(price));
-            ticker.setDateTime(DateUtils.getDateTimeFromEpoch(innerNode.get("time").asLong()));
+            ZonedDateTime dateTime = DateUtils.getDateTimeFromEpoch(innerNode.get("time").asLong());
+            if(dateTime.isBefore(DateUtils.currentDateTime())){
+                ticker.setDateTime(dateTime);
+            }
             tickers.add(ticker);
         }
         return tickers;
@@ -391,7 +395,8 @@ public class RestClient implements InitializingBean {
         Set<BitfinexTicker> tickers = new HashSet<>();
         for (JsonNode innerNode : parentNode) {
             String pair = innerNode.get(0).asText();
-            if (!pair.startsWith("t")) {
+            String prefix = "t";
+            if (!pair.startsWith(prefix)) {
                 continue;
             }
             BitfinexTicker ticker = new BitfinexTicker();
@@ -399,7 +404,7 @@ public class RestClient implements InitializingBean {
             if (target == null) {
                 continue;
             }
-            String base = pair.replace(target, "");
+            String base = pair.replace(prefix, "").replace(":", "").replace(target, "");
             ticker.setBase(base);
             ticker.setTarget(target);
             ticker.setPrice(new BigDecimal(innerNode.get(1).asText()));

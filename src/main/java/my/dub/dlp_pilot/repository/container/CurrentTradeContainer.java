@@ -17,8 +17,9 @@ import java.util.stream.Collectors;
 public class CurrentTradeContainer {
     private final Set<Trade> tradesInProgress = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
+    // check if similar trade exists here, as well as before creating trade
     public boolean addTrade(Trade trade) {
-        if (trade == null) {
+        if (trade == null || isSimilarPresent(trade)) {
             return false;
         }
         return tradesInProgress.add(trade);
@@ -65,6 +66,11 @@ public class CurrentTradeContainer {
                     ((exchangeShort.equals(exchange1) && exchangeLong.equals(exchange2)) ||
                             (exchangeShort.equals(exchange2) && exchangeLong.equals(exchange1)));
         });
+    }
+
+    public boolean isSimilarPresent(Trade trade) {
+        return isSimilarPresent(trade.getBase(), trade.getTarget(), trade.getPositionShort().getExchange().getName(),
+                                trade.getPositionLong().getExchange().getName());
     }
 
     public void removeTrades(Collection<Trade> trades) {
