@@ -11,8 +11,6 @@ create table if not exists exchange
     primary key (id),
     constraint exchange_base_endpoint_uindex
         unique (base_endpoint),
-    constraint exchange_id_uindex
-        unique (id),
     constraint exchange_name_uindex
         unique (name)
 )
@@ -20,6 +18,41 @@ create table if not exists exchange
 
 create unique index exchange_id_uindex
     on exchange (id);
+
+create table if not exists test_run
+(
+    id                           int auto_increment,
+    entry_amounts_usd            varchar(50)                        not null,
+    entry_min_percentage         decimal(8, 3)                      not null,
+    entry_max_percentage         decimal(8, 3)                      not null,
+    exit_diff_percentage         decimal(8, 3)                      not null,
+    trade_timeout_mins           int                                not null,
+    detrimental_percentage_delta decimal(8, 3)                      not null,
+    time_start                   datetime default CURRENT_TIMESTAMP not null,
+    time_end                     datetime default CURRENT_TIMESTAMP not null,
+    path_to_result_file          varchar(276)                       null,
+    primary key (id)
+);
+
+create unique index test_run_id_uindex
+    on test_run (id);
+
+create table if not exists position
+(
+    id          int auto_increment,
+    side        tinyint         not null,
+    open_price  decimal(25, 12) not null,
+    close_price decimal(25, 12) null,
+    exchange_id int             null,
+    primary key (id),
+    constraint position_exchange_fk
+        foreign key (exchange_id) references exchange (id)
+            on update cascade on delete set null
+)
+    comment 'exchange-specific position';
+
+create unique index position_id_uindex
+    on position (id);
 
 create table if not exists trade
 (
@@ -49,23 +82,6 @@ create table if not exists trade
 create unique index trade_id_uindex
     on trade (id);
 
-create table if not exists position
-(
-    id          int auto_increment,
-    side        tinyint         not null,
-    open_price  decimal(25, 12) not null,
-    close_price decimal(25, 12) null,
-    exchange_id int             null,
-    primary key (id),
-    constraint position_exchange_fk
-        foreign key (exchange_id) references exchange (id)
-            on update cascade on delete set null
-)
-    comment 'exchange-specific position';
-
-create unique index position_id_uindex
-    on position (id);
-
 create table if not exists trade_dynamic_result_data
 (
     id            int auto_increment,
@@ -83,21 +99,3 @@ create table if not exists trade_dynamic_result_data
 
 create unique index trade_dynamic_result_data_id_uindex
     on trade_dynamic_result_data (id);
-
-create table if not exists test_run
-(
-    id                           int auto_increment,
-    entry_amounts_usd            varchar(50)                        not null,
-    entry_min_percentage         decimal(8, 3)                      not null,
-    entry_max_percentage         decimal(8, 3)                      not null,
-    exit_diff_percentage         decimal(8, 3)                      not null,
-    trade_timeout_mins           int                                not null,
-    detrimental_percentage_delta decimal(8, 3)                      not null,
-    time_start                   datetime default CURRENT_TIMESTAMP not null,
-    time_end                     datetime default CURRENT_TIMESTAMP not null,
-    path_to_result_file          varchar(276)                       null,
-    primary key (id)
-);
-
-create unique index test_run_id_uindex
-    on test_run (id);
