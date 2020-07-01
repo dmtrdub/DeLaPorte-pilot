@@ -11,7 +11,7 @@ import my.dub.dlp_pilot.model.TradeDynamicResultData;
 import my.dub.dlp_pilot.model.TradeResultType;
 import my.dub.dlp_pilot.model.client.Ticker;
 import my.dub.dlp_pilot.repository.TradeRepository;
-import my.dub.dlp_pilot.repository.container.CurrentTradeContainer;
+import my.dub.dlp_pilot.repository.container.TradeContainer;
 import my.dub.dlp_pilot.service.ExchangeService;
 import my.dub.dlp_pilot.service.TestRunService;
 import my.dub.dlp_pilot.service.TickerService;
@@ -29,6 +29,7 @@ import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
+import java.time.ZonedDateTime;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -40,7 +41,7 @@ import java.util.stream.Collectors;
 public class TradeServiceImpl implements TradeService {
 
     private final TradeRepository repository;
-    private final CurrentTradeContainer tradeContainer;
+    private final TradeContainer tradeContainer;
     private final TickerService tickerService;
     private final ExchangeService exchangeService;
     private final ParametersComponent parameters;
@@ -48,7 +49,7 @@ public class TradeServiceImpl implements TradeService {
 
     @Autowired
     public TradeServiceImpl(TradeRepository repository,
-                            CurrentTradeContainer tradeContainer,
+                            TradeContainer tradeContainer,
                             TickerService tickerService,
                             ExchangeService exchangeService,
                             ParametersComponent parameters, TestRunService testRunService) {
@@ -102,18 +103,33 @@ public class TradeServiceImpl implements TradeService {
         if (ticker.isStale() && equivalentTicker.isStale()) {
             return false;
         }
-        if(Calculations.isNotPositive(ticker.getPrice()) || Calculations.isNotPositive(equivalentTicker.getPrice())) {
+        if (Calculations.isNotPositive(ticker.getPrice()) || Calculations.isNotPositive(equivalentTicker.getPrice())) {
             return false;
         }
         if (tradeContainer.isSimilarPresent(ticker.getBase(), ticker.getTarget(), ticker.getExchangeName(),
                                             equivalentTicker.getExchangeName())) {
             return false;
         }
-        Pair<Long, Long> tradesCount =
-                tradeContainer.tradesCount(ticker.getExchangeName(), equivalentTicker.getExchangeName());
+        ExchangeName exchangeShort;
+        ExchangeName exchangeLong;
+        if (ticker.getPrice().compareTo(equivalentTicker.getPrice()) > 0) {
+            exchangeShort = ticker.getExchangeName();
+            exchangeLong = equivalentTicker.getExchangeName();
+        } else {
+            exchangeShort = equivalentTicker.getExchangeName();
+            exchangeLong = ticker.getExchangeName();
+        }
+        if (tradeContainer.hasDetrimentalRecord(exchangeShort, exchangeLong)) {
+            return false;
+        }
         int parallelTradesNumber = parameters.getParallelTradesNumber();
-        return tradesCount.getFirst() <= parallelTradesNumber && tradesCount.getSecond() <=
-                parallelTradesNumber;
+        if (parallelTradesNumber != 0) {
+            Pair<Long, Long> tradesCount =
+                    tradeContainer.tradesCount(ticker.getExchangeName(), equivalentTicker.getExchangeName());
+            return tradesCount.getFirst() <= parallelTradesNumber && tradesCount.getSecond() <=
+                    parallelTradesNumber;
+        }
+        return true;
     }
 
     private boolean checkProfitability(Ticker ticker, Ticker equivalentTicker) {
@@ -181,6 +197,7 @@ public class TradeServiceImpl implements TradeService {
             repository.saveAll(tradesToSave);
             tradesToSave
                     .forEach(trade -> log.debug("{} closed. Reason: {}", trade.toShortString(), trade.getResultType()));
+            addDetrimentalRecords(tradesToSave);
             if (isTestRunEnd) {
                 log.info("Closed all opened trades for {} exchange due to the end of Test Run",
                          exchangeName.getFullName());
@@ -188,6 +205,25 @@ public class TradeServiceImpl implements TradeService {
         }
         if (!tradesCompleted.isEmpty()) {
             tradeContainer.removeTrades(tradesCompleted);
+        }
+    }
+
+    private void addDetrimentalRecords(Set<Trade> tradesToSave) {
+        int suspenseAfterDetrimentalSeconds = parameters.getSuspenseAfterDetrimentalSeconds();
+        if (suspenseAfterDetrimentalSeconds != 0) {
+            tradesToSave.stream().filter(trade -> TradeResultType.DETRIMENTAL.equals(trade.getResultType()))
+                        .forEach(trade -> {
+                            ExchangeName exchangeShort = trade.getPositionShort().getExchange().getName();
+                            ExchangeName exchangeLong = trade.getPositionLong().getExchange().getName();
+                            ZonedDateTime invalidationDateTime =
+                                    trade.getEndTime().plusSeconds(suspenseAfterDetrimentalSeconds);
+                            tradeContainer
+                                    .addDetrimentalRecord(exchangeShort, exchangeLong, invalidationDateTime);
+                            log.debug(
+                                    "Added new detrimental record for {} (SHORT) and {} (LONG) exchanges. " +
+                                            "Similar trades will be suspended until {}",
+                                    exchangeShort, exchangeLong, invalidationDateTime);
+                        });
         }
     }
 

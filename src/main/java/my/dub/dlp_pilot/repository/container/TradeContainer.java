@@ -1,12 +1,15 @@
 package my.dub.dlp_pilot.repository.container;
 
+import my.dub.dlp_pilot.model.DetrimentalRecord;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.Position;
 import my.dub.dlp_pilot.model.Trade;
+import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
+import java.time.ZonedDateTime;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
@@ -14,8 +17,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Component
-public class CurrentTradeContainer {
+public class TradeContainer {
     private final Set<Trade> tradesInProgress = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<DetrimentalRecord> detrimentalRecords = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     // check if similar trade exists here, as well as before creating trade
     public boolean addTrade(Trade trade) {
@@ -82,6 +86,29 @@ public class CurrentTradeContainer {
 
     public boolean isEmpty() {
         return tradesInProgress.isEmpty();
+    }
+
+    public void addDetrimentalRecord(ExchangeName exchangeShort, ExchangeName exchangeLong,
+                                     ZonedDateTime dateTimeClosed) {
+        if (hasDetrimentalRecord(exchangeShort, exchangeLong)) {
+            return;
+        }
+        DetrimentalRecord newDetrimentalRecord = new DetrimentalRecord(exchangeShort, exchangeLong, dateTimeClosed);
+        detrimentalRecords.add(newDetrimentalRecord);
+    }
+
+    public boolean hasDetrimentalRecord(ExchangeName exchangeShort, ExchangeName exchangeLong) {
+        DetrimentalRecord existingRecord = detrimentalRecords.stream().filter(detRecord -> detRecord.getExchangeShort()
+                                                                                                    .equals(exchangeShort) &&
+                detRecord.getExchangeLong().equals(exchangeLong)).findFirst().orElse(null);
+        if (existingRecord == null) {
+            return false;
+        }
+        if (DateUtils.currentDateTime().isAfter(existingRecord.getInvalidationDateTime())) {
+            detrimentalRecords.remove(existingRecord);
+            return false;
+        }
+        return true;
     }
 
 }
