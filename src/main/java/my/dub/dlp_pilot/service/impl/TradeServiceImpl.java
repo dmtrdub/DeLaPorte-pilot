@@ -126,8 +126,7 @@ public class TradeServiceImpl implements TradeService {
         if (parallelTradesNumber != 0) {
             Pair<Long, Long> tradesCount =
                     tradeContainer.tradesCount(ticker.getExchangeName(), equivalentTicker.getExchangeName());
-            return tradesCount.getFirst() <= parallelTradesNumber && tradesCount.getSecond() <=
-                    parallelTradesNumber;
+            return tradesCount.getFirst() <= parallelTradesNumber && tradesCount.getSecond() <= parallelTradesNumber;
         }
         return true;
     }
@@ -186,8 +185,8 @@ public class TradeServiceImpl implements TradeService {
                         parameters.getExitPercentageDiff(DateUtils.durationSeconds(trade.getStartTime()))) >= 0) {
                     closeAndAddToSets(tradesCompleted, tradesToSave, trade, tickerShort, tickerLong,
                                       TradeResultType.SUCCESSFUL);
-                } else if (percentageDiff.subtract(entryPercentageDiff)
-                                         .compareTo(parameters.getDetrimentPercentageDelta()) >= 0) {
+                } else if (isDetrimental(positionShort.getOpenPrice(), tickerShort, positionLong.getOpenPrice(),
+                                         tickerLong, percentageDiff, entryPercentageDiff)) {
                     closeAndAddToSets(tradesCompleted, tradesToSave, trade, tickerShort, tickerLong,
                                       TradeResultType.DETRIMENTAL);
                 }
@@ -206,6 +205,23 @@ public class TradeServiceImpl implements TradeService {
         if (!tradesCompleted.isEmpty()) {
             tradeContainer.removeTrades(tradesCompleted);
         }
+    }
+
+    private boolean isDetrimental(BigDecimal positionShortOpenPrice, Ticker tickerShort,
+                                  BigDecimal positionLongOpenPrice, Ticker tickerLong, BigDecimal percentageDiff,
+                                  BigDecimal entryPercentageDiff) {
+        if (percentageDiff.subtract(entryPercentageDiff).compareTo(parameters.getDetrimentPercentageDelta()) >= 0) {
+            return true;
+        }
+        BigDecimal amountUsd = BigDecimal.valueOf(parameters.getEntryAmounts().get(0));
+        BigDecimal pnlShort =
+                Calculations.pnl(PositionSide.SHORT, positionShortOpenPrice, tickerShort.getPrice(), amountUsd);
+        BigDecimal pnlLong =
+                Calculations.pnl(PositionSide.LONG, positionLongOpenPrice, tickerLong.getPrice(), amountUsd);
+        //calculate rough income - without expenses
+        BigDecimal incomeRough = Calculations.income(pnlShort, pnlLong, BigDecimal.ZERO);
+        return incomeRough.abs().compareTo(
+                Calculations.originalValueFromPercent(amountUsd, parameters.getDetrimentEntryAmountPercentage())) >= 0;
     }
 
     private void addDetrimentalRecords(Set<Trade> tradesToSave) {
@@ -302,10 +318,9 @@ public class TradeServiceImpl implements TradeService {
                                                           positionShort.getClosePrice(), amountUsd));
         dynamicResultData.setPnlUsdLong(Calculations.pnl(positionLong.getSide(), positionLong.getOpenPrice(),
                                                          positionLong.getClosePrice(), amountUsd));
-        BigDecimal variableExpenses = Calculations.originalValueFromPercentSum(amountUsd, positionShort.getExchange()
-                                                                                                       .getTakerFeePercentage(),
-                                                                               amountUsd, positionLong.getExchange()
-                                                                                                      .getTakerFeePercentage());
+        BigDecimal variableExpenses = Calculations
+                .originalValueFromPercentSum(amountUsd, positionShort.getExchange().getTakerFeePercentage(), amountUsd,
+                                             positionLong.getExchange().getTakerFeePercentage());
         dynamicResultData.setTotalExpensesUsd(trade.getFixedExpensesUsd().add(variableExpenses));
         dynamicResultData.setIncomeUsd(Calculations.income(dynamicResultData.getPnlUsdShort(),
                                                            dynamicResultData.getPnlUsdLong(),
@@ -317,8 +332,8 @@ public class TradeServiceImpl implements TradeService {
     @Override
     @Transactional
     public Set<Trade> getCompletedTradesNotWrittenToFile() {
-        return repository
-                .findByWrittenToFileFalseAndTestRunIdEquals(testRunService.getCurrentTestRun().getId());
+        return repository.findByWrittenToFileFalseAndTestRunIdEqualsOrderByEndTimeAsc(
+                testRunService.getCurrentTestRun().getId());
     }
 
     @Override

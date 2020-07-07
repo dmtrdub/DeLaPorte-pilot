@@ -18,8 +18,6 @@ import java.time.ZonedDateTime;
 import java.util.Set;
 
 import static my.dub.dlp_pilot.Constants.FILE_PATH_PARAM_LENGTH;
-import static my.dub.dlp_pilot.Constants.PERCENTAGE_SCALE;
-import static my.dub.dlp_pilot.Constants.STRING_PARAM_LENGTH;
 
 @Data
 @NoArgsConstructor
@@ -33,23 +31,8 @@ public class TestRun implements Serializable {
     @EqualsAndHashCode.Exclude
     private Long id;
 
-    @Column(name = "entry_amounts_usd", nullable = false, length = STRING_PARAM_LENGTH)
-    private String entryAmountsUsd;
-
-    @Column(name = "entry_min_percentage", nullable = false, precision = 8, scale = PERCENTAGE_SCALE)
-    private Double entryMinPercentage;
-
-    @Column(name = "entry_max_percentage", nullable = false, precision = 8, scale = PERCENTAGE_SCALE)
-    private Double entryMaxPercentage;
-
-    @Column(name = "exit_diff_percentage", nullable = false, precision = 8, scale = PERCENTAGE_SCALE)
-    private Double exitDiffPercentage;
-
-    @Column(name = "trade_timeout_mins", nullable = false)
-    private Integer tradeTimeoutMins;
-
-    @Column(name = "detrimental_percentage_delta", nullable = false, precision = 8, scale = PERCENTAGE_SCALE)
-    private Double detrimentalPercentageDelta;
+    @Column(name = "config_params", nullable = false, length = 4000)
+    private String configParams;
 
     @Column(name = "time_start", columnDefinition = "default CURRENT_TIMESTAMP")
     private ZonedDateTime startTime;

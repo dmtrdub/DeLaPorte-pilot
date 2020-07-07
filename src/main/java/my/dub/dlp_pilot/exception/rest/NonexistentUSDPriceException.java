@@ -1,27 +1,17 @@
 package my.dub.dlp_pilot.exception.rest;
 
+import lombok.Getter;
+
+@Getter
 public class NonexistentUSDPriceException extends RuntimeException {
     private final String exchange;
-    private final String fallbackExchange;
     private final String baseSymbol;
 
-    public NonexistentUSDPriceException(String exchange, String fallbackExchange, String baseSymbol) {
-        super(String.format("Unable to get USD price for base symbol %s on %s exchange and on fallback %s exchange",
-                            baseSymbol, exchange, fallbackExchange));
+    public NonexistentUSDPriceException(String exchange, String baseSymbol) {
+        super(String.format("Unable to get USD price for base symbol %s on %s exchange",
+                            baseSymbol, exchange));
         this.exchange = exchange;
-        this.fallbackExchange = fallbackExchange;
         this.baseSymbol = baseSymbol;
     }
 
-    public String getExchange() {
-        return exchange;
-    }
-
-    public String getFallbackExchange() {
-        return fallbackExchange;
-    }
-
-    public String getBaseSymbol() {
-        return baseSymbol;
-    }
 }

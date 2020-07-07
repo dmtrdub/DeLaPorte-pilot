@@ -40,24 +40,21 @@ public class TestRunServiceImpl implements TestRunService {
         this.parameters = parameters;
     }
 
-    @Transactional
     @Override
+    @Transactional
     public void createAndSave() {
         TestRun testRun = new TestRun();
-        testRun.setEntryAmountsUsd(String.join(",", parameters.getEntryAmountsUsdParam()));
-        testRun.setEntryMinPercentage(parameters.getEntryMinPercentageDouble());
-        testRun.setEntryMaxPercentage(parameters.getEntryMaxPercentageDouble());
-        testRun.setExitDiffPercentage(parameters.getExitPercentageDiffDouble());
-        testRun.setTradeTimeoutMins(parameters.getTradeMinutesTimeout());
-        testRun.setDetrimentalPercentageDelta(parameters.getDetrimentPercentageDeltaDouble());
+        String configuration = parameters.getConfiguration().orElseThrow(
+                () -> new IllegalArgumentException("Empty configuration passed to Test Run!"));
+        testRun.setConfigParams(configuration);
         ZonedDateTime startTime = DateUtils.currentDateTime();
         testRun.setStartTime(startTime);
         int tickerDataCaptureDurationSeconds = parameters.getStaleDifferenceSeconds() + 1;
-        testRun.setEndTime(
-                startTime.plus(parameters.getTestRunDuration()).plusSeconds(tickerDataCaptureDurationSeconds));
+        tradeStopDateTime =
+                startTime.plus(parameters.getTestRunDuration()).plusSeconds(tickerDataCaptureDurationSeconds);
+        testRun.setEndTime(tradeStopDateTime.plusSeconds(parameters.getExitMaxDelaySeconds()));
         currentTestRun = repository.save(testRun);
-        tradeStopDateTime = currentTestRun.getEndTime();
-        testRunEndDateTime = tradeStopDateTime.plusSeconds(parameters.getExitMaxDelaySeconds());
+        testRunEndDateTime = currentTestRun.getEndTime();
         tickerDataCaptureEndDateTime = startTime.plusSeconds(tickerDataCaptureDurationSeconds);
     }
 

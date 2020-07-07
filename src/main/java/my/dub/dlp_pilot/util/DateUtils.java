@@ -72,6 +72,14 @@ public final class DateUtils {
         return Duration.between(start, end).toSeconds();
     }
 
+    public static String durationSecondsDetailed(Temporal start, Temporal end) {
+        if (start == null || end == null) {
+            return "0";
+        }
+        Duration duration = Duration.between(start, end);
+        return String.format("%d.%3d", duration.toSeconds(), duration.toMillisPart()).replaceAll("\\s+", "");
+    }
+
     public static Duration parseDuration(String input) {
         if (StringUtils.isEmpty(input)) {
             return null;

@@ -18,6 +18,7 @@ import java.math.RoundingMode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -49,7 +50,7 @@ public class FileResultService {
                       "Expenses_" + amount, "Income" + amount)).collect(Collectors.joining(dynamicDelimiter)) + "_" +
                 USD;
         header = String.join(",", "Base", "Target", "Entry_Percentage_Diff", dynamicHeaders, "Time_Start", "Time_End",
-                             "Result_Type", "Exchange_Short", "Exchange_Long");
+                             "Duration_(sec)", "Result_Type", "Exchange_Short", "Exchange_Long");
         initFile();
     }
 
@@ -93,11 +94,12 @@ public class FileResultService {
                 .join(",", decimalResults(resultData.getPnlUsdShort(), resultData.getPnlUsdLong(),
                                           resultData.getTotalExpensesUsd(), resultData.getIncomeUsd())))
                                     .collect(Collectors.joining(","));
-        return String.join(",", trade.getBase(), trade.getTarget(),
-                           decimalResult(trade.getEntryPercentageDiff()), dynamicResult,
-                           DateUtils.formatDateTime(trade.getStartTime()), DateUtils.formatDateTime(trade.getEndTime()),
-                           trade.getResultType().name(), positionShort.getExchange().getFullName(),
-                           positionLong.getExchange().getFullName());
+        ZonedDateTime startTime = trade.getStartTime();
+        ZonedDateTime endTime = trade.getEndTime();
+        return String.join(",", trade.getBase(), trade.getTarget(), decimalResult(trade.getEntryPercentageDiff()),
+                           dynamicResult, DateUtils.formatDateTime(startTime), DateUtils.formatDateTime(endTime),
+                           DateUtils.durationSecondsDetailed(startTime, endTime), trade.getResultType().name(),
+                           positionShort.getExchange().getFullName(), positionLong.getExchange().getFullName());
     }
 
     private String decimalResult(BigDecimal decimal) {

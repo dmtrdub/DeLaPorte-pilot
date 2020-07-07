@@ -12,7 +12,7 @@ import java.util.Set;
 @Repository
 public interface TradeRepository extends CrudRepository<Trade, Long> {
 
-    Set<Trade> findByWrittenToFileFalseAndTestRunIdEquals(Long testRunId);
+    Set<Trade> findByWrittenToFileFalseAndTestRunIdEqualsOrderByEndTimeAsc(Long testRunId);
 
     @Modifying
     @Query("update Trade t set t.writtenToFile=true where t.id in :tradeIds")

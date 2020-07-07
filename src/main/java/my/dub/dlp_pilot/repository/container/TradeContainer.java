@@ -67,8 +67,8 @@ public class TradeContainer {
             ExchangeName exchangeShort = trade.getPositionShort().getExchange().getName();
             ExchangeName exchangeLong = trade.getPositionLong().getExchange().getName();
             return trade.getBase().equals(base) && trade.getTarget().equals(target) &&
-                    ((exchangeShort.equals(exchange1) && exchangeLong.equals(exchange2)) ||
-                            (exchangeShort.equals(exchange2) && exchangeLong.equals(exchange1)));
+                    (exchangeShort.equals(exchange1) || exchangeLong.equals(exchange2) ||
+                            exchangeShort.equals(exchange2) || exchangeLong.equals(exchange1));
         });
     }
 

@@ -60,7 +60,7 @@ public final class Calculations {
     }
 
     public static BigDecimal pnl(PositionSide side, BigDecimal openPrice, BigDecimal closePrice, BigDecimal amountUsd) {
-        BigDecimal amount = amountUsd.divide(closePrice, Constants.PRICE_SCALE, RoundingMode.HALF_UP);
+        BigDecimal amount = amountUsd.divide(openPrice, Constants.PRICE_SCALE, RoundingMode.HALF_UP);
         if (PositionSide.SHORT.equals(side)) {
             return openPrice.subtract(closePrice).multiply(amount).setScale(Constants.PRICE_SCALE, RoundingMode.HALF_UP)
                             .stripTrailingZeros();

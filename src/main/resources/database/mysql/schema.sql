@@ -21,16 +21,12 @@ create unique index exchange_id_uindex
 
 create table if not exists test_run
 (
-    id                           int auto_increment,
-    entry_amounts_usd            varchar(50)                        not null,
-    entry_min_percentage         decimal(8, 3)                      not null,
-    entry_max_percentage         decimal(8, 3)                      not null,
-    exit_diff_percentage         decimal(8, 3)                      not null,
-    trade_timeout_mins           int                                not null,
-    detrimental_percentage_delta decimal(8, 3)                      not null,
-    time_start                   datetime default CURRENT_TIMESTAMP not null,
-    time_end                     datetime default CURRENT_TIMESTAMP not null,
-    path_to_result_file          varchar(276)                       null,
+    id                  int auto_increment,
+    config_params       varchar(4000)                      not null,
+    time_start          datetime default CURRENT_TIMESTAMP not null,
+    time_end            datetime default CURRENT_TIMESTAMP not null,
+    path_to_result_file varchar(276)                       null,
+    forced_exit         tinyint  default 0                 null,
     primary key (id)
 );
 

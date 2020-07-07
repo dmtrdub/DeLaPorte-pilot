@@ -1,31 +1,35 @@
 package my.dub.dlp_pilot.configuration;
 
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.Constants;
-import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.util.DateUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.util.ResourceUtils;
 
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
+import java.util.Properties;
 import java.util.stream.Collectors;
 
 @Component
 @Getter
+@Slf4j
 public class ParametersComponent implements InitializingBean {
 
     @Value("${init_trade_delay_ms}")
     private long initDelayMs;
     @Value("${ticker_stale_difference_seconds}")
     private int staleDifferenceSeconds;
-    @Value("${usd_price_fallback_exchange_name}")
-    private String fallbackExchangeParam;
     @Value("${trade_entry_min_percentage}")
     private double entryMinPercentageDouble;
     @Value("${trade_entry_max_percentage}")
@@ -42,6 +46,8 @@ public class ParametersComponent implements InitializingBean {
     private int tradeMinutesTimeout;
     @Value("${trade_detrimental_percentage_delta}")
     private double detrimentPercentageDeltaDouble;
+    @Value("${trade_detrimental_entry_amount_percentage}")
+    private double detrimentEntryAmountPercentageDouble;
     @Value("${trade_parallel_number}")
     private int parallelTradesNumber;
     @Value("${trade_suspense_after_detrimental_duration_seconds}")
@@ -57,20 +63,19 @@ public class ParametersComponent implements InitializingBean {
     @Value("${test_run_max_delay_on_exit_seconds}")
     private int exitMaxDelaySeconds;
 
-    private ExchangeName fallbackExchangeName;
     private BigDecimal entryMinPercentage;
     private BigDecimal entryMaxPercentage;
     private BigDecimal exitPercentageDiff;
     private BigDecimal exitPercentageDiffDecreaseBy;
     private List<Double> entryAmounts;
     private BigDecimal detrimentPercentageDelta;
+    private BigDecimal detrimentEntryAmountPercentage;
     private Duration testRunDuration;
 
     @Override
     public void afterPropertiesSet() {
         validateInputParams();
         initDelayMs = initDelayMs > 0 ? initDelayMs : 0;
-        fallbackExchangeName = ExchangeName.valueOf(fallbackExchangeParam);
         entryMinPercentage = BigDecimal.valueOf(entryMinPercentageDouble);
         entryMaxPercentage = BigDecimal.valueOf(entryMaxPercentageDouble);
         exitPercentageDiff = BigDecimal.valueOf(exitPercentageDiffDouble);
@@ -78,9 +83,10 @@ public class ParametersComponent implements InitializingBean {
         entryAmounts = Arrays.stream(entryAmountsUsdParam).mapToDouble(Double::parseDouble).boxed().distinct().sorted()
                              .collect(Collectors.toList());
         detrimentPercentageDelta = BigDecimal.valueOf(detrimentPercentageDeltaDouble);
+        detrimentEntryAmountPercentage = BigDecimal.valueOf(detrimentEntryAmountPercentageDouble);
         parallelTradesNumber = parallelTradesNumber > 0 ? parallelTradesNumber : 0;
         suspenseAfterDetrimentalSeconds = suspenseAfterDetrimentalSeconds > 0 ? suspenseAfterDetrimentalSeconds : 0;
-        testRunDuration = DateUtils.parseDuration(testRunDurationParam);
+        testRunDuration = DateUtils.parseDuration(testRunDurationParam.toUpperCase());
     }
 
     private void validateInputParams() {
@@ -120,6 +126,12 @@ public class ParametersComponent implements InitializingBean {
         if (detrimentPercentageDeltaDouble <= 0) {
             throw new IllegalArgumentException("Detrimental percentage delta cannot be <= 0!");
         }
+        if (detrimentEntryAmountPercentageDouble <= 0) {
+            throw new IllegalArgumentException("Detrimental entry amount percentage cannot be <= 0!");
+        }
+        if (detrimentEntryAmountPercentageDouble >= 100) {
+            throw new IllegalArgumentException("Detrimental entry amount percentage cannot be >= 100!");
+        }
         if (StringUtils.isEmpty(testRunDurationParam)) {
             throw new IllegalArgumentException("Duration parameter cannot be empty!");
         }
@@ -151,5 +163,20 @@ public class ParametersComponent implements InitializingBean {
             return exitPercentageDiff;
         }
         return exitPercentageDiff.subtract(exitPercentageDiffDecreaseBy.multiply(BigDecimal.valueOf(decreaseTimes)));
+    }
+
+    public Optional<String> getConfiguration() {
+        Properties prop = new Properties();
+        try {
+            prop.load(new FileInputStream(ResourceUtils.getFile("classpath:application.properties")));
+        } catch (IOException e) {
+            log.error("Unable to load application.properties file! Details: " + e.getMessage());
+            return Optional.empty();
+        }
+        List<String> configProperties = prop.entrySet().stream().filter(entry -> {
+            String key = (String) entry.getKey();
+            return key.startsWith("ticker") || key.startsWith("trade");
+        }).map(entry -> entry.getKey() + ":" + entry.getValue()).collect(Collectors.toList());
+        return Optional.of(String.join(";", configProperties));
     }
 }
