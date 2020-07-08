@@ -69,6 +69,10 @@ public class Exchange implements Serializable {
     @Transient
     private transient Set<Ticker> tickers = new HashSet<>();
 
+    @EqualsAndHashCode.Exclude
+    @Transient
+    private transient boolean faulty;
+
     public String getFullName() {
         return name.getFullName();
     }

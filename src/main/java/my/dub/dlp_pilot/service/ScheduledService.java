@@ -50,7 +50,7 @@ public class ScheduledService implements InitializingBean {
     private void start() {
         testRunService.createAndSave();
         fileResultService.init();
-        Set<Exchange> exchanges = exchangeService.findAll();
+        Set<Exchange> exchanges = exchangeService.loadAll();
         if (CollectionUtils.isEmpty(exchanges)) {
             throw new IllegalArgumentException("There are no exchanges to work with!");
         }

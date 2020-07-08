@@ -74,7 +74,7 @@ public class RestClient implements InitializingBean {
 
     @Override
     public void afterPropertiesSet() {
-        Set<Exchange> exchanges = exchangeService.findAll();
+        Set<Exchange> exchanges = exchangeService.loadAll();
         pingAll(exchanges);
         fetchAllAdditionalSymbolData(exchanges);
     }
@@ -253,10 +253,15 @@ public class RestClient implements InitializingBean {
                     break;
             }
             log.debug("Successfully fetched {} tickers from {} exchange", result.size(), exchange.getFullName());
+            if (exchange.isFaulty()) {
+                exchangeService.updateCachedExchangeFault(exchange, false);
+            }
         } catch (UnexpectedEndpointResponseException | UnexpectedResponseStatusCodeException e) {
             log.error(e.getMessage());
+            exchangeService.updateCachedExchangeFault(exchange, true);
         } catch (IOException e) {
-            log.error("Unable to fetch tickers on {} exchange! Details: {}", exchangeName, e.getMessage());
+            log.error("Unable to fetch tickers on {} exchange! Details: {}", exchangeName, e.toString());
+            exchangeService.updateCachedExchangeFault(exchange, true);
         }
 
         return result;
@@ -366,7 +371,7 @@ public class RestClient implements InitializingBean {
             }
             ticker.setPrice(new BigDecimal(price));
             ZonedDateTime dateTime = DateUtils.getDateTimeFromEpoch(innerNode.get("time").asLong());
-            if(dateTime.isBefore(DateUtils.currentDateTime())){
+            if (dateTime.isBefore(DateUtils.currentDateTime())) {
                 ticker.setDateTime(dateTime);
             }
             tickers.add(ticker);

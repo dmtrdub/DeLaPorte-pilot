@@ -2,6 +2,7 @@ package my.dub.dlp_pilot.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.configuration.ParametersComponent;
+import my.dub.dlp_pilot.exception.MissingEntityException;
 import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.Position;
@@ -110,6 +111,10 @@ public class TradeServiceImpl implements TradeService {
                                             equivalentTicker.getExchangeName())) {
             return false;
         }
+        if (exchangeService.isExchangeFaulty(ticker.getExchangeName()) ||
+                exchangeService.isExchangeFaulty(equivalentTicker.getExchangeName())) {
+            return false;
+        }
         ExchangeName exchangeShort;
         ExchangeName exchangeLong;
         if (ticker.getPrice().compareTo(equivalentTicker.getPrice()) > 0) {
@@ -166,12 +171,12 @@ public class TradeServiceImpl implements TradeService {
             Position positionLong = trade.getPositionLong();
             Ticker tickerShort = tickerService
                     .getTicker(positionShort.getExchange().getName(), trade.getBase(), trade.getTarget())
-                    .orElseThrow(() -> new NullPointerException(
-                            String.format("Ticker for position (%s) in container is null!", positionShort.toString())));
+                    .orElseThrow(
+                            () -> new MissingEntityException(Ticker.class.getSimpleName(), positionShort.toString()));
             Ticker tickerLong = tickerService
                     .getTicker(positionLong.getExchange().getName(), trade.getBase(), trade.getTarget())
-                    .orElseThrow(() -> new NullPointerException(
-                            String.format("Ticker for position (%s) in container is null!", positionLong.toString())));
+                    .orElseThrow(
+                            () -> new MissingEntityException(Ticker.class.getSimpleName(), positionLong.toString()));
             if (isTestRunEnd) {
                 closeAndAddToSets(tradesCompleted, tradesToSave, trade, tickerShort, tickerLong,
                                   TradeResultType.TEST_RUN_END);
@@ -302,9 +307,8 @@ public class TradeServiceImpl implements TradeService {
         BigDecimal tickerPrice = ticker.getPrice();
         position.setOpenPrice(tickerPrice);
         ExchangeName exchangeName = ticker.getExchangeName();
-        Exchange exchange = exchangeService.findByName(
-                exchangeName).orElseThrow(
-                () -> new NullPointerException(String.format("Exchange by name %s was not found!", exchangeName)));
+        Exchange exchange = exchangeService.findByName(exchangeName).orElseThrow(
+                () -> new MissingEntityException(Exchange.class.getSimpleName(), exchangeName.name()));
         position.setExchange(exchange);
         return position;
     }
