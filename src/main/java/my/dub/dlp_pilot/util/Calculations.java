@@ -2,10 +2,10 @@ package my.dub.dlp_pilot.util;
 
 import my.dub.dlp_pilot.Constants;
 import my.dub.dlp_pilot.model.PositionSide;
-import my.dub.dlp_pilot.model.client.Ticker;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Arrays;
 
 public final class Calculations {
 
@@ -14,7 +14,7 @@ public final class Calculations {
     private Calculations() {
     }
 
-    public static BigDecimal percentageDifference(BigDecimal price1, BigDecimal price2) {
+    public static BigDecimal percentageDifferenceAbs(BigDecimal price1, BigDecimal price2) {
         if (price1 == null || price2 == null) {
             return BigDecimal.ZERO;
         }
@@ -28,13 +28,9 @@ public final class Calculations {
         return BigDecimal.ZERO;
     }
 
-    public static BigDecimal percentageDifference(Ticker tickerShort, Ticker tickerLong) {
-        if (tickerLong == null || tickerShort == null || isZero(tickerLong.getPrice())) {
-            return BigDecimal.ZERO;
-        }
-        return tickerShort.getPrice().multiply(HUNDRED)
-                          .divide(tickerLong.getPrice(), Constants.PERCENTAGE_SCALE, RoundingMode.HALF_UP)
-                          .subtract(HUNDRED);
+    public static BigDecimal percentageDifference(BigDecimal priceShort, BigDecimal priceLong) {
+        return priceShort.multiply(HUNDRED).divide(priceLong, Constants.PERCENTAGE_SCALE, RoundingMode.HALF_UP)
+                         .subtract(HUNDRED);
     }
 
     public static BigDecimal expectedClosePriceLong(BigDecimal priceShort, BigDecimal priceLong,
@@ -78,7 +74,8 @@ public final class Calculations {
         return pnl(PositionSide.LONG, openPriceLong, expectedClosePriceLong, amountUsd);
     }
 
-    public static BigDecimal income(BigDecimal pnl1, BigDecimal pnl2, BigDecimal totalExpenses) {
+    public static BigDecimal income(BigDecimal pnl1, BigDecimal pnl2, BigDecimal... expenses) {
+        BigDecimal totalExpenses = Arrays.stream(expenses).reduce(BigDecimal.ZERO, BigDecimal::add);
         return pnl1.add(pnl2).subtract(totalExpenses);
     }
 

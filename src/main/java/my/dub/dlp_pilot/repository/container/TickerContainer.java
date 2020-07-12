@@ -68,7 +68,7 @@ public class TickerContainer {
 
     public Stream<Ticker> getAllStream() {
         return Stream.of(bigONETickers, binanceTickers, bitBayTickers, bitfinexTickers, bithumbTickers, bitmartTickers,
-                  bitmaxTickers, bittrexTickers, bwTickers, coinoneTickers).flatMap(Collection::stream);
+                         bitmaxTickers, bittrexTickers, bwTickers, coinoneTickers).flatMap(Collection::stream);
     }
 
     public Set<Ticker> getTickers(ExchangeName exchangeName, boolean includeStale) {
@@ -103,9 +103,12 @@ public class TickerContainer {
             Ticker existingTicker =
                     tickerSet.stream().filter(exTicker -> exTicker.isSimilar(newTicker)).findFirst().orElse(null);
             if (existingTicker != null) {
-                BigDecimal existingPrice = existingTicker.getPrice();
-                if (existingPrice.compareTo(newTicker.getPrice()) != 0) {
-                    newTicker.setPreviousPrice(existingPrice);
+                BigDecimal existingPriceAsk = existingTicker.getPriceAsk();
+                BigDecimal existingPriceBid = existingTicker.getPriceBid();
+                if (existingPriceAsk.compareTo(newTicker.getPriceAsk()) != 0 ||
+                        existingPriceBid.compareTo(newTicker.getPriceBid()) != 0) {
+                    newTicker.setPreviousPriceAsk(existingPriceAsk);
+                    newTicker.setPreviousPriceBid(existingPriceBid);
                     tickerSet.remove(existingTicker);
                     tickerSet.add(newTicker);
                 }
@@ -113,9 +116,5 @@ public class TickerContainer {
                 tickerSet.add(newTicker);
             }
         });
-    }
-
-    public boolean isEmpty(ExchangeName exchangeName) {
-        return CollectionUtils.isEmpty(tickerSet(exchangeName));
     }
 }

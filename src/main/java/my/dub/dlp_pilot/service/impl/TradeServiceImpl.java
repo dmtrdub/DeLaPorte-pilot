@@ -72,23 +72,37 @@ public class TradeServiceImpl implements TradeService {
         allTickers.removeAll(tickersToCompare);
         allTickers.forEach(ticker -> {
             Ticker equivalentTicker = tickerService.findEquivalentTickerFromSet(ticker, tickersToCompare);
-            if (canEnterTrade(ticker, equivalentTicker)) {
+            if (equivalentTicker == null) {
+                return;
+            }
+            Ticker tickerShort;
+            Ticker tickerLong;
+            if (ticker.getPriceAsk().compareTo(equivalentTicker.getPriceBid()) > 0) {
+                tickerLong = equivalentTicker;
+                tickerShort = ticker;
+            } else if (equivalentTicker.getPriceAsk().compareTo(ticker.getPriceBid()) > 0) {
+                tickerLong = ticker;
+                tickerShort = equivalentTicker;
+            } else {
+                return;
+            }
+            if (canEnterTrade(tickerShort, tickerLong)) {
                 BigDecimal currentPercentageDiff =
-                        Calculations.percentageDifference(ticker.getPrice(), equivalentTicker.getPrice());
+                        Calculations.percentageDifference(tickerShort.getPriceAsk(), tickerLong.getPriceBid());
                 BigDecimal prevPercentageDiff = Calculations
-                        .percentageDifference(ticker.getPreviousPrice(), equivalentTicker.getPreviousPrice());
+                        .percentageDifference(ticker.getPreviousPriceAsk(), equivalentTicker.getPreviousPriceBid());
                 if (currentPercentageDiff.compareTo(parameters.getEntryMinPercentage()) < 0 ||
                         prevPercentageDiff.compareTo(parameters.getEntryMinPercentage()) >= 0 ||
                         currentPercentageDiff.compareTo(parameters.getEntryMaxPercentage()) > 0) {
                     return;
                 }
-                if (!checkProfitability(ticker, equivalentTicker)) {
+                if (isOpenDetrimental(tickerShort, tickerLong)) {
                     return;
                 }
                 Assert.isTrue(ticker.getBase().equals(equivalentTicker.getBase()) &&
                                       ticker.getTarget().equals(equivalentTicker.getTarget()),
                               "Base and target should be equal!");
-                Trade trade = createTrade(ticker, equivalentTicker, currentPercentageDiff);
+                Trade trade = createTrade(tickerShort, tickerLong, currentPercentageDiff);
                 boolean added = tradeContainer.addTrade(trade);
                 if (added) {
                     log.debug("New {} created and added to container", trade.toShortString());
@@ -97,62 +111,29 @@ public class TradeServiceImpl implements TradeService {
         });
     }
 
-    private boolean canEnterTrade(Ticker ticker, Ticker equivalentTicker) {
-        if (equivalentTicker == null) {
+    private boolean canEnterTrade(Ticker tickerShort, Ticker tickerLong) {
+        if (tickerShort.isStale() && tickerLong.isStale()) {
             return false;
         }
-        if (ticker.isStale() && equivalentTicker.isStale()) {
+        if (tradeContainer
+                .isSimilarPresent(tickerShort.getBase(), tickerShort.getTarget(), tickerShort.getExchangeName(),
+                                  tickerShort.getExchangeName())) {
             return false;
         }
-        if (Calculations.isNotPositive(ticker.getPrice()) || Calculations.isNotPositive(equivalentTicker.getPrice())) {
+        if (exchangeService.isExchangeFaulty(tickerShort.getExchangeName()) ||
+                exchangeService.isExchangeFaulty(tickerShort.getExchangeName())) {
             return false;
         }
-        if (tradeContainer.isSimilarPresent(ticker.getBase(), ticker.getTarget(), ticker.getExchangeName(),
-                                            equivalentTicker.getExchangeName())) {
-            return false;
-        }
-        if (exchangeService.isExchangeFaulty(ticker.getExchangeName()) ||
-                exchangeService.isExchangeFaulty(equivalentTicker.getExchangeName())) {
-            return false;
-        }
-        ExchangeName exchangeShort;
-        ExchangeName exchangeLong;
-        if (ticker.getPrice().compareTo(equivalentTicker.getPrice()) > 0) {
-            exchangeShort = ticker.getExchangeName();
-            exchangeLong = equivalentTicker.getExchangeName();
-        } else {
-            exchangeShort = equivalentTicker.getExchangeName();
-            exchangeLong = ticker.getExchangeName();
-        }
-        if (tradeContainer.hasDetrimentalRecord(exchangeShort, exchangeLong)) {
+        if (tradeContainer.hasDetrimentalRecord(tickerShort.getExchangeName(), tickerLong.getExchangeName())) {
             return false;
         }
         int parallelTradesNumber = parameters.getParallelTradesNumber();
         if (parallelTradesNumber != 0) {
             Pair<Long, Long> tradesCount =
-                    tradeContainer.tradesCount(ticker.getExchangeName(), equivalentTicker.getExchangeName());
+                    tradeContainer.tradesCount(tickerShort.getExchangeName(), tickerShort.getExchangeName());
             return tradesCount.getFirst() <= parallelTradesNumber && tradesCount.getSecond() <= parallelTradesNumber;
         }
         return true;
-    }
-
-    private boolean checkProfitability(Ticker ticker, Ticker equivalentTicker) {
-        BigDecimal priceLong;
-        BigDecimal priceShort;
-        if (ticker.getPrice().compareTo(equivalentTicker.getPrice()) > 0) {
-            priceLong = equivalentTicker.getPrice();
-            priceShort = ticker.getPrice();
-        } else {
-            priceLong = ticker.getPrice();
-            priceShort = equivalentTicker.getPrice();
-        }
-        BigDecimal minEntryAmount = BigDecimal.valueOf(parameters.getEntryAmounts().get(0));
-        BigDecimal expenses1 = exchangeService.getTotalExpenses(ticker.getExchangeName(), minEntryAmount);
-        BigDecimal expenses2 = exchangeService.getTotalExpenses(equivalentTicker.getExchangeName(), minEntryAmount);
-        BigDecimal expectedIncome = Calculations.expectedIncome(priceLong, priceShort, minEntryAmount,
-                                                                parameters.getExitPercentageDiff(),
-                                                                expenses1.add(expenses2));
-        return expectedIncome.compareTo(BigDecimal.ZERO) >= 0;
     }
 
     @Override
@@ -184,14 +165,13 @@ public class TradeServiceImpl implements TradeService {
                 closeAndAddToSets(tradesCompleted, tradesToSave, trade, tickerShort, tickerLong,
                                   TradeResultType.TIMED_OUT);
             } else {
-                BigDecimal percentageDiff = Calculations.percentageDifference(tickerShort, tickerLong);
-                BigDecimal entryPercentageDiff = trade.getEntryPercentageDiff();
-                if (entryPercentageDiff.subtract(percentageDiff).compareTo(
-                        parameters.getExitPercentageDiff(DateUtils.durationSeconds(trade.getStartTime()))) >= 0) {
+                BigDecimal income = calculateCurrentIncome(positionShort.getOpenPrice(), tickerShort.getPriceAsk(),
+                                                           tickerShort.getExchangeName(), positionLong.getOpenPrice(),
+                                                           tickerLong.getPriceBid(), tickerLong.getExchangeName());
+                if (isExistingSuccessful(income, trade.getStartTime())) {
                     closeAndAddToSets(tradesCompleted, tradesToSave, trade, tickerShort, tickerLong,
                                       TradeResultType.SUCCESSFUL);
-                } else if (isDetrimental(positionShort.getOpenPrice(), tickerShort, positionLong.getOpenPrice(),
-                                         tickerLong, percentageDiff, entryPercentageDiff)) {
+                } else if (isExistingDetrimental(income)) {
                     closeAndAddToSets(tradesCompleted, tradesToSave, trade, tickerShort, tickerLong,
                                       TradeResultType.DETRIMENTAL);
                 }
@@ -212,21 +192,42 @@ public class TradeServiceImpl implements TradeService {
         }
     }
 
-    private boolean isDetrimental(BigDecimal positionShortOpenPrice, Ticker tickerShort,
-                                  BigDecimal positionLongOpenPrice, Ticker tickerLong, BigDecimal percentageDiff,
-                                  BigDecimal entryPercentageDiff) {
-        if (percentageDiff.subtract(entryPercentageDiff).compareTo(parameters.getDetrimentPercentageDelta()) >= 0) {
-            return true;
-        }
+    private boolean isExistingSuccessful(BigDecimal income, ZonedDateTime tradeStartTime) {
+        BigDecimal amountUsd = BigDecimal.valueOf(parameters.getEntryAmounts().get(0));
+        BigDecimal exitPercentage = parameters.getExitPercentage(DateUtils.durationSeconds(tradeStartTime));
+        return income.compareTo(Calculations.originalValueFromPercent(amountUsd, exitPercentage)) >= 0;
+    }
+
+    private boolean isExistingDetrimental(BigDecimal income) {
+        return isDetrimental(parameters.getDetrimentAmountPercentage(), income);
+    }
+
+    private boolean isOpenDetrimental(Ticker tickerShort, Ticker tickerLong) {
+        BigDecimal openPriceShort = tickerShort.getPriceBid();
+        BigDecimal openPriceLong = tickerLong.getPriceAsk();
+        BigDecimal income =
+                calculateCurrentIncome(openPriceShort, tickerShort.getPriceAsk(), tickerShort.getExchangeName(),
+                                       openPriceLong, tickerLong.getPriceBid(), tickerLong.getExchangeName());
+        return isDetrimental(parameters.getEntryDetrimentPercentage(), income);
+    }
+
+    private boolean isDetrimental(BigDecimal detrimentalEntryPercentage, BigDecimal income) {
+        BigDecimal amountUsd = BigDecimal.valueOf(parameters.getEntryAmounts().get(0));
+        return income
+                .compareTo(Calculations.originalValueFromPercent(amountUsd, detrimentalEntryPercentage).negate()) <= 0;
+    }
+
+    private BigDecimal calculateCurrentIncome(BigDecimal positionShortOpenPrice, BigDecimal tickerShortPrice,
+                                              ExchangeName exchangeShort, BigDecimal positionLongOpenPrice,
+                                              BigDecimal tickerLongPrice, ExchangeName exchangeLong) {
         BigDecimal amountUsd = BigDecimal.valueOf(parameters.getEntryAmounts().get(0));
         BigDecimal pnlShort =
-                Calculations.pnl(PositionSide.SHORT, positionShortOpenPrice, tickerShort.getPrice(), amountUsd);
+                Calculations.pnl(PositionSide.SHORT, positionShortOpenPrice, tickerShortPrice, amountUsd);
         BigDecimal pnlLong =
-                Calculations.pnl(PositionSide.LONG, positionLongOpenPrice, tickerLong.getPrice(), amountUsd);
-        //calculate rough income - without expenses
-        BigDecimal incomeRough = Calculations.income(pnlShort, pnlLong, BigDecimal.ZERO);
-        return incomeRough.abs().compareTo(
-                Calculations.originalValueFromPercent(amountUsd, parameters.getDetrimentEntryAmountPercentage())) >= 0;
+                Calculations.pnl(PositionSide.LONG, positionLongOpenPrice, tickerLongPrice, amountUsd);
+        BigDecimal expensesShort = exchangeService.getTotalExpenses(exchangeShort, amountUsd);
+        BigDecimal expensesLong = exchangeService.getTotalExpenses(exchangeLong, amountUsd);
+        return Calculations.income(pnlShort, pnlLong, expensesShort, expensesLong);
     }
 
     private void addDetrimentalRecords(Set<Trade> tradesToSave) {
@@ -257,11 +258,11 @@ public class TradeServiceImpl implements TradeService {
     }
 
     private void closeTrade(Trade trade, TradeResultType resultType, Ticker tickerShort, Ticker tickerLong) {
-        BigDecimal priceShort = tickerShort.getPrice();
+        BigDecimal priceShort = tickerShort.getPriceAsk();
         Position positionShort = trade.getPositionShort();
         positionShort.setClosePrice(priceShort);
 
-        BigDecimal priceLong = tickerLong.getPrice();
+        BigDecimal priceLong = tickerLong.getPriceBid();
         Position positionLong = trade.getPositionLong();
         positionLong.setClosePrice(priceLong);
 
@@ -274,22 +275,14 @@ public class TradeServiceImpl implements TradeService {
         trade.setResultData(resultData);
     }
 
-    private Trade createTrade(Ticker ticker1, Ticker ticker2, BigDecimal percentageDiff) {
+    private Trade createTrade(Ticker tickerShort, Ticker tickerLong, BigDecimal percentageDiff) {
         Trade trade = new Trade();
-        trade.setBase(ticker1.getBase());
-        trade.setTarget(ticker1.getTarget());
+        // tickerShort and tickerLong have equal base and target
+        trade.setBase(tickerShort.getBase());
+        trade.setTarget(tickerShort.getTarget());
         trade.setEntryPercentageDiff(percentageDiff);
-        BigDecimal price1 = ticker1.getPrice();
-        BigDecimal price2 = ticker2.getPrice();
-        Position longPos;
-        Position shortPos;
-        if (price1.compareTo(price2) > 0) {
-            shortPos = createPosition(PositionSide.SHORT, ticker1);
-            longPos = createPosition(PositionSide.LONG, ticker2);
-        } else {
-            longPos = createPosition(PositionSide.LONG, ticker1);
-            shortPos = createPosition(PositionSide.SHORT, ticker2);
-        }
+        Position shortPos = createPosition(PositionSide.SHORT, tickerShort);
+        Position longPos = createPosition(PositionSide.LONG, tickerLong);
         trade.setPositions(shortPos, longPos);
         trade.setResultType(TradeResultType.IN_PROGRESS);
         Exchange exchangeShort = shortPos.getExchange();
@@ -304,7 +297,7 @@ public class TradeServiceImpl implements TradeService {
     private Position createPosition(PositionSide side, Ticker ticker) {
         Position position = new Position();
         position.setSide(side);
-        BigDecimal tickerPrice = ticker.getPrice();
+        BigDecimal tickerPrice = ticker.getPriceOnOpen(side);
         position.setOpenPrice(tickerPrice);
         ExchangeName exchangeName = ticker.getExchangeName();
         Exchange exchange = exchangeService.findByName(exchangeName).orElseThrow(

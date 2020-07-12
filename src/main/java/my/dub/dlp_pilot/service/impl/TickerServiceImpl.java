@@ -81,7 +81,11 @@ public class TickerServiceImpl implements TickerService {
     @Override
     public Ticker findEquivalentTickerFromSet(Ticker originalTicker, Set<Ticker> tickerSet) {
         Objects.requireNonNull(originalTicker, "Ticker that has to be compared is null!");
-        return tickerSet.stream().filter(ticker -> ticker.getBase().equals(originalTicker.getBase()) &&
+        if (originalTicker.isPriceInvalid()) {
+            return null;
+        }
+        return tickerSet.stream().filter(ticker -> !ticker.isPriceInvalid() &&
+                ticker.getBase().equals(originalTicker.getBase()) &&
                 ticker.getTarget().equals(originalTicker.getTarget())).findAny().orElse(null);
     }
 }

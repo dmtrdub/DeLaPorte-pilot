@@ -8,7 +8,7 @@
         </encoder>
     </appender>
 
-    <timestamp key="timestamp" datePattern="yyyyMMdd-HHmmss"/>
+    <!--<timestamp key="timestamp" datePattern="yyyyMMdd-HHmmss"/>
     <appender name="file" class="ch.qos.logback.core.FileAppender">
         <file>logs/log_${timestamp}.log</file>
         <append>true</append>
@@ -16,9 +16,9 @@
             <charset>UTF-8</charset>
             <pattern>%d{HH:mm:ss.SSS} %-5level - %msg%n</pattern>
         </encoder>
-    </appender>
+    </appender>-->
 
-    <logger name="my.dub.dlp_pilot" level="info"/>
+    <logger name="my.dub.dlp_pilot" level="debug"/>
 
     <root level="info">
         <appender-ref ref="console"/>

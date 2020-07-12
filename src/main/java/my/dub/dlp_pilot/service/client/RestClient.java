@@ -293,7 +293,8 @@ public class RestClient implements InitializingBean {
             if (!parsePairResult) {
                 continue;
             }
-            ticker.setPrice(new BigDecimal(innerNode.get("close").asText()));
+            ticker.setPriceAsk(new BigDecimal(innerNode.get("ask").get("price").asText()));
+            ticker.setPriceBid(new BigDecimal(innerNode.get("bid").get("price").asText()));
             tickers.add(ticker);
         }
         return tickers;
@@ -301,11 +302,11 @@ public class RestClient implements InitializingBean {
 
     /**
      * @param exchange
-     * @see <a href="https://github.com/binance-exchange/binance-official-api-docs/blob/master/rest-api.md#symbol-price-ticker">Binance REST API - Ticker</a>
+     * @see <a href="https://github.com/binance-exchange/binance-official-api-docs/blob/master/rest-api.md#symbol-order-book-ticker">Binance REST API - Ticker</a>
      */
     private Set<BinanceTicker> fetchBinanceTickers(Exchange exchange) throws IOException {
         String exchangeName = exchange.getFullName();
-        String resp = executeRequest(exchange.getBaseEndpoint(), "ticker/price", exchangeName);
+        String resp = executeRequest(exchange.getBaseEndpoint(), "ticker/bookTicker", exchangeName);
         JsonNode parentNode = new ObjectMapper().readTree(resp);
         JsonNode statusNode = parentNode.get("code");
 
@@ -328,7 +329,8 @@ public class RestClient implements InitializingBean {
             if (!parsePairResult) {
                 continue;
             }
-            ticker.setPrice(new BigDecimal(innerNode.get("price").asText()));
+            ticker.setPriceAsk(new BigDecimal(innerNode.get("askPrice").asText()));
+            ticker.setPriceBid(new BigDecimal(innerNode.get("bidPrice").asText()));
             tickers.add(ticker);
         }
         return tickers;
@@ -363,13 +365,20 @@ public class RestClient implements InitializingBean {
             if (!parsePairResult) {
                 continue;
             }
-            String price = innerNode.get("highestBid").asText();
-            if (StringUtils.isEmpty(price) || "null".equalsIgnoreCase(price)) {
-                log.debug("Unable to fetch price data for pair: {} on exchange: {}. Skipping...", ticker.getPair(),
+            String priceBid = innerNode.get("highestBid").asText();
+            if (StringUtils.isEmpty(priceBid) || "null".equalsIgnoreCase(priceBid)) {
+                log.debug("Unable to fetch BID price data for pair: {} on exchange: {}. Skipping...", ticker.getPair(),
                           exchangeName);
                 continue;
             }
-            ticker.setPrice(new BigDecimal(price));
+            String priceAsk = innerNode.get("lowestAsk").asText();
+            if (StringUtils.isEmpty(priceAsk) || "null".equalsIgnoreCase(priceAsk)) {
+                log.debug("Unable to fetch ASK price data for pair: {} on exchange: {}. Skipping...", ticker.getPair(),
+                          exchangeName);
+                continue;
+            }
+            ticker.setPriceBid(new BigDecimal(priceBid));
+            ticker.setPriceAsk(new BigDecimal(priceAsk));
             ZonedDateTime dateTime = DateUtils.getDateTimeFromEpoch(innerNode.get("time").asLong());
             if (dateTime.isBefore(DateUtils.currentDateTime())) {
                 ticker.setDateTime(dateTime);
@@ -412,7 +421,8 @@ public class RestClient implements InitializingBean {
             String base = pair.replace(prefix, "").replace(":", "").replace(target, "");
             ticker.setBase(base);
             ticker.setTarget(target);
-            ticker.setPrice(new BigDecimal(innerNode.get(1).asText()));
+            ticker.setPriceBid(new BigDecimal(innerNode.get(1).asText()));
+            ticker.setPriceAsk(new BigDecimal(innerNode.get(3).asText()));
             tickers.add(ticker);
         }
         return tickers;
@@ -443,7 +453,9 @@ public class RestClient implements InitializingBean {
             if (!parsePairResult) {
                 continue;
             }
-            ticker.setPrice(new BigDecimal(innerNode.get("c").asText()));
+            //TODO: use orderbook
+            ticker.setPriceAsk(new BigDecimal(innerNode.get("c").asText()));
+            ticker.setPriceBid(new BigDecimal(innerNode.get("c").asText()));
             tickers.add(ticker);
         }
         return tickers;
@@ -474,7 +486,8 @@ public class RestClient implements InitializingBean {
             if (!parsePairResult) {
                 continue;
             }
-            ticker.setPrice(new BigDecimal(innerNode.get("current_price").asText()));
+            ticker.setPriceAsk(new BigDecimal(innerNode.get("ask_1").asText()));
+            ticker.setPriceBid(new BigDecimal(innerNode.get("bid_1").asText()));
             tickers.add(ticker);
         }
         return tickers;
@@ -506,7 +519,8 @@ public class RestClient implements InitializingBean {
             if (!parsePairResult) {
                 continue;
             }
-            ticker.setPrice(new BigDecimal(innerNode.get("close").asText()));
+            ticker.setPriceAsk(new BigDecimal(innerNode.get("ask").get(0).asText()));
+            ticker.setPriceBid(new BigDecimal(innerNode.get("bid").get(0).asText()));
             tickers.add(ticker);
         }
         return tickers;
@@ -538,7 +552,8 @@ public class RestClient implements InitializingBean {
             if (!parsePairResult) {
                 continue;
             }
-            ticker.setPrice(new BigDecimal(innerNode.get("lastTradeRate").asText()));
+            ticker.setPriceAsk(new BigDecimal(innerNode.get("askRate").asText()));
+            ticker.setPriceBid(new BigDecimal(innerNode.get("bidRate").asText()));
             tickers.add(ticker);
         }
         return tickers;
@@ -576,7 +591,9 @@ public class RestClient implements InitializingBean {
             if (!parsePairResult) {
                 continue;
             }
-            ticker.setPrice(new BigDecimal(innerNode.get(1).asText()));
+            //TODO: use orderbook
+            ticker.setPriceBid(new BigDecimal(innerNode.get(1).asText()));
+            ticker.setPriceAsk(new BigDecimal(innerNode.get(1).asText()));
             tickers.add(ticker);
         }
         return tickers;
@@ -609,7 +626,9 @@ public class RestClient implements InitializingBean {
             CoinoneTicker ticker = new CoinoneTicker();
             ticker.setBase(innerNode.get("currency").asText().toUpperCase());
             ticker.setTarget("KRW");
-            ticker.setPrice(new BigDecimal(innerNode.get("last").asText()));
+            //TODO: use orderbook
+            ticker.setPriceBid(new BigDecimal(innerNode.get("last").asText()));
+            ticker.setPriceAsk(new BigDecimal(innerNode.get("last").asText()));
             tickers.add(ticker);
         }
         return tickers;

@@ -34,20 +34,20 @@ public class ParametersComponent implements InitializingBean {
     private double entryMinPercentageDouble;
     @Value("${trade_entry_max_percentage}")
     private double entryMaxPercentageDouble;
-    @Value("${trade_exit_diff_percentage}")
-    private double exitPercentageDiffDouble;
-    @Value("${trade_decrease_exit_diff_percentage_after_seconds}")
-    private int exitPercentageDiffDecreaseAfterSeconds;
-    @Value("${trade_decrease_exit_diff_percentage_by}")
-    private double exitPercentageDiffDecreaseByDouble;
+    @Value("${trade_exit_amount_percentage}")
+    private double exitAmountPercentageDouble;
+    @Value("${trade_decrease_exit_amount_percentage_after_seconds}")
+    private int exitAmountPercentageDecreaseAfterSeconds;
+    @Value("${trade_decrease_exit_amount_percentage_by}")
+    private double exitAmountPercentageDecreaseByDouble;
     @Value("${trade_entry_amounts_usd}")
     private String[] entryAmountsUsdParam;
     @Value("${trade_minutes_timeout}")
     private int tradeMinutesTimeout;
-    @Value("${trade_detrimental_percentage_delta}")
-    private double detrimentPercentageDeltaDouble;
-    @Value("${trade_detrimental_entry_amount_percentage}")
-    private double detrimentEntryAmountPercentageDouble;
+    @Value("${trade_entry_detrimental_amount_percentage}")
+    private double entryDetrimentAmountPercentageDouble;
+    @Value("${trade_detrimental_amount_percentage}")
+    private double detrimentAmountPercentageDouble;
     @Value("${trade_parallel_number}")
     private int parallelTradesNumber;
     @Value("${trade_suspense_after_detrimental_duration_seconds}")
@@ -65,11 +65,11 @@ public class ParametersComponent implements InitializingBean {
 
     private BigDecimal entryMinPercentage;
     private BigDecimal entryMaxPercentage;
-    private BigDecimal exitPercentageDiff;
-    private BigDecimal exitPercentageDiffDecreaseBy;
+    private BigDecimal exitPercentage;
+    private BigDecimal exitPercentageDecreaseBy;
     private List<Double> entryAmounts;
-    private BigDecimal detrimentPercentageDelta;
-    private BigDecimal detrimentEntryAmountPercentage;
+    private BigDecimal entryDetrimentPercentage;
+    private BigDecimal detrimentAmountPercentage;
     private Duration testRunDuration;
 
     @Override
@@ -78,12 +78,12 @@ public class ParametersComponent implements InitializingBean {
         initDelayMs = initDelayMs > 0 ? initDelayMs : 0;
         entryMinPercentage = BigDecimal.valueOf(entryMinPercentageDouble);
         entryMaxPercentage = BigDecimal.valueOf(entryMaxPercentageDouble);
-        exitPercentageDiff = BigDecimal.valueOf(exitPercentageDiffDouble);
-        exitPercentageDiffDecreaseBy = BigDecimal.valueOf(exitPercentageDiffDecreaseByDouble);
+        exitPercentage = BigDecimal.valueOf(exitAmountPercentageDouble);
+        exitPercentageDecreaseBy = BigDecimal.valueOf(exitAmountPercentageDecreaseByDouble);
         entryAmounts = Arrays.stream(entryAmountsUsdParam).mapToDouble(Double::parseDouble).boxed().distinct().sorted()
                              .collect(Collectors.toList());
-        detrimentPercentageDelta = BigDecimal.valueOf(detrimentPercentageDeltaDouble);
-        detrimentEntryAmountPercentage = BigDecimal.valueOf(detrimentEntryAmountPercentageDouble);
+        entryDetrimentPercentage = BigDecimal.valueOf(entryDetrimentAmountPercentageDouble);
+        detrimentAmountPercentage = BigDecimal.valueOf(detrimentAmountPercentageDouble);
         parallelTradesNumber = parallelTradesNumber > 0 ? parallelTradesNumber : 0;
         suspenseAfterDetrimentalSeconds = suspenseAfterDetrimentalSeconds > 0 ? suspenseAfterDetrimentalSeconds : 0;
         testRunDuration = DateUtils.parseDuration(testRunDurationParam.toUpperCase());
@@ -99,10 +99,10 @@ public class ParametersComponent implements InitializingBean {
         if (entryMaxPercentageDouble <= entryMinPercentageDouble) {
             throw new IllegalArgumentException("Trade entry max percentage cannot be <= entry min percentage!");
         }
-        if (exitPercentageDiffDouble >= entryMinPercentageDouble) {
+        if (exitAmountPercentageDouble >= entryMinPercentageDouble) {
             throw new IllegalArgumentException("Trade exit percentage diff cannot be >= entry min percentage!");
         }
-        if (exitPercentageDiffDecreaseByDouble >= exitPercentageDiffDouble) {
+        if (exitAmountPercentageDecreaseByDouble >= exitAmountPercentageDouble) {
             throw new IllegalArgumentException("Trade exit percentage diff decrease cannot be >= exit percentage!");
         }
         if (ArrayUtils.isEmpty(entryAmountsUsdParam)) {
@@ -119,18 +119,25 @@ public class ParametersComponent implements InitializingBean {
         if (tradeMinutesTimeout <= 0) {
             throw new IllegalArgumentException("Trade timeout minutes cannot be <= 0!");
         }
-        if (exitPercentageDiffDecreaseAfterSeconds >= (tradeMinutesTimeout * 60)) {
+        if (exitAmountPercentageDecreaseAfterSeconds >= (tradeMinutesTimeout * 60)) {
             throw new IllegalArgumentException(
                     "Exit percentage decrease diff after seconds cannot be >= trade timeout minutes!");
         }
-        if (detrimentPercentageDeltaDouble <= 0) {
-            throw new IllegalArgumentException("Detrimental percentage delta cannot be <= 0!");
+        if (entryDetrimentAmountPercentageDouble <= 0) {
+            throw new IllegalArgumentException("Entry detrimental percentage cannot be <= 0!");
         }
-        if (detrimentEntryAmountPercentageDouble <= 0) {
-            throw new IllegalArgumentException("Detrimental entry amount percentage cannot be <= 0!");
+        if (entryDetrimentAmountPercentageDouble >= 100) {
+            throw new IllegalArgumentException("Entry detrimental percentage cannot be >= 100!");
         }
-        if (detrimentEntryAmountPercentageDouble >= 100) {
-            throw new IllegalArgumentException("Detrimental entry amount percentage cannot be >= 100!");
+        if (detrimentAmountPercentageDouble <= 0) {
+            throw new IllegalArgumentException("Detrimental exit amount percentage cannot be <= 0!");
+        }
+        if (detrimentAmountPercentageDouble >= 100) {
+            throw new IllegalArgumentException("Detrimental exit amount percentage cannot be >= 100!");
+        }
+        if (detrimentAmountPercentageDouble <= entryDetrimentAmountPercentageDouble) {
+            throw new IllegalArgumentException(
+                    "Detrimental exit amount percentage cannot be <= Entry detrimental percentage!");
         }
         if (StringUtils.isEmpty(testRunDurationParam)) {
             throw new IllegalArgumentException("Duration parameter cannot be empty!");
@@ -154,15 +161,17 @@ public class ParametersComponent implements InitializingBean {
         }
     }
 
-    public BigDecimal getExitPercentageDiff(long tradeDurationSeconds) {
-        if (exitPercentageDiffDecreaseAfterSeconds <= 0 || exitPercentageDiffDecreaseByDouble <= 0) {
-            return exitPercentageDiff;
+    public BigDecimal getExitPercentage(long tradeDurationSeconds) {
+        if (exitAmountPercentageDecreaseAfterSeconds <= 0 || exitAmountPercentageDecreaseByDouble <= 0) {
+            return exitPercentage;
         }
-        long decreaseTimes = tradeDurationSeconds / exitPercentageDiffDecreaseAfterSeconds;
+        long decreaseTimes = tradeDurationSeconds / exitAmountPercentageDecreaseAfterSeconds;
         if (decreaseTimes <= 0) {
-            return exitPercentageDiff;
+            return exitPercentage;
         }
-        return exitPercentageDiff.subtract(exitPercentageDiffDecreaseBy.multiply(BigDecimal.valueOf(decreaseTimes)));
+        BigDecimal exitPerc =
+                exitPercentage.subtract(exitPercentageDecreaseBy.multiply(BigDecimal.valueOf(decreaseTimes)));
+        return exitPerc.compareTo(BigDecimal.ZERO) <= 0 ? BigDecimal.valueOf(0.01d) : exitPerc;
     }
 
     public Optional<String> getConfiguration() {
