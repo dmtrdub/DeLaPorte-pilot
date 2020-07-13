@@ -121,7 +121,7 @@ public class TradeServiceImpl implements TradeService {
             return false;
         }
         if (exchangeService.isExchangeFaulty(tickerShort.getExchangeName()) ||
-                exchangeService.isExchangeFaulty(tickerShort.getExchangeName())) {
+                exchangeService.isExchangeFaulty(tickerLong.getExchangeName())) {
             return false;
         }
         if (tradeContainer.hasDetrimentalRecord(tickerShort.getExchangeName(), tickerLong.getExchangeName())) {
@@ -161,19 +161,23 @@ public class TradeServiceImpl implements TradeService {
             if (isTestRunEnd) {
                 closeAndAddToSets(tradesCompleted, tradesToSave, trade, tickerShort, tickerLong,
                                   TradeResultType.TEST_RUN_END);
-            } else if (DateUtils.durationMinutes(trade.getStartTime()) > parameters.getTradeMinutesTimeout()) {
-                closeAndAddToSets(tradesCompleted, tradesToSave, trade, tickerShort, tickerLong,
-                                  TradeResultType.TIMED_OUT);
             } else {
-                BigDecimal income = calculateCurrentIncome(positionShort.getOpenPrice(), tickerShort.getPriceAsk(),
-                                                           tickerShort.getExchangeName(), positionLong.getOpenPrice(),
-                                                           tickerLong.getPriceBid(), tickerLong.getExchangeName());
-                if (isExistingSuccessful(income, trade.getStartTime())) {
+                int tradeMinutesTimeout = parameters.getTradeMinutesTimeout();
+                if (tradeMinutesTimeout != 0 && DateUtils.durationMinutes(trade.getStartTime()) > tradeMinutesTimeout) {
                     closeAndAddToSets(tradesCompleted, tradesToSave, trade, tickerShort, tickerLong,
-                                      TradeResultType.SUCCESSFUL);
-                } else if (isExistingDetrimental(income)) {
-                    closeAndAddToSets(tradesCompleted, tradesToSave, trade, tickerShort, tickerLong,
-                                      TradeResultType.DETRIMENTAL);
+                                      TradeResultType.TIMED_OUT);
+                } else {
+                    BigDecimal income = calculateCurrentIncome(positionShort.getOpenPrice(), tickerShort.getPriceAsk(),
+                                                               tickerShort.getExchangeName(),
+                                                               positionLong.getOpenPrice(),
+                                                               tickerLong.getPriceBid(), tickerLong.getExchangeName());
+                    if (isExistingSuccessful(income, trade.getStartTime())) {
+                        closeAndAddToSets(tradesCompleted, tradesToSave, trade, tickerShort, tickerLong,
+                                          TradeResultType.SUCCESSFUL);
+                    } else if (isExistingDetrimental(income)) {
+                        closeAndAddToSets(tradesCompleted, tradesToSave, trade, tickerShort, tickerLong,
+                                          TradeResultType.DETRIMENTAL);
+                    }
                 }
             }
         });

@@ -1,5 +1,6 @@
 package my.dub.dlp_pilot.util;
 
+import org.springframework.lang.NonNull;
 import org.springframework.util.StringUtils;
 
 import java.time.Duration;
@@ -80,9 +81,9 @@ public final class DateUtils {
         return String.format("%d.%3d", duration.toSeconds(), duration.toMillisPart()).replaceAll("\\s+", "");
     }
 
-    public static Duration parseDuration(String input) {
+    public static Duration parseDuration(@NonNull String input) {
         if (StringUtils.isEmpty(input)) {
-            return null;
+            return Duration.ZERO;
         }
         try {
             if (!input.startsWith("PT")) {
@@ -90,7 +91,7 @@ public final class DateUtils {
             }
             return Duration.parse(input);
         } catch (DateTimeParseException e) {
-            return null;
+            return Duration.ZERO;
         }
     }
 }

@@ -84,6 +84,7 @@ public class ParametersComponent implements InitializingBean {
                              .collect(Collectors.toList());
         entryDetrimentPercentage = BigDecimal.valueOf(entryDetrimentAmountPercentageDouble);
         detrimentAmountPercentage = BigDecimal.valueOf(detrimentAmountPercentageDouble);
+        tradeMinutesTimeout = tradeMinutesTimeout > 0 ? tradeMinutesTimeout : 0;
         parallelTradesNumber = parallelTradesNumber > 0 ? parallelTradesNumber : 0;
         suspenseAfterDetrimentalSeconds = suspenseAfterDetrimentalSeconds > 0 ? suspenseAfterDetrimentalSeconds : 0;
         testRunDuration = DateUtils.parseDuration(testRunDurationParam.toUpperCase());
@@ -116,13 +117,6 @@ public class ParametersComponent implements InitializingBean {
                   .anyMatch(aDouble -> aDouble < 10)) {
             throw new IllegalArgumentException("Trade entry sum cannot be < $10");
         }
-        if (tradeMinutesTimeout <= 0) {
-            throw new IllegalArgumentException("Trade timeout minutes cannot be <= 0!");
-        }
-        if (exitAmountPercentageDecreaseAfterSeconds >= (tradeMinutesTimeout * 60)) {
-            throw new IllegalArgumentException(
-                    "Exit percentage decrease diff after seconds cannot be >= trade timeout minutes!");
-        }
         if (entryDetrimentAmountPercentageDouble <= 0) {
             throw new IllegalArgumentException("Entry detrimental percentage cannot be <= 0!");
         }
@@ -142,7 +136,8 @@ public class ParametersComponent implements InitializingBean {
         if (StringUtils.isEmpty(testRunDurationParam)) {
             throw new IllegalArgumentException("Duration parameter cannot be empty!");
         }
-        if (DateUtils.parseDuration(testRunDurationParam) == null) {
+        Duration duration = DateUtils.parseDuration(testRunDurationParam);
+        if (duration == null || duration.equals(Duration.ZERO)) {
             throw new IllegalArgumentException("Duration parameter cannot be parsed!");
         }
         if (StringUtils.isEmpty(pathToResultDir)) {
