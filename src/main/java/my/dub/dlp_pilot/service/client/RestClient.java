@@ -293,8 +293,29 @@ public class RestClient implements InitializingBean {
             if (!parsePairResult) {
                 continue;
             }
-            ticker.setPriceAsk(new BigDecimal(innerNode.get("ask").get("price").asText()));
-            ticker.setPriceBid(new BigDecimal(innerNode.get("bid").get("price").asText()));
+            //TODO: add logging
+            JsonNode askNode = innerNode.get("ask");
+            if(askNode != null) {
+                JsonNode askPrice = askNode.get("price");
+                if(askPrice != null) {
+                    ticker.setPriceAsk(new BigDecimal(askPrice.asText()));
+                } else {
+                    continue;
+                }
+            } else {
+                continue;
+            }
+            JsonNode bidNode = innerNode.get("bid");
+            if(bidNode != null) {
+                JsonNode bidPrice = bidNode.get("price");
+                if(bidPrice != null) {
+                    ticker.setPriceBid(new BigDecimal(bidPrice.asText()));
+                } else {
+                    continue;
+                }
+            } else {
+                continue;
+            }
             tickers.add(ticker);
         }
         return tickers;
