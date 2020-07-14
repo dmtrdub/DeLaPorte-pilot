@@ -61,7 +61,8 @@ public abstract class Ticker {
     }
 
     public boolean isPriceInvalid() {
-        return Calculations.isNotPositive(priceAsk) || Calculations.isNotPositive(priceBid) ||
-                previousPriceAsk == null || previousPriceBid == null;
+        return priceAsk == null || priceBid == null || Calculations.isNotPositive(priceAsk) ||
+                Calculations.isNotPositive(priceBid) || previousPriceAsk == null || previousPriceBid == null ||
+                Calculations.isNotPositive(previousPriceAsk) || Calculations.isNotPositive(previousPriceBid);
     }
 }
