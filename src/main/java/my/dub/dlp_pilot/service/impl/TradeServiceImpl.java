@@ -77,10 +77,10 @@ public class TradeServiceImpl implements TradeService {
             }
             Ticker tickerShort;
             Ticker tickerLong;
-            if (ticker.getPriceAsk().compareTo(equivalentTicker.getPriceBid()) > 0) {
+            if (ticker.getPriceBid().compareTo(equivalentTicker.getPriceAsk()) > 0) {
                 tickerLong = equivalentTicker;
                 tickerShort = ticker;
-            } else if (equivalentTicker.getPriceAsk().compareTo(ticker.getPriceBid()) > 0) {
+            } else if (equivalentTicker.getPriceBid().compareTo(ticker.getPriceAsk()) > 0) {
                 tickerLong = ticker;
                 tickerShort = equivalentTicker;
             } else {
@@ -88,9 +88,9 @@ public class TradeServiceImpl implements TradeService {
             }
             if (canEnterTrade(tickerShort, tickerLong)) {
                 BigDecimal currentPercentageDiff =
-                        Calculations.percentageDifference(tickerShort.getPriceAsk(), tickerLong.getPriceBid());
+                        Calculations.percentageDifference(tickerShort.getPriceBid(), tickerLong.getPriceAsk());
                 BigDecimal prevPercentageDiff = Calculations
-                        .percentageDifference(ticker.getPreviousPriceAsk(), equivalentTicker.getPreviousPriceBid());
+                        .percentageDifference(ticker.getPreviousPriceBid(), equivalentTicker.getPreviousPriceAsk());
                 if (currentPercentageDiff.compareTo(parameters.getEntryMinPercentage()) < 0 ||
                         prevPercentageDiff.compareTo(parameters.getEntryMinPercentage()) >= 0 ||
                         currentPercentageDiff.compareTo(parameters.getEntryMaxPercentage()) > 0) {
