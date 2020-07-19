@@ -3,7 +3,6 @@ package my.dub.dlp_pilot.model;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
-import my.dub.dlp_pilot.model.client.Ticker;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;

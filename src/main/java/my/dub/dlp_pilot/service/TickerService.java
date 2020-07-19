@@ -2,7 +2,7 @@ package my.dub.dlp_pilot.service;
 
 import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.ExchangeName;
-import my.dub.dlp_pilot.model.client.Ticker;
+import my.dub.dlp_pilot.model.Ticker;
 
 import java.util.Collection;
 import java.util.Optional;

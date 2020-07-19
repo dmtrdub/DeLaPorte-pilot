@@ -1,10 +1,7 @@
-package my.dub.dlp_pilot.model.client;
+package my.dub.dlp_pilot.model;
 
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import my.dub.dlp_pilot.Constants;
-import my.dub.dlp_pilot.model.ExchangeName;
-import my.dub.dlp_pilot.model.PositionSide;
 import my.dub.dlp_pilot.util.Calculations;
 import my.dub.dlp_pilot.util.DateUtils;
 
@@ -12,17 +9,13 @@ import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 
 @Data
-public abstract class Ticker {
+@EqualsAndHashCode(callSuper = true)
+public class Ticker extends ExchangeData {
 
-    public Ticker() {
+    public Ticker(ExchangeName exchangeName) {
+        super(exchangeName);
         dateTime = DateUtils.currentDateTime();
     }
-
-    private ExchangeName exchangeName;
-
-    private String base;
-
-    private String target;
 
     private BigDecimal priceBid;
 
@@ -40,15 +33,11 @@ public abstract class Ticker {
     @EqualsAndHashCode.Exclude
     private ZonedDateTime dateTime;
 
-    public String getPair() {
-        return base + Constants.DEFAULT_PAIR_DELIMITER + target;
-    }
-
     public boolean isSimilar(Ticker newTicker) {
         if (newTicker == null) return false;
         if (this == newTicker) return false;
-        return exchangeName.equals(newTicker.exchangeName) && base.equals(newTicker.base) &&
-                target.equals(newTicker.target);
+        return getExchangeName().equals(newTicker.getExchangeName()) && getBase().equals(newTicker.getBase()) &&
+                getTarget().equals(newTicker.getTarget());
     }
 
     public BigDecimal getPriceOnOpen(PositionSide side) {

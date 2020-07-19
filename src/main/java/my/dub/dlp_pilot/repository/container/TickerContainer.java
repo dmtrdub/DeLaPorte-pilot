@@ -2,7 +2,7 @@ package my.dub.dlp_pilot.repository.container;
 
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.model.ExchangeName;
-import my.dub.dlp_pilot.model.client.Ticker;
+import my.dub.dlp_pilot.model.Ticker;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
