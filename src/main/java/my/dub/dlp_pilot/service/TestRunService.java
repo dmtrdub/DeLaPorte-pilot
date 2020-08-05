@@ -12,7 +12,7 @@ public interface TestRunService {
 
     boolean isTestRunEnd();
 
-    boolean isTickerDataCapture();
+    boolean isInitialDataCapture();
 
     void checkExitFile();
 }

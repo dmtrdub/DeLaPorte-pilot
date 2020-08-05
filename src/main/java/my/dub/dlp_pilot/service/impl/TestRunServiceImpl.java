@@ -28,11 +28,11 @@ public class TestRunServiceImpl implements TestRunService {
     private TestRun currentTestRun;
     private ZonedDateTime tradeStopDateTime;
     private ZonedDateTime testRunEndDateTime;
-    private ZonedDateTime tickerDataCaptureEndDateTime;
+    private ZonedDateTime initDataCaptureEndDateTime;
 
     private final AtomicBoolean tradeStop = new AtomicBoolean();
     private final AtomicBoolean testRunEnd = new AtomicBoolean();
-    private final AtomicBoolean tickerDataCapture = new AtomicBoolean(true);
+    private final AtomicBoolean initialDataCapture = new AtomicBoolean(true);
 
     @Autowired
     public TestRunServiceImpl(TestRunRepository repository, ParametersComponent parameters) {
@@ -49,13 +49,13 @@ public class TestRunServiceImpl implements TestRunService {
         testRun.setConfigParams(configuration);
         ZonedDateTime startTime = DateUtils.currentDateTime();
         testRun.setStartTime(startTime);
-        int tickerDataCaptureDurationSeconds = parameters.getStaleDifferenceSeconds() + 1;
+        int dataCaptureDurationSeconds = parameters.getDataCapturePeriodSeconds();
         tradeStopDateTime =
-                startTime.plus(parameters.getTestRunDuration()).plusSeconds(tickerDataCaptureDurationSeconds);
+                startTime.plus(parameters.getTestRunDuration()).plusSeconds(dataCaptureDurationSeconds);
         testRun.setEndTime(tradeStopDateTime.plusSeconds(parameters.getExitMaxDelaySeconds()));
         currentTestRun = repository.save(testRun);
         testRunEndDateTime = currentTestRun.getEndTime();
-        tickerDataCaptureEndDateTime = startTime.plusSeconds(tickerDataCaptureDurationSeconds);
+        initDataCaptureEndDateTime = startTime.plusSeconds(dataCaptureDurationSeconds);
     }
 
     @Override
@@ -80,11 +80,11 @@ public class TestRunServiceImpl implements TestRunService {
     }
 
     @Override
-    public boolean isTickerDataCapture() {
-        if (tickerDataCaptureEndDateTime != null && tickerDataCapture.get()) {
-            tickerDataCapture.set(!DateUtils.currentDateTime().isAfter(tickerDataCaptureEndDateTime));
+    public boolean isInitialDataCapture() {
+        if (initDataCaptureEndDateTime != null && initialDataCapture.get()) {
+            initialDataCapture.set(!DateUtils.currentDateTime().isAfter(initDataCaptureEndDateTime));
         }
-        return tickerDataCapture.get();
+        return initialDataCapture.get();
     }
 
     @Override

@@ -28,24 +28,28 @@ public class ParametersComponent implements InitializingBean {
 
     @Value("${init_trade_delay_ms}")
     private long initDelayMs;
-    @Value("${ticker_stale_difference_seconds}")
+    @Value("${price_data_stale_difference_seconds}")
     private int staleDifferenceSeconds;
-    @Value("${trade_entry_min_percentage}")
-    private double entryMinPercentageDouble;
+    @Value("${price_data_capture_period_seconds}")
+    private int dataCapturePeriodSeconds;
+    @Value("${price_data_capture_interval_duration}")
+    private String dataCaptureIntervalDurationParam;
+    @Value("${price_data_invalidate_after_seconds}")
+    private int priceDataInvalidateAfterSeconds;
+    @Value("${trade_entry_profit_percentage}")
+    private double entryProfitPercentageDouble;
     @Value("${trade_entry_max_percentage}")
     private double entryMaxPercentageDouble;
-    @Value("${trade_exit_amount_percentage}")
-    private double exitAmountPercentageDouble;
-    @Value("${trade_decrease_exit_amount_percentage_after_seconds}")
-    private int exitAmountPercentageDecreaseAfterSeconds;
-    @Value("${trade_decrease_exit_amount_percentage_by}")
-    private double exitAmountPercentageDecreaseByDouble;
+    @Value("${trade_exit_profit_percentage}")
+    private double exitProfitPercentageDouble;
+    @Value("${trade_decrease_exit_profit_percentage_after_seconds}")
+    private int exitProfitPercentageDecreaseAfterSeconds;
+    @Value("${trade_decrease_exit_profit_percentage_by}")
+    private double exitProfitPercentageDecreaseByDouble;
     @Value("${trade_entry_amounts_usd}")
     private String[] entryAmountsUsdParam;
     @Value("${trade_minutes_timeout}")
     private int tradeMinutesTimeout;
-    @Value("${trade_entry_detrimental_amount_percentage}")
-    private double entryDetrimentAmountPercentageDouble;
     @Value("${trade_detrimental_amount_percentage}")
     private double detrimentAmountPercentageDouble;
     @Value("${trade_parallel_number}")
@@ -63,12 +67,12 @@ public class ParametersComponent implements InitializingBean {
     @Value("${test_run_max_delay_on_exit_seconds}")
     private int exitMaxDelaySeconds;
 
-    private BigDecimal entryMinPercentage;
+    private Duration dataCaptureIntervalDuration;
+    private BigDecimal entryProfitPercentage;
     private BigDecimal entryMaxPercentage;
-    private BigDecimal exitPercentage;
-    private BigDecimal exitPercentageDecreaseBy;
+    private BigDecimal exitProfitPercentage;
+    private BigDecimal exitProfitPercentageDecreaseBy;
     private List<Double> entryAmounts;
-    private BigDecimal entryDetrimentPercentage;
     private BigDecimal detrimentAmountPercentage;
     private Duration testRunDuration;
 
@@ -76,34 +80,45 @@ public class ParametersComponent implements InitializingBean {
     public void afterPropertiesSet() {
         validateInputParams();
         initDelayMs = initDelayMs > 0 ? initDelayMs : 0;
-        entryMinPercentage = BigDecimal.valueOf(entryMinPercentageDouble);
+        dataCaptureIntervalDuration = DateUtils.parseDuration(dataCaptureIntervalDurationParam);
+        if (Duration.ZERO.equals(dataCaptureIntervalDuration)) {
+            log.warn("Price data capture interval is set to 0! Memory may be overloaded!");
+        } else {
+            log.info("Price data capture interval is set to {}", DateUtils.formatDuration(dataCaptureIntervalDuration));
+        }
+        priceDataInvalidateAfterSeconds = priceDataInvalidateAfterSeconds > 0 ? priceDataInvalidateAfterSeconds : 0;
+        entryProfitPercentage = BigDecimal.valueOf(entryProfitPercentageDouble);
         entryMaxPercentage = BigDecimal.valueOf(entryMaxPercentageDouble);
-        exitPercentage = BigDecimal.valueOf(exitAmountPercentageDouble);
-        exitPercentageDecreaseBy = BigDecimal.valueOf(exitAmountPercentageDecreaseByDouble);
+        exitProfitPercentage = BigDecimal.valueOf(exitProfitPercentageDouble);
+        exitProfitPercentageDecreaseBy = BigDecimal.valueOf(exitProfitPercentageDecreaseByDouble);
         entryAmounts = Arrays.stream(entryAmountsUsdParam).mapToDouble(Double::parseDouble).boxed().distinct().sorted()
                              .collect(Collectors.toList());
-        entryDetrimentPercentage = BigDecimal.valueOf(entryDetrimentAmountPercentageDouble);
         detrimentAmountPercentage = BigDecimal.valueOf(detrimentAmountPercentageDouble);
         tradeMinutesTimeout = tradeMinutesTimeout > 0 ? tradeMinutesTimeout : 0;
         parallelTradesNumber = parallelTradesNumber > 0 ? parallelTradesNumber : 0;
         suspenseAfterDetrimentalSeconds = suspenseAfterDetrimentalSeconds > 0 ? suspenseAfterDetrimentalSeconds : 0;
         testRunDuration = DateUtils.parseDuration(testRunDurationParam.toUpperCase());
+        if (Duration.ZERO.equals(testRunDuration)) {
+            log.warn("Test run duration is 0!");
+        } else {
+            log.info("Test run duration is set to {}", DateUtils.formatDuration(testRunDuration));
+        }
     }
 
     private void validateInputParams() {
         if (staleDifferenceSeconds < 1) {
             throw new IllegalArgumentException("Stale difference for ticker cannot be < 1 seconds!");
         }
-        if (entryMinPercentageDouble <= 0.0) {
-            throw new IllegalArgumentException("Trade entry min percentage cannot be <= 0!");
+        if (dataCapturePeriodSeconds < 1) {
+            throw new IllegalArgumentException("Price data capture interval cannot be < 1 seconds!");
         }
-        if (entryMaxPercentageDouble <= entryMinPercentageDouble) {
+        if (entryProfitPercentageDouble < 0.0d) {
+            throw new IllegalArgumentException("Trade entry min percentage cannot be < 0!");
+        }
+        if (entryMaxPercentageDouble <= entryProfitPercentageDouble) {
             throw new IllegalArgumentException("Trade entry max percentage cannot be <= entry min percentage!");
         }
-        if (exitAmountPercentageDouble >= entryMinPercentageDouble) {
-            throw new IllegalArgumentException("Trade exit percentage diff cannot be >= entry min percentage!");
-        }
-        if (exitAmountPercentageDecreaseByDouble >= exitAmountPercentageDouble) {
+        if (exitProfitPercentageDecreaseByDouble >= exitProfitPercentageDouble) {
             throw new IllegalArgumentException("Trade exit percentage diff decrease cannot be >= exit percentage!");
         }
         if (ArrayUtils.isEmpty(entryAmountsUsdParam)) {
@@ -117,21 +132,11 @@ public class ParametersComponent implements InitializingBean {
                   .anyMatch(aDouble -> aDouble < 10)) {
             throw new IllegalArgumentException("Trade entry sum cannot be < $10");
         }
-        if (entryDetrimentAmountPercentageDouble <= 0) {
-            throw new IllegalArgumentException("Entry detrimental percentage cannot be <= 0!");
-        }
-        if (entryDetrimentAmountPercentageDouble >= 100) {
-            throw new IllegalArgumentException("Entry detrimental percentage cannot be >= 100!");
-        }
         if (detrimentAmountPercentageDouble <= 0) {
             throw new IllegalArgumentException("Detrimental exit amount percentage cannot be <= 0!");
         }
         if (detrimentAmountPercentageDouble >= 100) {
             throw new IllegalArgumentException("Detrimental exit amount percentage cannot be >= 100!");
-        }
-        if (detrimentAmountPercentageDouble <= entryDetrimentAmountPercentageDouble) {
-            throw new IllegalArgumentException(
-                    "Detrimental exit amount percentage cannot be <= Entry detrimental percentage!");
         }
         if (StringUtils.isEmpty(testRunDurationParam)) {
             throw new IllegalArgumentException("Duration parameter cannot be empty!");
@@ -156,16 +161,16 @@ public class ParametersComponent implements InitializingBean {
         }
     }
 
-    public BigDecimal getExitPercentage(long tradeDurationSeconds) {
-        if (exitAmountPercentageDecreaseAfterSeconds <= 0 || exitAmountPercentageDecreaseByDouble <= 0) {
-            return exitPercentage;
+    public BigDecimal getExitProfitPercentage(long tradeDurationSeconds) {
+        if (exitProfitPercentageDecreaseAfterSeconds <= 0 || exitProfitPercentageDecreaseByDouble <= 0) {
+            return exitProfitPercentage;
         }
-        long decreaseTimes = tradeDurationSeconds / exitAmountPercentageDecreaseAfterSeconds;
+        long decreaseTimes = tradeDurationSeconds / exitProfitPercentageDecreaseAfterSeconds;
         if (decreaseTimes <= 0) {
-            return exitPercentage;
+            return exitProfitPercentage;
         }
-        BigDecimal exitPerc =
-                exitPercentage.subtract(exitPercentageDecreaseBy.multiply(BigDecimal.valueOf(decreaseTimes)));
+        BigDecimal exitPerc = exitProfitPercentage
+                .subtract(exitProfitPercentageDecreaseBy.multiply(BigDecimal.valueOf(decreaseTimes)));
         return exitPerc.compareTo(BigDecimal.ZERO) <= 0 ? BigDecimal.valueOf(0.01d) : exitPerc;
     }
 
@@ -179,7 +184,7 @@ public class ParametersComponent implements InitializingBean {
         }
         List<String> configProperties = prop.entrySet().stream().filter(entry -> {
             String key = (String) entry.getKey();
-            return key.startsWith("ticker") || key.startsWith("trade");
+            return key.startsWith("price") || key.startsWith("trade");
         }).map(entry -> entry.getKey() + ":" + entry.getValue()).collect(Collectors.toList());
         return Optional.of(String.join(";", configProperties));
     }

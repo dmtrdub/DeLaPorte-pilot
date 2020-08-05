@@ -16,6 +16,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
+
 @Slf4j
 @Component
 public class TickerContainer {
@@ -72,9 +75,8 @@ public class TickerContainer {
     }
 
     public Set<Ticker> getTickers(ExchangeName exchangeName, boolean includeStale) {
-        if (exchangeName == null) {
-            return Collections.emptySet();
-        }
+        checkNotNull(exchangeName, "ExchangeName cannot be null when searching Tickers!");
+
         Set<Ticker> result = tickerSet(exchangeName);
         if (!includeStale) {
             return result.stream().filter(ticker -> !ticker.isStale()).collect(Collectors.toSet());
@@ -83,9 +85,10 @@ public class TickerContainer {
     }
 
     public Optional<Ticker> getTicker(ExchangeName exchangeName, String base, String target) {
-        if (exchangeName == null || StringUtils.isEmpty(base) || StringUtils.isEmpty(target)) {
-            return Optional.empty();
-        }
+        checkNotNull(exchangeName, "ExchangeName cannot be null when searching Ticker!");
+        checkArgument(!StringUtils.isEmpty(base), "Base cannot be empty when searching Ticker!");
+        checkArgument(!StringUtils.isEmpty(target), "Target cannot be empty when searching Ticker!");
+
         Set<Ticker> tickers = tickerSet(exchangeName);
         if (CollectionUtils.isEmpty(tickers)) {
             return Optional.empty();

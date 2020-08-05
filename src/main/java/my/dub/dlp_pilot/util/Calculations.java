@@ -6,6 +6,7 @@ import my.dub.dlp_pilot.model.PositionSide;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Arrays;
+import java.util.Collection;
 
 public final class Calculations {
 
@@ -65,24 +66,14 @@ public final class Calculations {
                          .stripTrailingZeros();
     }
 
-    public static BigDecimal expectedPnlLong(BigDecimal openPriceLong, BigDecimal openPriceShort, BigDecimal amountUsd,
-                                             BigDecimal exitPercentageDiff) {
-        if (openPriceLong == null || openPriceShort == null || isZero(openPriceLong) || isZero(openPriceShort)) {
-            return BigDecimal.ZERO;
-        }
-        BigDecimal expectedClosePriceLong = expectedClosePriceLong(openPriceShort, openPriceLong, exitPercentageDiff);
-        return pnl(PositionSide.LONG, openPriceLong, expectedClosePriceLong, amountUsd);
+    public static BigDecimal pnl(BigDecimal priceDiff, BigDecimal openPrice, BigDecimal amountUsd) {
+        return priceDiff.multiply(amountUsd).divide(openPrice, Constants.PRICE_SCALE, RoundingMode.HALF_UP)
+                        .stripTrailingZeros();
     }
 
     public static BigDecimal income(BigDecimal pnl1, BigDecimal pnl2, BigDecimal... expenses) {
         BigDecimal totalExpenses = Arrays.stream(expenses).reduce(BigDecimal.ZERO, BigDecimal::add);
         return pnl1.add(pnl2).subtract(totalExpenses);
-    }
-
-    public static BigDecimal expectedIncome(BigDecimal openPriceLong, BigDecimal openPriceShort, BigDecimal amountUsd,
-                                            BigDecimal exitPercentageDiff, BigDecimal totalExpenses) {
-        return income(expectedPnlLong(openPriceLong, openPriceShort, amountUsd, exitPercentageDiff),
-                      BigDecimal.ZERO, totalExpenses);
     }
 
     public static BigDecimal getDecimal(String value, int scale) {
@@ -101,5 +92,10 @@ public final class Calculations {
 
     public static boolean isNotPositive(BigDecimal value) {
         return value.compareTo(BigDecimal.ZERO) <= 0;
+    }
+
+    public static BigDecimal average(Collection<BigDecimal> values) {
+        BigDecimal sum = values.stream().reduce(BigDecimal::add).orElse(BigDecimal.ZERO);
+        return sum.divide(BigDecimal.valueOf(values.size()), RoundingMode.HALF_UP);
     }
 }

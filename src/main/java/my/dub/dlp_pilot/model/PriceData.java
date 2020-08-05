@@ -4,12 +4,12 @@ import lombok.Data;
 import my.dub.dlp_pilot.Constants;
 
 @Data
-public abstract class ExchangeData {
+public abstract class PriceData {
 
-    public ExchangeData() {
+    public PriceData() {
     }
 
-    public ExchangeData(ExchangeName exchangeName) {
+    public PriceData(ExchangeName exchangeName) {
         this.exchangeName = exchangeName;
     }
 

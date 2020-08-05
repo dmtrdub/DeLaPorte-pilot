@@ -45,6 +45,11 @@ public final class DateUtils {
         return dateTime.format(formatter);
     }
 
+    public static boolean isDurationLonger(Temporal start, Temporal end, Duration toCompare) {
+        Duration duration = Duration.between(start, end);
+        return duration.compareTo(toCompare) > 0;
+    }
+
     public static long durationMinutes(Temporal start, Temporal end) {
         if (start == null || end == null) {
             return 0;
@@ -93,5 +98,12 @@ public final class DateUtils {
         } catch (DateTimeParseException e) {
             return Duration.ZERO;
         }
+    }
+
+    public static String formatDuration(@NonNull Duration duration) {
+        return duration.toString()
+                       .substring(2)
+                       .replaceAll("(\\d[HMS])(?!$)", "$1 ")
+                       .toLowerCase();
     }
 }

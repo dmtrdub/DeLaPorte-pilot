@@ -173,7 +173,7 @@ public class RestClient implements InitializingBean {
             String pair = innerNode.get("name").asText();
             int state = innerNode.get("state").asInt();
             if (state != 1) {
-                log.debug("Symbol {} on {} exchange has unacceptable state {}. Skipping symbol info...", pair,
+                log.trace("Symbol {} on {} exchange has unacceptable state {}. Skipping symbol info...", pair,
                           exchangeName, state);
                 continue;
             }
@@ -198,7 +198,7 @@ public class RestClient implements InitializingBean {
             String pair = innerNode.get("symbol").asText();
             String status = innerNode.get("status").asText();
             if (List.of("HALT", "BREAK").contains(status)) {
-                log.debug("Symbol {} on {} exchange has unacceptable status {}. Skipping symbol info...", pair,
+                log.trace("Symbol {} on {} exchange has unacceptable status {}. Skipping symbol info...", pair,
                           exchangeName, status);
                 continue;
             }
@@ -245,7 +245,7 @@ public class RestClient implements InitializingBean {
                     result = fetchCoinoneTickers(exchange);
                     break;
             }
-            log.debug("Successfully fetched {} tickers from {} exchange", result.size(), exchange.getFullName());
+            log.trace("Successfully fetched {} tickers from {} exchange", result.size(), exchange.getFullName());
             if (exchange.isFaulty()) {
                 exchangeService.updateCachedExchangeFault(exchange, false);
             }
@@ -420,7 +420,7 @@ public class RestClient implements InitializingBean {
         Set<Ticker> tickers = new HashSet<>();
         for (JsonNode innerNode : parentNode) {
             if (innerNode == null || innerNode.isEmpty() || innerNode.size() < 4) {
-                log.debug("Inner node does not contain full ticker data in response for exchange {}!", exchangeName);
+                log.trace("Inner node does not contain full ticker data in response for exchange {}!", exchangeName);
                 continue;
             }
             String pair = innerNode.get(0).asText();
@@ -682,7 +682,7 @@ public class RestClient implements InitializingBean {
             ticker.setBase(findOriginalSymbol(symbols[0].toUpperCase()));
             ticker.setTarget(findOriginalSymbol(symbols[1].toUpperCase()));
         } catch (ArrayIndexOutOfBoundsException e) {
-            log.debug("Incorrect pair input ({}) for {} exchange! Expecting to parse with split regex: {}", input,
+            log.trace("Incorrect pair input ({}) for {} exchange! Expecting to parse with split regex: {}", input,
                       ticker.getExchangeName().getFullName(), splitRegex);
             return false;
         }
@@ -706,7 +706,7 @@ public class RestClient implements InitializingBean {
     }
 
     private void logInvalidPriceData(String exchangeName, String pair, String priceType) {
-        log.debug("Unable to fetch {} price data for pair: {} on exchange: {}. Skipping...", priceType, pair,
+        log.trace("Unable to fetch {} price data for pair: {} on exchange: {}. Skipping...", priceType, pair,
                   exchangeName);
     }
 }

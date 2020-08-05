@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.configuration.ParametersComponent;
 import my.dub.dlp_pilot.exception.TestRunEndException;
 import my.dub.dlp_pilot.model.Exchange;
+import my.dub.dlp_pilot.model.ExchangeName;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Scope;
@@ -24,6 +25,7 @@ public class ScheduledService implements InitializingBean {
     private final ExchangeService exchangeService;
     private final TickerService tickerService;
     private final TradeService tradeService;
+    private final PriceDifferenceService priceDifferenceService;
     private final TestRunService testRunService;
     private final FileResultService fileResultService;
 
@@ -31,12 +33,15 @@ public class ScheduledService implements InitializingBean {
 
     @Autowired
     public ScheduledService(ExchangeService exchangeService, TickerService tickerService,
-                            TradeService tradeService, TestRunService testRunService,
+                            TradeService tradeService,
+                            PriceDifferenceService priceDifferenceService,
+                            TestRunService testRunService,
                             FileResultService fileResultService,
                             ParametersComponent parameters) {
         this.exchangeService = exchangeService;
         this.tickerService = tickerService;
         this.tradeService = tradeService;
+        this.priceDifferenceService = priceDifferenceService;
         this.testRunService = testRunService;
         this.fileResultService = fileResultService;
         this.parameters = parameters;
@@ -87,8 +92,9 @@ public class ScheduledService implements InitializingBean {
 
     private void run(Exchange exchange) {
         tickerService.fetchAndSave(exchange);
-        tradeService.searchForTrades(exchange);
-        tradeService.handleTrades(exchange.getName());
+        ExchangeName exchangeName = exchange.getName();
+        priceDifferenceService.handlePriceDifference(exchangeName);
+        tradeService.handleTrades(exchangeName);
     }
 
     private int calculateFixedDelayInMillis(Exchange exchange) {

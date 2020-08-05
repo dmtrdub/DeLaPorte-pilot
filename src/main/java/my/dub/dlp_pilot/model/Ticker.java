@@ -10,7 +10,7 @@ import java.time.ZonedDateTime;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class Ticker extends ExchangeData {
+public class Ticker extends PriceData {
 
     public Ticker(ExchangeName exchangeName) {
         super(exchangeName);
@@ -24,6 +24,7 @@ public class Ticker extends ExchangeData {
     @EqualsAndHashCode.Exclude
     private boolean stale;
 
+    //TODO: possibly remove previous price
     @EqualsAndHashCode.Exclude
     private BigDecimal previousPriceAsk;
 
@@ -47,6 +48,10 @@ public class Ticker extends ExchangeData {
             return priceAsk;
         }
         return BigDecimal.ZERO;
+    }
+
+    public BigDecimal getSpread() {
+        return priceAsk.subtract(priceBid);
     }
 
     public boolean isPriceInvalid() {

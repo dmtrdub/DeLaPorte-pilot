@@ -19,6 +19,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 @Service
 public class ExchangeServiceImpl implements ExchangeService, InitializingBean {
 
@@ -50,17 +52,15 @@ public class ExchangeServiceImpl implements ExchangeService, InitializingBean {
 
     @Override
     public Optional<Exchange> findById(Long id) {
-        if (id == null) {
-            return Optional.empty();
-        }
+        checkNotNull(id, "Exchange ID cannot be null when searching Exchange by ID!");
+
         return exchanges.stream().filter(exchange -> id.equals(exchange.getId())).findFirst();
     }
 
     @Override
     public Optional<Exchange> findByName(ExchangeName exchangeName) {
-        if (exchangeName == null) {
-            return Optional.empty();
-        }
+        checkNotNull(exchangeName, "Exchange name cannot be null when searching Exchange by name!");
+
         return exchanges.stream().filter(exchange -> exchangeName.equals(exchange.getName())).findFirst();
     }
 
