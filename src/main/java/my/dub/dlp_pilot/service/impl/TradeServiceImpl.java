@@ -1,5 +1,12 @@
 package my.dub.dlp_pilot.service.impl;
 
+import static com.google.common.base.Preconditions.checkState;
+import java.math.BigDecimal;
+import java.time.ZonedDateTime;
+import java.util.Collection;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.configuration.ParametersComponent;
 import my.dub.dlp_pilot.exception.MissingEntityException;
@@ -27,15 +34,6 @@ import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
-
-import java.math.BigDecimal;
-import java.time.ZonedDateTime;
-import java.util.Collection;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
-
-import static com.google.common.base.Preconditions.checkState;
 
 @Slf4j
 @Service
@@ -91,21 +89,22 @@ public class TradeServiceImpl implements TradeService {
         if (ticker1.isStale() && ticker2.isStale()) {
             return false;
         }
-        if (tradeContainer.isSimilarPresent(ticker1.getBase(), ticker1.getTarget(), ticker1.getExchangeName(),
-                                            ticker2.getExchangeName())) {
+        String base = ticker1.getBase();
+        String target = ticker1.getTarget();
+        if (tradeContainer.isSimilarPresent(base, target, ticker1.getExchangeName(), ticker2.getExchangeName())) {
             return false;
         }
         if (exchangeService.isExchangeFaulty(ticker1.getExchangeName()) ||
-                exchangeService.isExchangeFaulty(ticker2.getExchangeName())) {
+            exchangeService.isExchangeFaulty(ticker2.getExchangeName())) {
             return false;
         }
-        if (tradeContainer.hasDetrimentalRecord(ticker1.getExchangeName(), ticker2.getExchangeName())) {
+        if (tradeContainer.hasDetrimentalRecord(ticker1.getExchangeName(), ticker2.getExchangeName(), base, target)) {
             return false;
         }
         int parallelTradesNumber = parameters.getParallelTradesNumber();
         if (parallelTradesNumber != 0) {
             Pair<Long, Long> tradesCount =
-                    tradeContainer.tradesCount(ticker1.getExchangeName(), ticker2.getExchangeName());
+                tradeContainer.tradesCount(ticker1.getExchangeName(), ticker2.getExchangeName());
             return tradesCount.getFirst() <= parallelTradesNumber && tradesCount.getSecond() <= parallelTradesNumber;
         }
         return true;
@@ -245,10 +244,12 @@ public class TradeServiceImpl implements TradeService {
         ExchangeName exchangeShort = trade.getPositionShort().getExchange().getName();
         ExchangeName exchangeLong = trade.getPositionLong().getExchange().getName();
         ZonedDateTime invalidationDateTime = trade.getEndTime().plusSeconds(suspenseAfterDetrimentalSeconds);
-        tradeContainer.addDetrimentalRecord(exchangeShort, exchangeLong, invalidationDateTime);
-        log.debug(
-                "Added new detrimental record for {} (SHORT) and {} (LONG) exchanges. Similar trades will be suspended until {}",
-                exchangeShort, exchangeLong, invalidationDateTime);
+        String base = trade.getBase();
+        String target = trade.getTarget();
+        tradeContainer.addDetrimentalRecord(exchangeShort, exchangeLong, base, target, invalidationDateTime);
+        log.debug("Added new detrimental record for {} (SHORT) and {} (LONG) exchanges, base: {}, target {}. " +
+                      "Similar trades will be suspended until {}",
+                  exchangeShort, exchangeLong, base, target, invalidationDateTime);
     }
 
     private void closeTrade(Trade trade, TradeResultType resultType, Ticker tickerShort, Ticker tickerLong) {

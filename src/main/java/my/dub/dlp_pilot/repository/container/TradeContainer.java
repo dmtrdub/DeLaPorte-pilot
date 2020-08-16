@@ -1,5 +1,11 @@
 package my.dub.dlp_pilot.repository.container;
 
+import java.time.ZonedDateTime;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import my.dub.dlp_pilot.model.DetrimentalRecord;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.Position;
@@ -7,13 +13,6 @@ import my.dub.dlp_pilot.model.Trade;
 import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Component;
-
-import java.time.ZonedDateTime;
-import java.util.Collections;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 @Component
 public class TradeContainer {
@@ -33,8 +32,7 @@ public class TradeContainer {
         if (exchangeName == null) {
             return Collections.emptySet();
         }
-        return trades.values().stream().filter(trade -> matchExchange(exchangeName, trade))
-                     .collect(Collectors.toSet());
+        return trades.values().stream().filter(trade -> matchExchange(exchangeName, trade)).collect(Collectors.toSet());
     }
 
     public Pair<Long, Long> tradesCount(ExchangeName exchangeName1, ExchangeName exchangeName2) {
@@ -59,7 +57,7 @@ public class TradeContainer {
         Position positionShort = trade.getPositionShort();
 
         return (positionLong != null && exchangeName.equals(positionLong.getExchange().getName())) ||
-                (positionShort != null && exchangeName.equals(positionShort.getExchange().getName()));
+            (positionShort != null && exchangeName.equals(positionShort.getExchange().getName()));
     }
 
     // Similar trade = equal base, target, exchange1 and exchange2
@@ -68,8 +66,8 @@ public class TradeContainer {
             ExchangeName exchangeShort = trade.getPositionShort().getExchange().getName();
             ExchangeName exchangeLong = trade.getPositionLong().getExchange().getName();
             return trade.getBase().equals(base) && trade.getTarget().equals(target) &&
-                    (exchangeShort.equals(exchange1) && exchangeLong.equals(exchange2)) ||
-                    (exchangeShort.equals(exchange2) && exchangeLong.equals(exchange1));
+                (exchangeShort.equals(exchange1) && exchangeLong.equals(exchange2)) ||
+                (exchangeShort.equals(exchange2) && exchangeLong.equals(exchange1));
         });
     }
 
@@ -79,9 +77,9 @@ public class TradeContainer {
             ExchangeName exchangeShort = existingTrade.getPositionShort().getExchange().getName();
             ExchangeName exchangeLong = existingTrade.getPositionLong().getExchange().getName();
             return existingTrade.getBase().equals(trade.getBase()) &&
-                    existingTrade.getTarget().equals(trade.getTarget()) &&
-                    exchangeShort.equals(trade.getPositionShort().getExchange().getName()) &&
-                    exchangeLong.equals(trade.getPositionLong().getExchange().getName());
+                existingTrade.getTarget().equals(trade.getTarget()) &&
+                exchangeShort.equals(trade.getPositionShort().getExchange().getName()) &&
+                exchangeLong.equals(trade.getPositionLong().getExchange().getName());
         });
     }
 
@@ -93,19 +91,22 @@ public class TradeContainer {
         return trades.isEmpty();
     }
 
-    public void addDetrimentalRecord(ExchangeName exchangeShort, ExchangeName exchangeLong,
+    public void addDetrimentalRecord(ExchangeName exchangeShort, ExchangeName exchangeLong, String base, String target,
                                      ZonedDateTime dateTimeClosed) {
-        if (hasDetrimentalRecord(exchangeShort, exchangeLong)) {
+        if (hasDetrimentalRecord(exchangeShort, exchangeLong, base, target)) {
             return;
         }
-        DetrimentalRecord newDetrimentalRecord = new DetrimentalRecord(exchangeShort, exchangeLong, dateTimeClosed);
+        DetrimentalRecord newDetrimentalRecord =
+            new DetrimentalRecord(exchangeShort, exchangeLong, base, target, dateTimeClosed);
         detrimentalRecords.add(newDetrimentalRecord);
     }
 
-    public boolean hasDetrimentalRecord(ExchangeName exchangeShort, ExchangeName exchangeLong) {
-        DetrimentalRecord existingRecord = detrimentalRecords.stream().filter(detRecord -> detRecord.getExchangeShort()
-                                                                                                    .equals(exchangeShort) &&
-                detRecord.getExchangeLong().equals(exchangeLong)).findFirst().orElse(null);
+    public boolean hasDetrimentalRecord(ExchangeName exchangeShort, ExchangeName exchangeLong, String base,
+                                        String target) {
+        DetrimentalRecord existingRecord = detrimentalRecords.stream().filter(
+            detRecord -> detRecord.getExchangeShort().equals(exchangeShort) &&
+                detRecord.getExchangeLong().equals(exchangeLong) && detRecord.getBase().equals(base) &&
+                detRecord.getTarget().equals(target)).findFirst().orElse(null);
         if (existingRecord == null) {
             return false;
         }

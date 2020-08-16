@@ -22,4 +22,11 @@ public abstract class PriceData {
     public String getPair() {
         return base + Constants.DEFAULT_PAIR_DELIMITER + target;
     }
+
+    public boolean isSimilar(PriceData otherPriceData) {
+        if (otherPriceData == null) return false;
+        if (this == otherPriceData) return false;
+        return exchangeName.equals(otherPriceData.getExchangeName()) && base.equals(otherPriceData.getBase()) &&
+            target.equals(otherPriceData.getTarget());
+    }
 }

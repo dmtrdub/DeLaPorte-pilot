@@ -1,12 +1,11 @@
 package my.dub.dlp_pilot.model;
 
+import java.math.BigDecimal;
+import java.time.ZonedDateTime;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import my.dub.dlp_pilot.util.Calculations;
 import my.dub.dlp_pilot.util.DateUtils;
-
-import java.math.BigDecimal;
-import java.time.ZonedDateTime;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -33,13 +32,6 @@ public class Ticker extends PriceData {
 
     @EqualsAndHashCode.Exclude
     private ZonedDateTime dateTime;
-
-    public boolean isSimilar(Ticker newTicker) {
-        if (newTicker == null) return false;
-        if (this == newTicker) return false;
-        return getExchangeName().equals(newTicker.getExchangeName()) && getBase().equals(newTicker.getBase()) &&
-                getTarget().equals(newTicker.getTarget());
-    }
 
     public BigDecimal getPriceOnOpen(PositionSide side) {
         if (PositionSide.SHORT.equals(side)) {
