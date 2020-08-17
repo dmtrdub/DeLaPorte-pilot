@@ -105,8 +105,8 @@ public class TradeContainer {
                                         String target) {
         DetrimentalRecord existingRecord = detrimentalRecords.stream().filter(
             detRecord -> detRecord.getExchangeShort().equals(exchangeShort) &&
-                detRecord.getExchangeLong().equals(exchangeLong) && detRecord.getBase().equals(base) &&
-                detRecord.getTarget().equals(target)).findFirst().orElse(null);
+                detRecord.getExchangeLong().equals(exchangeLong) && (detRecord.getBase().equals(base) ||
+                detRecord.getTarget().equals(target))).findFirst().orElse(null);
         if (existingRecord == null) {
             return false;
         }
