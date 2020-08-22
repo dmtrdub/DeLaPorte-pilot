@@ -1,12 +1,12 @@
 package my.dub.dlp_pilot.util;
 
-import my.dub.dlp_pilot.Constants;
-import my.dub.dlp_pilot.model.PositionSide;
-
+import static com.google.common.base.Preconditions.checkNotNull;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Arrays;
 import java.util.Collection;
+import my.dub.dlp_pilot.Constants;
+import my.dub.dlp_pilot.model.PositionSide;
 
 public final class Calculations {
 
@@ -15,29 +15,28 @@ public final class Calculations {
     private Calculations() {
     }
 
-    public static BigDecimal percentageDifferenceAbs(BigDecimal price1, BigDecimal price2) {
-        if (price1 == null || price2 == null) {
-            return BigDecimal.ZERO;
+    public static BigDecimal percentageDifference(BigDecimal newValue, BigDecimal origValue) {
+        checkNotNull(newValue, "New value should not be null when calculating percentage difference!");
+        checkNotNull(origValue, "Original value should not be null when calculating percentage difference!");
+
+        if (isZero(origValue)) {
+            return newValue.multiply(HUNDRED);
         }
-        if (price1.compareTo(price2) > 0 && !isZero(price2)) {
-            return price1.multiply(HUNDRED).divide(price2, Constants.PERCENTAGE_SCALE, RoundingMode.HALF_UP)
-                         .subtract(HUNDRED);
-        } else if (price2.compareTo(price1) > 0 && !isZero(price1)) {
-            return price2.multiply(HUNDRED).divide(price1, Constants.PERCENTAGE_SCALE, RoundingMode.HALF_UP)
-                         .subtract(HUNDRED);
-        }
-        return BigDecimal.ZERO;
+
+        BigDecimal result =
+            newValue.subtract(origValue).divide(origValue, Constants.PERCENTAGE_SCALE, RoundingMode.HALF_UP)
+                    .multiply(HUNDRED);
+        return origValue.compareTo(newValue) > 0 && !isNotPositive(result) ? result.negate() : result;
     }
 
-    public static BigDecimal percentageDifference(BigDecimal priceShort, BigDecimal priceLong) {
-        return priceShort.multiply(HUNDRED).divide(priceLong, Constants.PERCENTAGE_SCALE, RoundingMode.HALF_UP)
-                         .subtract(HUNDRED);
+    public static BigDecimal percentageDifferencePrice(BigDecimal priceShort, BigDecimal priceLong) {
+        return percentageDifference(priceShort, priceLong);
     }
 
     public static BigDecimal expectedClosePriceLong(BigDecimal priceShort, BigDecimal priceLong,
                                                     BigDecimal exitPercentageDiff) {
         if (priceShort == null || priceLong == null || exitPercentageDiff == null || isZero(priceShort) ||
-                isZero(priceLong)) {
+            isZero(priceLong)) {
             return BigDecimal.ZERO;
         }
         BigDecimal shortPriceVar = priceShort.multiply(HUNDRED);

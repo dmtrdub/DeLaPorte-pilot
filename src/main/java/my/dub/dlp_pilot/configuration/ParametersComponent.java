@@ -1,5 +1,14 @@
 package my.dub.dlp_pilot.configuration;
 
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+import java.util.Properties;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.Constants;
@@ -10,16 +19,6 @@ import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ResourceUtils;
-
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.time.Duration;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
-import java.util.Properties;
-import java.util.stream.Collectors;
 
 @Component
 @Getter
@@ -48,6 +47,8 @@ public class ParametersComponent implements InitializingBean {
     private double exitProfitPercentageDecreaseByDouble;
     @Value("${trade_entry_amounts_usd}")
     private String[] entryAmountsUsdParam;
+    @Value("${trade_exit_sync_pnl_percentage_diff}")
+    private double exitSyncOnPnlPercentageDiffDouble;
     @Value("${trade_minutes_timeout}")
     private int tradeMinutesTimeout;
     @Value("${trade_detrimental_amount_percentage}")
@@ -72,6 +73,7 @@ public class ParametersComponent implements InitializingBean {
     private BigDecimal entryMaxPercentage;
     private BigDecimal exitProfitPercentage;
     private BigDecimal exitProfitPercentageDecreaseBy;
+    private BigDecimal exitSyncOnPnlPercentageDiff;
     private List<Double> entryAmounts;
     private BigDecimal detrimentAmountPercentage;
     private Duration testRunDuration;
@@ -94,6 +96,9 @@ public class ParametersComponent implements InitializingBean {
         entryAmounts = Arrays.stream(entryAmountsUsdParam).mapToDouble(Double::parseDouble).boxed().distinct().sorted()
                              .collect(Collectors.toList());
         detrimentAmountPercentage = BigDecimal.valueOf(detrimentAmountPercentageDouble);
+        exitSyncOnPnlPercentageDiff =
+            exitSyncOnPnlPercentageDiffDouble > 0 ? BigDecimal.valueOf(exitSyncOnPnlPercentageDiffDouble) :
+                BigDecimal.ZERO;
         tradeMinutesTimeout = tradeMinutesTimeout > 0 ? tradeMinutesTimeout : 0;
         parallelTradesNumber = parallelTradesNumber > 0 ? parallelTradesNumber : 0;
         suspenseAfterDetrimentalSeconds = suspenseAfterDetrimentalSeconds > 0 ? suspenseAfterDetrimentalSeconds : 0;
@@ -126,7 +131,7 @@ public class ParametersComponent implements InitializingBean {
         }
         if (String.join(",", entryAmountsUsdParam).length() > Constants.STRING_PARAM_LENGTH) {
             throw new IllegalArgumentException(
-                    String.format("Trade entry sums cannot be longer than %d chars!", Constants.STRING_PARAM_LENGTH));
+                String.format("Trade entry sums cannot be longer than %d chars!", Constants.STRING_PARAM_LENGTH));
         }
         if (Arrays.stream(entryAmountsUsdParam).mapToDouble(Double::parseDouble).boxed()
                   .anyMatch(aDouble -> aDouble < 10)) {
@@ -150,8 +155,8 @@ public class ParametersComponent implements InitializingBean {
         }
         if (pathToResultDir.length() > Constants.FILE_PATH_PARAM_LENGTH) {
             throw new IllegalArgumentException(
-                    String.format("Path to result dir parameter cannot be longer than %d chars!",
-                                  Constants.FILE_PATH_PARAM_LENGTH));
+                String.format("Path to result dir parameter cannot be longer than %d chars!",
+                              Constants.FILE_PATH_PARAM_LENGTH));
         }
         if (StringUtils.isNotEmpty(forcedExitFilePath) && StringUtils.isBlank(exitCode)) {
             throw new IllegalArgumentException("Exit code cannot be empty if forced exit is enabled!");
@@ -170,7 +175,7 @@ public class ParametersComponent implements InitializingBean {
             return exitProfitPercentage;
         }
         BigDecimal exitPerc = exitProfitPercentage
-                .subtract(exitProfitPercentageDecreaseBy.multiply(BigDecimal.valueOf(decreaseTimes)));
+            .subtract(exitProfitPercentageDecreaseBy.multiply(BigDecimal.valueOf(decreaseTimes)));
         return exitPerc.compareTo(BigDecimal.ZERO) <= 0 ? BigDecimal.valueOf(0.01d) : exitPerc;
     }
 
