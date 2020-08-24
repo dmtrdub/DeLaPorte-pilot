@@ -33,6 +33,7 @@ public class TickerContainer {
     private final Set<Ticker> bittrexTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<Ticker> bwTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<Ticker> coinoneTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<Ticker> exmoTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private Set<Ticker> tickerSet(ExchangeName exchangeName) {
         switch (exchangeName) {
@@ -56,6 +57,8 @@ public class TickerContainer {
                 return bwTickers;
             case COINONE:
                 return coinoneTickers;
+            case EXMO:
+                return exmoTickers;
         }
         return Collections.emptySet();
     }

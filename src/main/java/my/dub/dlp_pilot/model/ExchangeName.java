@@ -10,7 +10,8 @@ public enum ExchangeName {
     BITMAX("BitMax"),
     BITTREX("Bittrex"),
     BW("BW.com"),
-    COINONE("Coinone");
+    COINONE("Coinone"),
+    EXMO("Exmo");
 
     private final String fullName;
 

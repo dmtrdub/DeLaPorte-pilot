@@ -11,6 +11,7 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -174,6 +175,9 @@ public class RestClient implements InitializingBean {
                     break;
                 case COINONE:
                     result = fetchCoinoneTickers(exchange);
+                    break;
+                case EXMO:
+                    result = fetchExmoTickers(exchange);
                     break;
             }
             log.trace("Successfully fetched {} tickers from {} exchange", result.size(), exchange.getFullName());
@@ -395,10 +399,7 @@ public class RestClient implements InitializingBean {
             }
             ticker.setPriceBid(new BigDecimal(priceBid));
             ticker.setPriceAsk(new BigDecimal(priceAsk));
-            ZonedDateTime dateTime = DateUtils.getDateTimeFromEpoch(innerNode.get("time").asLong());
-            if (dateTime.isBefore(DateUtils.currentDateTime())) {
-                ticker.setDateTime(dateTime);
-            }
+            setTickerDateTime(innerNode, ticker, "time", ChronoUnit.MILLIS);
             tickers.add(ticker);
         }
         return tickers;
@@ -676,6 +677,40 @@ public class RestClient implements InitializingBean {
         return tickers;
     }
 
+    /**
+     * @param exchange
+     *
+     * @see
+     * <a href="https://documenter.getpostman.com/view/10287440/SzYXWKPi?version=d0437340-da8e-4fe8-8a3b-e81b8e972e22#4c8e6459-3503-4361-b012-c34bb9f7e385">EXMO
+     * REST API - Ticker</a>
+     */
+    private Set<Ticker> fetchExmoTickers(Exchange exchange) throws IOException {
+        String exchangeName = exchange.getFullName();
+        String resp = executeRequest(exchange.getBaseEndpoint(), "ticker", exchangeName);
+        JsonNode parentNode = new ObjectMapper().readTree(resp);
+        if (parentNode == null || parentNode.isEmpty()) {
+            throw new UnexpectedEndpointResponseException(exchangeName, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
+        }
+        JsonNode errorNode = parentNode.get("error");
+        if (errorNode != null) {
+            throw new UnexpectedEndpointResponseException(exchangeName, errorNode.asText());
+        }
+        Set<Ticker> tickers = new HashSet<>();
+        parentNode.fields().forEachRemaining(entry -> {
+            Ticker ticker = new Ticker(ExchangeName.EXMO);
+            boolean parsePairResult = setSymbols(entry.getKey(), "_", ticker);
+            if (!parsePairResult) {
+                return;
+            }
+            JsonNode innerNode = entry.getValue();
+            ticker.setPriceBid(new BigDecimal(innerNode.get("sell_price").asText()));
+            ticker.setPriceAsk(new BigDecimal(innerNode.get("buy_price").asText()));
+            setTickerDateTime(innerNode, ticker, "updated", ChronoUnit.SECONDS);
+            tickers.add(ticker);
+        });
+        return tickers;
+    }
+
     private String executeRequest(String baseUrl, String endpointUrl, String exchangeName) throws IOException {
         String fullUrl = baseUrl + endpointUrl;
         HttpRequest req = reqFactory().buildGetRequest(new GenericUrl(fullUrl));
@@ -724,5 +759,18 @@ public class RestClient implements InitializingBean {
     private void logInvalidPriceData(String exchangeName, String pair, String priceType) {
         log.trace("Unable to fetch {} price data for pair: {} on exchange: {}. Skipping...", priceType, pair,
                   exchangeName);
+    }
+
+    private void setTickerDateTime(JsonNode innerNode, Ticker ticker, String fieldName, ChronoUnit epochChronoUnit) {
+        ZonedDateTime dateTime;
+        long epoch = innerNode.get(fieldName).asLong();
+        if (ChronoUnit.SECONDS.equals(epochChronoUnit)) {
+            dateTime = DateUtils.getDateTimeFromEpochSecond(epoch);
+        } else {
+            dateTime = DateUtils.getDateTimeFromEpochMilli(epoch);
+        }
+        if (dateTime.isBefore(DateUtils.currentDateTime())) {
+            ticker.setDateTime(dateTime);
+        }
     }
 }
