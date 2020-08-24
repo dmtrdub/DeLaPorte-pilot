@@ -1,5 +1,11 @@
 package my.dub.dlp_pilot.service.impl;
 
+import static com.google.common.base.Preconditions.checkState;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.configuration.ParametersComponent;
 import my.dub.dlp_pilot.model.ExchangeName;
@@ -15,13 +21,6 @@ import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-
-import static com.google.common.base.Preconditions.checkState;
-
 @Slf4j
 @Service
 public class PriceDifferenceServiceImpl implements PriceDifferenceService {
@@ -34,10 +33,8 @@ public class PriceDifferenceServiceImpl implements PriceDifferenceService {
     private final ParametersComponent parameters;
 
     @Autowired
-    public PriceDifferenceServiceImpl(TickerService tickerService,
-                                      PriceDifferenceContainer container,
-                                      TestRunService testRunService, TradeService tradeService,
-                                      ParametersComponent parameters) {
+    public PriceDifferenceServiceImpl(TickerService tickerService, PriceDifferenceContainer container,
+            TestRunService testRunService, TradeService tradeService, ParametersComponent parameters) {
         this.tickerService = tickerService;
         this.container = container;
         this.testRunService = testRunService;
@@ -47,11 +44,11 @@ public class PriceDifferenceServiceImpl implements PriceDifferenceService {
 
     @Override
     public void handlePriceDifference(ExchangeName exchangeName) {
-        Set<Ticker> allTickers = tickerService.getAllTickers(true);
+        Set<Ticker> allTickers = tickerService.checkAndGetTickers();
         Set<Ticker> tickersToCompare = tickerService.getTickers(exchangeName);
         allTickers.removeAll(tickersToCompare);
         allTickers.forEach(ticker -> {
-            Ticker equivalentTicker = tickerService.findEquivalentTickerFromSet(ticker, tickersToCompare);
+            Ticker equivalentTicker = tickerService.findValidEquivalentTickerFromSet(ticker, tickersToCompare);
             if (equivalentTicker == null) {
                 return;
             }
@@ -90,15 +87,15 @@ public class PriceDifferenceServiceImpl implements PriceDifferenceService {
     }
 
     private void handleValidPriceDifference(PriceDifference priceDifference, Ticker ticker1, Ticker ticker2,
-                                            BigDecimal currentPriceDifference, BigDecimal currentAverage) {
-        if (!testRunService.isInitialDataCapture() && !testRunService.isTradeStopped() &&
-                !testRunService.isTestRunEnd() && currentPriceDifference.compareTo(BigDecimal.ZERO) > 0 &&
-                currentPriceDifference.compareTo(currentAverage) > 0) {
+            BigDecimal currentPriceDifference, BigDecimal currentAverage) {
+        if (!testRunService.isInitialDataCapture() && !testRunService.isTradeStopped() && !testRunService.isTestRunEnd()
+                && currentPriceDifference.compareTo(BigDecimal.ZERO) > 0
+                && currentPriceDifference.compareTo(currentAverage) > 0) {
             // set breakthrough price + time if first breakthrough occurs, or when data capture period has passed
-            if (priceDifference.getBreakThroughAvgPriceDiff() == null ||
-                    (parameters.getPriceDataInvalidateAfterSeconds() != 0 &&
-                            DateUtils.durationSeconds(priceDifference.getBreakThroughDateTime()) >
-                                    parameters.getPriceDataInvalidateAfterSeconds())) {
+            if (priceDifference.getBreakThroughAvgPriceDiff() == null || (
+                    parameters.getPriceDataInvalidateAfterSeconds() != 0
+                            && DateUtils.durationSeconds(priceDifference.getBreakThroughDateTime()) > parameters
+                            .getPriceDataInvalidateAfterSeconds())) {
                 log.trace("Updated breakthrough price difference ({}) for {}", currentAverage,
                           priceDifference.toShortString());
                 priceDifference.setCurrentBreakThroughPrice(currentAverage);
@@ -108,7 +105,7 @@ public class PriceDifferenceServiceImpl implements PriceDifferenceService {
     }
 
     private PriceDifference createPriceDifference(Ticker ticker, Ticker equivalentTicker, String base, String target,
-                                                  ExchangeName exchangeName1, ExchangeName exchangeName2) {
+            ExchangeName exchangeName1, ExchangeName exchangeName2) {
         PriceDifference priceDifference = new PriceDifference();
         priceDifference.setBase(base);
         priceDifference.setTarget(target);

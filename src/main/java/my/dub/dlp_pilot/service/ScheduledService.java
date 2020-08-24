@@ -1,10 +1,14 @@
 package my.dub.dlp_pilot.service;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.configuration.ParametersComponent;
 import my.dub.dlp_pilot.exception.TestRunEndException;
 import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.ExchangeName;
+import my.dub.dlp_pilot.service.impl.FileResultServiceImpl;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Scope;
@@ -12,10 +16,6 @@ import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
-
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Set;
 
 @Slf4j
 @Component
@@ -27,17 +27,14 @@ public class ScheduledService implements InitializingBean {
     private final TradeService tradeService;
     private final PriceDifferenceService priceDifferenceService;
     private final TestRunService testRunService;
-    private final FileResultService fileResultService;
+    private final FileResultServiceImpl fileResultService;
 
     private final ParametersComponent parameters;
 
     @Autowired
-    public ScheduledService(ExchangeService exchangeService, TickerService tickerService,
-                            TradeService tradeService,
-                            PriceDifferenceService priceDifferenceService,
-                            TestRunService testRunService,
-                            FileResultService fileResultService,
-                            ParametersComponent parameters) {
+    public ScheduledService(ExchangeService exchangeService, TickerService tickerService, TradeService tradeService,
+            PriceDifferenceService priceDifferenceService, TestRunService testRunService,
+            FileResultServiceImpl fileResultService, ParametersComponent parameters) {
         this.exchangeService = exchangeService;
         this.tickerService = tickerService;
         this.tradeService = tradeService;
@@ -65,7 +62,7 @@ public class ScheduledService implements InitializingBean {
         taskScheduler.setThreadNamePrefix("scheduled-");
         taskScheduler.setErrorHandler(t -> {
             if (t instanceof TestRunEndException) {
-                if (tradeService.allTradesClosed()) {
+                if (tradeService.isAllTradesClosed()) {
                     log.info("De La Porte is exiting...");
                     taskScheduler.getScheduledExecutor().shutdownNow();
                     taskScheduler.getScheduledThreadPoolExecutor().shutdownNow();

@@ -52,22 +52,14 @@ public class TradeContainer {
         return Pair.of(exchange1Count, exchange2Count);
     }
 
-    private boolean matchExchange(ExchangeName exchangeName, Trade trade) {
-        Position positionLong = trade.getPositionLong();
-        Position positionShort = trade.getPositionShort();
-
-        return (positionLong != null && exchangeName.equals(positionLong.getExchange().getName())) ||
-            (positionShort != null && exchangeName.equals(positionShort.getExchange().getName()));
-    }
-
-    // Similar trade = equal base, target, exchange1 and exchange2
+    // Similar trade = equal base, target, exchange1 and exchange2 (or vice-versa)
     public boolean isSimilarPresent(String base, String target, ExchangeName exchange1, ExchangeName exchange2) {
         return trades.values().stream().anyMatch(trade -> {
             ExchangeName exchangeShort = trade.getPositionShort().getExchange().getName();
             ExchangeName exchangeLong = trade.getPositionLong().getExchange().getName();
-            return trade.getBase().equals(base) && trade.getTarget().equals(target) &&
-                (exchangeShort.equals(exchange1) && exchangeLong.equals(exchange2)) ||
-                (exchangeShort.equals(exchange2) && exchangeLong.equals(exchange1));
+            return trade.getBase().equals(base) && trade.getTarget().equals(target) && (exchangeShort.equals(exchange1)
+                    && exchangeLong.equals(exchange2)) || (exchangeShort.equals(exchange2) && exchangeLong
+                    .equals(exchange1));
         });
     }
 
@@ -76,10 +68,9 @@ public class TradeContainer {
         return trades.values().stream().anyMatch(existingTrade -> {
             ExchangeName exchangeShort = existingTrade.getPositionShort().getExchange().getName();
             ExchangeName exchangeLong = existingTrade.getPositionLong().getExchange().getName();
-            return existingTrade.getBase().equals(trade.getBase()) &&
-                existingTrade.getTarget().equals(trade.getTarget()) &&
-                exchangeShort.equals(trade.getPositionShort().getExchange().getName()) &&
-                exchangeLong.equals(trade.getPositionLong().getExchange().getName());
+            return existingTrade.getBase().equals(trade.getBase()) && existingTrade.getTarget()
+                    .equals(trade.getTarget()) && exchangeShort.equals(trade.getPositionShort().getExchange().getName())
+                    && exchangeLong.equals(trade.getPositionLong().getExchange().getName());
         });
     }
 
@@ -92,21 +83,21 @@ public class TradeContainer {
     }
 
     public void addDetrimentalRecord(ExchangeName exchangeShort, ExchangeName exchangeLong, String base, String target,
-                                     ZonedDateTime dateTimeClosed) {
-        if (hasDetrimentalRecord(exchangeShort, exchangeLong, base, target)) {
+            ZonedDateTime dateTimeClosed) {
+        if (checkHasDetrimentalRecord(exchangeShort, exchangeLong, base, target)) {
             return;
         }
         DetrimentalRecord newDetrimentalRecord =
-            new DetrimentalRecord(exchangeShort, exchangeLong, base, target, dateTimeClosed);
+                new DetrimentalRecord(exchangeShort, exchangeLong, base, target, dateTimeClosed);
         detrimentalRecords.add(newDetrimentalRecord);
     }
 
-    public boolean hasDetrimentalRecord(ExchangeName exchangeShort, ExchangeName exchangeLong, String base,
-                                        String target) {
-        DetrimentalRecord existingRecord = detrimentalRecords.stream().filter(
-            detRecord -> detRecord.getExchangeShort().equals(exchangeShort) &&
-                detRecord.getExchangeLong().equals(exchangeLong) && (detRecord.getBase().equals(base) ||
-                detRecord.getTarget().equals(target))).findFirst().orElse(null);
+    public boolean checkHasDetrimentalRecord(ExchangeName exchangeShort, ExchangeName exchangeLong, String base,
+            String target) {
+        DetrimentalRecord existingRecord = detrimentalRecords.stream()
+                .filter(detRecord -> detRecord.getExchangeShort().equals(exchangeShort) && detRecord.getExchangeLong()
+                        .equals(exchangeLong) && (detRecord.getBase().equals(base) || detRecord.getTarget()
+                        .equals(target))).findFirst().orElse(null);
         if (existingRecord == null) {
             return false;
         }
@@ -117,4 +108,11 @@ public class TradeContainer {
         return true;
     }
 
+    private boolean matchExchange(ExchangeName exchangeName, Trade trade) {
+        Position positionLong = trade.getPositionLong();
+        Position positionShort = trade.getPositionShort();
+
+        return (positionLong != null && exchangeName.equals(positionLong.getExchange().getName())) || (
+                positionShort != null && exchangeName.equals(positionShort.getExchange().getName()));
+    }
 }

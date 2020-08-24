@@ -1,5 +1,11 @@
 package my.dub.dlp_pilot.service.impl;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.time.ZonedDateTime;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.configuration.ParametersComponent;
 import my.dub.dlp_pilot.model.TestRun;
@@ -10,13 +16,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.time.ZonedDateTime;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 @Service
@@ -44,14 +43,13 @@ public class TestRunServiceImpl implements TestRunService {
     @Transactional
     public void createAndSave() {
         TestRun testRun = new TestRun();
-        String configuration = parameters.getConfiguration().orElseThrow(
-                () -> new IllegalArgumentException("Empty configuration passed to Test Run!"));
+        String configuration = parameters.getConfiguration()
+                .orElseThrow(() -> new IllegalArgumentException("Empty configuration passed to Test Run!"));
         testRun.setConfigParams(configuration);
         ZonedDateTime startTime = DateUtils.currentDateTime();
         testRun.setStartTime(startTime);
         int dataCaptureDurationSeconds = parameters.getDataCapturePeriodSeconds();
-        tradeStopDateTime =
-                startTime.plus(parameters.getTestRunDuration()).plusSeconds(dataCaptureDurationSeconds);
+        tradeStopDateTime = startTime.plus(parameters.getTestRunDuration()).plusSeconds(dataCaptureDurationSeconds);
         testRun.setEndTime(tradeStopDateTime.plusSeconds(parameters.getExitMaxDelaySeconds()));
         currentTestRun = repository.save(testRun);
         testRunEndDateTime = currentTestRun.getEndTime();
@@ -105,8 +103,8 @@ public class TestRunServiceImpl implements TestRunService {
             if (lines.stream().anyMatch(line -> line.contains(parameters.getExitCode()))) {
                 tradeStopDateTime = DateUtils.currentDateTime();
                 testRunEndDateTime = tradeStopDateTime.plusSeconds(parameters.getExitMaxDelaySeconds());
-                log.info(
-                        "Found force exit file {} containing valid exit code! Stopping trades now. Test Run will end at {}",
+                log.info("Found force exit file {} containing valid exit code! Stopping trades now. "
+                                 + "Test Run will end at {}",
                         exitFile.getName(), DateUtils.formatDateTime(testRunEndDateTime));
                 Files.delete(exitFile.toPath());
             }

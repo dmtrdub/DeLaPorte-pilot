@@ -1,5 +1,13 @@
 package my.dub.dlp_pilot.service.impl;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
+import java.math.BigDecimal;
+import java.util.Collections;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import my.dub.dlp_pilot.exception.MissingEntityException;
 import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.ExchangeName;
@@ -11,15 +19,6 @@ import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.math.BigDecimal;
-import java.util.Collections;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-
-import static com.google.common.base.Preconditions.checkNotNull;
 
 @Service
 public class ExchangeServiceImpl implements ExchangeService, InitializingBean {
@@ -58,17 +57,18 @@ public class ExchangeServiceImpl implements ExchangeService, InitializingBean {
     }
 
     @Override
-    public Optional<Exchange> findByName(ExchangeName exchangeName) {
+    public Exchange findByName(ExchangeName exchangeName) {
         checkNotNull(exchangeName, "Exchange name cannot be null when searching Exchange by name!");
 
-        return exchanges.stream().filter(exchange -> exchangeName.equals(exchange.getName())).findFirst();
+        return exchanges.stream().filter(exchange -> exchangeName.equals(exchange.getName())).findFirst()
+                .orElseThrow(() -> new MissingEntityException(ExchangeName.class.getSimpleName(), exchangeName.name()));
     }
 
     @Override
     public BigDecimal getTotalExpenses(ExchangeName exchangeName, BigDecimal tradeAmount) {
-        Exchange exchange = findByName(exchangeName).orElseThrow();
+        Exchange exchange = findByName(exchangeName);
         return exchange.getFixedFeesUsd()
-                       .add(Calculations.originalValueFromPercent(tradeAmount, exchange.getTakerFeePercentage()));
+                .add(Calculations.originalValueFromPercent(tradeAmount, exchange.getTakerFeePercentage()));
     }
 
     @Override
@@ -77,8 +77,8 @@ public class ExchangeServiceImpl implements ExchangeService, InitializingBean {
             return;
         }
         exchange.setFaulty(faulty);
-        boolean removed = exchanges.removeIf(exch -> Objects.equals(exch.getId(), exchange.getId()) &&
-                Objects.equals(exch.getName(), exchange.getName()));
+        boolean removed = exchanges.removeIf(exch -> Objects.equals(exch.getId(), exchange.getId()) && Objects
+                .equals(exch.getName(), exchange.getName()));
         if (removed) {
             exchanges.add(exchange);
         }
@@ -86,8 +86,8 @@ public class ExchangeServiceImpl implements ExchangeService, InitializingBean {
 
     @Override
     public boolean isExchangeFaulty(ExchangeName exchangeName) {
-        Exchange exchange = findByName(exchangeName)
-                .orElseThrow(() -> new MissingEntityException(Exchange.class.getSimpleName(), exchangeName.name()));
+        Exchange exchange = findByName(exchangeName);
+
         return exchange.isFaulty();
     }
 }

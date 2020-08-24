@@ -1,5 +1,10 @@
 package my.dub.dlp_pilot.service.impl;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
+import java.util.Collection;
+import java.util.Optional;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.configuration.ParametersComponent;
 import my.dub.dlp_pilot.model.Exchange;
@@ -14,12 +19,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-
 @Slf4j
 @Service
 public class TickerServiceImpl implements TickerService {
@@ -30,8 +29,8 @@ public class TickerServiceImpl implements TickerService {
     private final ParametersComponent parameters;
 
     @Autowired
-    public TickerServiceImpl(TickerContainer tickerContainer, RestClient restClient,
-                             TestRunService testRunService, ParametersComponent parameters) {
+    public TickerServiceImpl(TickerContainer tickerContainer, RestClient restClient, TestRunService testRunService,
+            ParametersComponent parameters) {
         this.tickerContainer = tickerContainer;
         this.restClient = restClient;
         this.testRunService = testRunService;
@@ -43,8 +42,7 @@ public class TickerServiceImpl implements TickerService {
         if (testRunService.isTradeStopped()) {
             return;
         }
-        Set<Ticker> tickers = new HashSet<>(restClient.fetchTickers(exchange));
-        save(exchange.getName(), tickers);
+        save(exchange.getName(), restClient.fetchTickers(exchange));
     }
 
     @Override
@@ -61,15 +59,13 @@ public class TickerServiceImpl implements TickerService {
     }
 
     @Override
-    public Set<Ticker> getAllTickers(boolean checkStale) {
-        if (checkStale) {
-            tickerContainer.getAllStream().forEach(ticker -> {
-                if (!ticker.isStale() &&
-                        DateUtils.durationSeconds(ticker.getDateTime()) >= parameters.getStaleDifferenceSeconds()) {
-                    ticker.setStale(true);
-                }
-            });
-        }
+    public Set<Ticker> checkAndGetTickers() {
+        tickerContainer.getAllStream().forEach(ticker -> {
+            if (!ticker.isStale() && DateUtils.durationSeconds(ticker.getDateTime()) >= parameters
+                    .getStaleDifferenceSeconds()) {
+                ticker.setStale(true);
+            }
+        });
         return tickerContainer.getAll(true);
     }
 
@@ -79,13 +75,13 @@ public class TickerServiceImpl implements TickerService {
     }
 
     @Override
-    public Ticker findEquivalentTickerFromSet(Ticker originalTicker, Set<Ticker> tickerSet) {
-        Objects.requireNonNull(originalTicker, "Ticker that has to be compared is null!");
+    public Ticker findValidEquivalentTickerFromSet(Ticker originalTicker, Set<Ticker> tickerSet) {
+        checkNotNull(originalTicker, "Ticker that has to be compared cannot be null!");
         if (originalTicker.isPriceInvalid()) {
             return null;
         }
-        return tickerSet.stream().filter(ticker -> !ticker.isPriceInvalid() &&
-                ticker.getBase().equals(originalTicker.getBase()) &&
-                ticker.getTarget().equals(originalTicker.getTarget())).findAny().orElse(null);
+        return tickerSet.stream()
+                .filter(ticker -> !ticker.isPriceInvalid() && ticker.getBase().equals(originalTicker.getBase())
+                        && ticker.getTarget().equals(originalTicker.getTarget())).findAny().orElse(null);
     }
 }

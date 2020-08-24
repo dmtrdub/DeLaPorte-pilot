@@ -1,12 +1,11 @@
 package my.dub.dlp_pilot.service;
 
-import my.dub.dlp_pilot.model.Exchange;
-import my.dub.dlp_pilot.model.ExchangeName;
-import my.dub.dlp_pilot.model.Ticker;
-
 import java.util.Collection;
 import java.util.Optional;
 import java.util.Set;
+import my.dub.dlp_pilot.model.Exchange;
+import my.dub.dlp_pilot.model.ExchangeName;
+import my.dub.dlp_pilot.model.Ticker;
 
 public interface TickerService {
 
@@ -16,10 +15,10 @@ public interface TickerService {
 
     Set<Ticker> getTickers(ExchangeName exchangeName);
 
-    Set<Ticker> getAllTickers(boolean checkStale);
+    Set<Ticker> checkAndGetTickers();
 
     Optional<Ticker> getTicker(ExchangeName exchangeName, String base, String target);
 
-    Ticker findEquivalentTickerFromSet(Ticker originalTicker, Set<Ticker> tickerSet);
+    Ticker findValidEquivalentTickerFromSet(Ticker originalTicker, Set<Ticker> tickerSet);
 
 }

@@ -8,6 +8,17 @@ import com.google.api.client.http.HttpRequestFactory;
 import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.Constants;
 import my.dub.dlp_pilot.exception.rest.UnexpectedEndpointResponseException;
@@ -21,18 +32,6 @@ import org.springframework.beans.factory.InitializingBean;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
-
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.time.ZonedDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Component
@@ -49,7 +48,9 @@ public class RestClient implements InitializingBean {
 
     private final ExchangeService exchangeService;
 
-    public RestClient(ExchangeService exchangeService) {this.exchangeService = exchangeService;}
+    public RestClient(ExchangeService exchangeService) {
+        this.exchangeService = exchangeService;
+    }
 
     private static HttpTransport transport() {
         if (null == transport) {
@@ -98,8 +99,7 @@ public class RestClient implements InitializingBean {
             case BITBAY:
             case BITMAX:
             case COINONE:
-                log.warn("Exchange: {} does not have a dedicated endpoint to check connection!",
-                         fullName);
+                log.warn("Exchange: {} does not have a dedicated endpoint to check connection!", fullName);
                 return;
             default:
                 pingUrl = baseEndpoint + "ping";
@@ -140,6 +140,57 @@ public class RestClient implements InitializingBean {
         }
     }
 
+    public Set<Ticker> fetchTickers(Exchange exchange) {
+        Set<Ticker> result = new HashSet<>();
+        ExchangeName exchangeName = exchange.getName();
+        try {
+            switch (exchangeName) {
+                case BIGONE:
+                    result = fetchBigONETickers(exchange);
+                    break;
+                case BINANCE:
+                    result = fetchBinanceTickers(exchange);
+                    break;
+                case BITBAY:
+                    result = fetchBitBayTickers(exchange);
+                    break;
+                case BITFINEX:
+                    result = fetchBitfinexTickers(exchange);
+                    break;
+                case BITHUMB:
+                    result = fetchBithumbTickers(exchange);
+                    break;
+                case BITMART:
+                    result = fetchBitmartTickers(exchange);
+                    break;
+                case BITMAX:
+                    result = fetchBitmaxTickers(exchange);
+                    break;
+                case BITTREX:
+                    result = fetchBittrexTickers(exchange);
+                    break;
+                case BW:
+                    result = fetchBWTickers(exchange);
+                    break;
+                case COINONE:
+                    result = fetchCoinoneTickers(exchange);
+                    break;
+            }
+            log.trace("Successfully fetched {} tickers from {} exchange", result.size(), exchange.getFullName());
+            if (exchange.isFaulty()) {
+                exchangeService.updateCachedExchangeFault(exchange, false);
+            }
+        } catch (UnexpectedEndpointResponseException | UnexpectedResponseStatusCodeException e) {
+            log.error(e.getMessage());
+            exchangeService.updateCachedExchangeFault(exchange, true);
+        } catch (IOException e) {
+            log.error("Unable to fetch tickers on {} exchange! Details: {}", exchangeName, e.toString());
+            exchangeService.updateCachedExchangeFault(exchange, true);
+        }
+
+        return result;
+    }
+
     private void fetchBinanceAdditionalSymbolData(Exchange exchange) throws IOException {
         Map<String, String> data = fetchBinanceSymbols(exchange);
         symbolAdditionalData.put(ExchangeName.BINANCE, data);
@@ -152,9 +203,8 @@ public class RestClient implements InitializingBean {
 
     private Map<String, String> fetchBWMarketIdPairData(Exchange bwExchange) throws IOException {
         String exchangeName = bwExchange.getFullName();
-        String resp = executeRequest(
-                bwExchange.getBaseEndpoint(), "exchange/config/controller/website/marketcontroller/getByWebId",
-                exchangeName);
+        String resp = executeRequest(bwExchange.getBaseEndpoint(),
+                                     "exchange/config/controller/website/marketcontroller/getByWebId", exchangeName);
 
         ObjectMapper objectMapper = new ObjectMapper();
         JsonNode parentNode = objectMapper.readTree(resp);
@@ -209,60 +259,11 @@ public class RestClient implements InitializingBean {
         return result;
     }
 
-    public Set<Ticker> fetchTickers(Exchange exchange) {
-        Set<Ticker> result = new HashSet<>();
-        ExchangeName exchangeName = exchange.getName();
-        try {
-            switch (exchangeName) {
-                case BIGONE:
-                    result = fetchBigONETickers(exchange);
-                    break;
-                case BINANCE:
-                    result = fetchBinanceTickers(exchange);
-                    break;
-                case BITBAY:
-                    result = fetchBitBayTickers(exchange);
-                    break;
-                case BITFINEX:
-                    result = fetchBitfinexTickers(exchange);
-                    break;
-                case BITHUMB:
-                    result = fetchBithumbTickers(exchange);
-                    break;
-                case BITMART:
-                    result = fetchBitmartTickers(exchange);
-                    break;
-                case BITMAX:
-                    result = fetchBitmaxTickers(exchange);
-                    break;
-                case BITTREX:
-                    result = fetchBittrexTickers(exchange);
-                    break;
-                case BW:
-                    result = fetchBWTickers(exchange);
-                    break;
-                case COINONE:
-                    result = fetchCoinoneTickers(exchange);
-                    break;
-            }
-            log.trace("Successfully fetched {} tickers from {} exchange", result.size(), exchange.getFullName());
-            if (exchange.isFaulty()) {
-                exchangeService.updateCachedExchangeFault(exchange, false);
-            }
-        } catch (UnexpectedEndpointResponseException | UnexpectedResponseStatusCodeException e) {
-            log.error(e.getMessage());
-            exchangeService.updateCachedExchangeFault(exchange, true);
-        } catch (IOException e) {
-            log.error("Unable to fetch tickers on {} exchange! Details: {}", exchangeName, e.toString());
-            exchangeService.updateCachedExchangeFault(exchange, true);
-        }
-
-        return result;
-    }
-
     /**
      * @param exchange
+     *
      * @return
+     *
      * @see <a href="https://open.big.one/docs/spot_tickers.html#ticker">BigONE REST API - Ticker</a>
      */
     private Set<Ticker> fetchBigONETickers(Exchange exchange) throws IOException {
@@ -305,7 +306,10 @@ public class RestClient implements InitializingBean {
 
     /**
      * @param exchange
-     * @see <a href="https://github.com/binance-exchange/binance-official-api-docs/blob/master/rest-api.md#symbol-order-book-ticker">Binance REST API - Order Book</a>
+     *
+     * @see
+     * <a href="https://github.com/binance-exchange/binance-official-api-docs/blob/master/rest-api.md#symbol-order-book-ticker">Binance
+     * REST API - Order Book</a>
      */
     private Set<Ticker> fetchBinanceTickers(Exchange exchange) throws IOException {
         String exchangeName = exchange.getFullName();
@@ -351,6 +355,7 @@ public class RestClient implements InitializingBean {
 
     /**
      * @param exchange
+     *
      * @see <a href="https://docs.bitbay.net/v1.0.1-en/reference#ticker-1">BitBay REST API - Ticker</a>
      */
     private Set<Ticker> fetchBitBayTickers(Exchange exchange) throws IOException {
@@ -362,7 +367,7 @@ public class RestClient implements InitializingBean {
 
         String status = statusNode.asText();
         if (!"Ok".equalsIgnoreCase(status)) {
-            List<String> errors = objectMapper.convertValue(parentNode.get("errors"), ArrayList.class);
+            ArrayList<String> errors = objectMapper.convertValue(parentNode.get("errors"), ArrayList.class);
             String message = String.join("; ", errors);
             throw new UnexpectedEndpointResponseException(exchangeName, status, message);
         }
@@ -401,6 +406,7 @@ public class RestClient implements InitializingBean {
 
     /**
      * @param exchange
+     *
      * @see <a href="https://docs.bitfinex.com/reference#rest-public-tickers">Bitfinex REST API - Tickers</a>
      */
     private Set<Ticker> fetchBitfinexTickers(Exchange exchange) throws IOException {
@@ -445,7 +451,10 @@ public class RestClient implements InitializingBean {
 
     /**
      * @param exchange
-     * @see <a href="https://github.com/bithumb-pro/bithumb.pro-official-api-docs/blob/master/rest-api.md#1-ticker">Bithumb REST API - Ticker</a>
+     *
+     * @see
+     * <a href="https://github.com/bithumb-pro/bithumb.pro-official-api-docs/blob/master/rest-api.md#1-ticker">Bithumb
+     * REST API - Ticker</a>
      */
     private Set<Ticker> fetchBithumbTickers(Exchange exchange) throws IOException {
         String exchangeName = exchange.getFullName();
@@ -478,7 +487,9 @@ public class RestClient implements InitializingBean {
 
     /**
      * @param exchange
-     * @see <a href="https://developer.bitmart.com/v2/en/?http#spot-api-public-endpoints-ticker">Bitmart REST API - Ticker</a>
+     *
+     * @see <a href="https://developer.bitmart.com/v2/en/?http#spot-api-public-endpoints-ticker">Bitmart REST API -
+     * Ticker</a>
      */
     private Set<Ticker> fetchBitmartTickers(Exchange exchange) throws IOException {
         String exchangeName = exchange.getFullName();
@@ -510,6 +521,7 @@ public class RestClient implements InitializingBean {
 
     /**
      * @param exchange
+     *
      * @see <a href="https://bitmax-exchange.github.io/bitmax-pro-api/#ticker">BitMax REST API - Ticker</a>
      */
     private Set<Ticker> fetchBitmaxTickers(Exchange exchange) throws IOException {
@@ -553,6 +565,7 @@ public class RestClient implements InitializingBean {
 
     /**
      * @param exchange
+     *
      * @see <a href="https://bittrex.github.io/api/v3#operation--markets-tickers-get">Bittrex REST API - Ticker</a>
      */
     private Set<Ticker> fetchBittrexTickers(Exchange exchange) throws IOException {
@@ -586,7 +599,10 @@ public class RestClient implements InitializingBean {
 
     /**
      * @param exchange
-     * @see <a href="https://github.com/bw-exchange/api_docs_en/wiki/REST_api_reference#interface-description-get--tickers-single-symbol">BW REST API - Ticker</a>
+     *
+     * @see
+     * <a href="https://github.com/bw-exchange/api_docs_en/wiki/REST_api_reference#interface-description-get--tickers-single-symbol">BW
+     * REST API - Ticker</a>
      */
     private Set<Ticker> fetchBWTickers(Exchange exchange) throws IOException {
         String exchangeName = exchange.getFullName();
@@ -628,6 +644,7 @@ public class RestClient implements InitializingBean {
      * NOTE: only KRW target symbol is supported!
      *
      * @param exchange
+     *
      * @see <a href="https://doc.coinone.co.kr/#operation/public_api_ticker_utc">Coinone REST API - Ticker</a>
      */
     private Set<Ticker> fetchCoinoneTickers(Exchange exchange) throws IOException {
@@ -658,7 +675,6 @@ public class RestClient implements InitializingBean {
         }
         return tickers;
     }
-
 
     private String executeRequest(String baseUrl, String endpointUrl, String exchangeName) throws IOException {
         String fullUrl = baseUrl + endpointUrl;

@@ -3,6 +3,8 @@ package my.dub.dlp_pilot;
 import java.util.List;
 
 public final class Constants {
+    private Constants() {
+    }
 
     public static final int PRICE_SCALE = 12;
     public static final int PERCENTAGE_SCALE = 3;
@@ -24,7 +26,4 @@ public final class Constants {
     public static final String DEFAULT_PAIR_DELIMITER = "/";
 
     public static final List<String> BITFINEX_TARGET_SYMBOLS = List.of("BTC", "ETH", "USD", "EUR", "JPY", "GBP", "EOS");
-
-    private Constants() {
-    }
 }

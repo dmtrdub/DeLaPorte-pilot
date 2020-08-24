@@ -94,11 +94,11 @@ public class ParametersComponent implements InitializingBean {
         exitProfitPercentage = BigDecimal.valueOf(exitProfitPercentageDouble);
         exitProfitPercentageDecreaseBy = BigDecimal.valueOf(exitProfitPercentageDecreaseByDouble);
         entryAmounts = Arrays.stream(entryAmountsUsdParam).mapToDouble(Double::parseDouble).boxed().distinct().sorted()
-                             .collect(Collectors.toList());
+                .collect(Collectors.toList());
         detrimentAmountPercentage = BigDecimal.valueOf(detrimentAmountPercentageDouble);
-        exitSyncOnPnlPercentageDiff =
-            exitSyncOnPnlPercentageDiffDouble > 0 ? BigDecimal.valueOf(exitSyncOnPnlPercentageDiffDouble) :
-                BigDecimal.ZERO;
+        exitSyncOnPnlPercentageDiff = exitSyncOnPnlPercentageDiffDouble > 0
+                ? BigDecimal.valueOf(exitSyncOnPnlPercentageDiffDouble)
+                : BigDecimal.ZERO;
         tradeMinutesTimeout = tradeMinutesTimeout > 0 ? tradeMinutesTimeout : 0;
         parallelTradesNumber = parallelTradesNumber > 0 ? parallelTradesNumber : 0;
         suspenseAfterDetrimentalSeconds = suspenseAfterDetrimentalSeconds > 0 ? suspenseAfterDetrimentalSeconds : 0;
@@ -131,10 +131,10 @@ public class ParametersComponent implements InitializingBean {
         }
         if (String.join(",", entryAmountsUsdParam).length() > Constants.STRING_PARAM_LENGTH) {
             throw new IllegalArgumentException(
-                String.format("Trade entry sums cannot be longer than %d chars!", Constants.STRING_PARAM_LENGTH));
+                    String.format("Trade entry sums cannot be longer than %d chars!", Constants.STRING_PARAM_LENGTH));
         }
         if (Arrays.stream(entryAmountsUsdParam).mapToDouble(Double::parseDouble).boxed()
-                  .anyMatch(aDouble -> aDouble < 10)) {
+                .anyMatch(aDouble -> aDouble < 10)) {
             throw new IllegalArgumentException("Trade entry sum cannot be < $10");
         }
         if (detrimentAmountPercentageDouble <= 0) {
@@ -155,8 +155,8 @@ public class ParametersComponent implements InitializingBean {
         }
         if (pathToResultDir.length() > Constants.FILE_PATH_PARAM_LENGTH) {
             throw new IllegalArgumentException(
-                String.format("Path to result dir parameter cannot be longer than %d chars!",
-                              Constants.FILE_PATH_PARAM_LENGTH));
+                    String.format("Path to result dir parameter cannot be longer than %d chars!",
+                                  Constants.FILE_PATH_PARAM_LENGTH));
         }
         if (StringUtils.isNotEmpty(forcedExitFilePath) && StringUtils.isBlank(exitCode)) {
             throw new IllegalArgumentException("Exit code cannot be empty if forced exit is enabled!");
@@ -175,7 +175,7 @@ public class ParametersComponent implements InitializingBean {
             return exitProfitPercentage;
         }
         BigDecimal exitPerc = exitProfitPercentage
-            .subtract(exitProfitPercentageDecreaseBy.multiply(BigDecimal.valueOf(decreaseTimes)));
+                .subtract(exitProfitPercentageDecreaseBy.multiply(BigDecimal.valueOf(decreaseTimes)));
         return exitPerc.compareTo(BigDecimal.ZERO) <= 0 ? BigDecimal.valueOf(0.01d) : exitPerc;
     }
 
@@ -192,5 +192,9 @@ public class ParametersComponent implements InitializingBean {
             return key.startsWith("price") || key.startsWith("trade");
         }).map(entry -> entry.getKey() + ":" + entry.getValue()).collect(Collectors.toList());
         return Optional.of(String.join(";", configProperties));
+    }
+
+    public BigDecimal getMinEntryAmount() {
+        return BigDecimal.valueOf(entryAmounts.get(0));
     }
 }

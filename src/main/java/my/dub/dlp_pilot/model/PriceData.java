@@ -24,9 +24,13 @@ public abstract class PriceData {
     }
 
     public boolean isSimilar(PriceData otherPriceData) {
-        if (otherPriceData == null) return false;
-        if (this == otherPriceData) return false;
-        return exchangeName.equals(otherPriceData.getExchangeName()) && base.equals(otherPriceData.getBase()) &&
-            target.equals(otherPriceData.getTarget());
+        if (otherPriceData == null) {
+            return false;
+        }
+        if (this == otherPriceData) {
+            return false;
+        }
+        return exchangeName.equals(otherPriceData.getExchangeName()) && base.equals(otherPriceData.getBase()) && target
+                .equals(otherPriceData.getTarget());
     }
 }

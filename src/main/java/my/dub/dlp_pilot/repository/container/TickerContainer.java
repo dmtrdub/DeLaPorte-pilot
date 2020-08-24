@@ -1,11 +1,7 @@
 package my.dub.dlp_pilot.repository.container;
 
-import lombok.extern.slf4j.Slf4j;
-import my.dub.dlp_pilot.model.ExchangeName;
-import my.dub.dlp_pilot.model.Ticker;
-import org.springframework.stereotype.Component;
-import org.springframework.util.CollectionUtils;
-import org.springframework.util.StringUtils;
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.math.BigDecimal;
 import java.util.Collection;
@@ -15,9 +11,12 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
+import lombok.extern.slf4j.Slf4j;
+import my.dub.dlp_pilot.model.ExchangeName;
+import my.dub.dlp_pilot.model.Ticker;
+import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 
 @Slf4j
 @Component
@@ -91,10 +90,11 @@ public class TickerContainer {
 
         Set<Ticker> tickers = tickerSet(exchangeName);
         if (CollectionUtils.isEmpty(tickers)) {
+            log.error("Ticker set for {} exchange is empty!", exchangeName);
             return Optional.empty();
         }
         return tickers.stream().filter(ticker -> ticker.getBase().equals(base) && ticker.getTarget().equals(target))
-                      .findFirst();
+                .findFirst();
     }
 
     public void addTickers(ExchangeName exchangeName, Collection<Ticker> tickers) {
@@ -108,8 +108,8 @@ public class TickerContainer {
             if (existingTicker != null) {
                 BigDecimal existingPriceAsk = existingTicker.getPriceAsk();
                 BigDecimal existingPriceBid = existingTicker.getPriceBid();
-                if (existingPriceAsk.compareTo(newTicker.getPriceAsk()) != 0 ||
-                        existingPriceBid.compareTo(newTicker.getPriceBid()) != 0) {
+                if (existingPriceAsk.compareTo(newTicker.getPriceAsk()) != 0
+                        || existingPriceBid.compareTo(newTicker.getPriceBid()) != 0) {
                     newTicker.setPreviousPriceAsk(existingPriceAsk);
                     newTicker.setPreviousPriceBid(existingPriceBid);
                     tickerSet.remove(existingTicker);

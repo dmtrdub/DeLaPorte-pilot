@@ -12,7 +12,7 @@ public enum ExchangeName {
     BW("BW.com"),
     COINONE("Coinone");
 
-    private String fullName;
+    private final String fullName;
 
     ExchangeName(String fullName) {
         this.fullName = fullName;
