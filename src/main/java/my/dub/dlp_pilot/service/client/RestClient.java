@@ -703,8 +703,8 @@ public class RestClient implements InitializingBean {
                 return;
             }
             JsonNode innerNode = entry.getValue();
-            ticker.setPriceBid(new BigDecimal(innerNode.get("sell_price").asText()));
-            ticker.setPriceAsk(new BigDecimal(innerNode.get("buy_price").asText()));
+            ticker.setPriceAsk(new BigDecimal(innerNode.get("sell_price").asText()));
+            ticker.setPriceBid(new BigDecimal(innerNode.get("buy_price").asText()));
             setTickerDateTime(innerNode, ticker, "updated", ChronoUnit.SECONDS);
             tickers.add(ticker);
         });

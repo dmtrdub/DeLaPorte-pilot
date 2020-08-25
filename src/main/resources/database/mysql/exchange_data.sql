@@ -10,7 +10,7 @@ values ('BIGONE', 0, 0.0005, 0.1, 7, 'https://big.one/api/v3/', 100),
        ('BITTREX', 0, 0.0005, 0.2, 9, 'https://api.bittrex.com/v3/', 60),
        ('BW', 0, 0.27, 0.2, 8, 'https://www.bw.com/', 100) /*double-check request rate*/,
        ('COINONE', 0, 0.00005, 0.15, 8, 'https://api.coinone.co.kr/', 100),
-       ('EXMO', 0, 0.0005, 0.2, 8, 'https://api.exmo.com/v1.1/', 100),
+       ('EXMO', 0, 0.0005, 0.4, 8, 'https://api.exmo.com/v1.1/', 100),
 
        ('gate', 'Gate.io', 0, 0.0005, 0.2, 419, 9),
        ('hitbtc', 'HitBTC', 0, 0.027, 0.07, 836, 8) /*unknown actual withdrawal fee*/,
