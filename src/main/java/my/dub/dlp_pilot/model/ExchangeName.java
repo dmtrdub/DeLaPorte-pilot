@@ -11,7 +11,8 @@ public enum ExchangeName {
     BITTREX("Bittrex"),
     BW("BW.com"),
     COINONE("Coinone"),
-    EXMO("Exmo");
+    EXMO("Exmo"),
+    GATE("Gate.io");
 
     private final String fullName;
 

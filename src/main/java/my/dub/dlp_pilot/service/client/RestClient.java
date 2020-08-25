@@ -100,6 +100,8 @@ public class RestClient implements InitializingBean {
             case BITBAY:
             case BITMAX:
             case COINONE:
+            case EXMO:
+            case GATE:
                 log.warn("Exchange: {} does not have a dedicated endpoint to check connection!", fullName);
                 return;
             default:
@@ -179,6 +181,8 @@ public class RestClient implements InitializingBean {
                 case EXMO:
                     result = fetchExmoTickers(exchange);
                     break;
+                case GATE:
+                    result = fetchGateTickers(exchange);
             }
             log.trace("Successfully fetched {} tickers from {} exchange", result.size(), exchange.getFullName());
             if (exchange.isFaulty()) {
@@ -706,6 +710,38 @@ public class RestClient implements InitializingBean {
             ticker.setPriceAsk(new BigDecimal(innerNode.get("sell_price").asText()));
             ticker.setPriceBid(new BigDecimal(innerNode.get("buy_price").asText()));
             setTickerDateTime(innerNode, ticker, "updated", ChronoUnit.SECONDS);
+            tickers.add(ticker);
+        });
+        return tickers;
+    }
+
+    /**
+     * @param exchange
+     *
+     * @see
+     * <a href="https://www.gate.io/en/api2#tickers">GATE.IO REST API - Tickers</a>
+     */
+    private Set<Ticker> fetchGateTickers(Exchange exchange) throws IOException {
+        String exchangeName = exchange.getFullName();
+        String resp = executeRequest(exchange.getBaseEndpoint(), "tickers", exchangeName);
+        JsonNode parentNode = new ObjectMapper().readTree(resp);
+        if (parentNode == null || parentNode.isEmpty()) {
+            throw new UnexpectedEndpointResponseException(exchangeName, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
+        }
+        JsonNode errorCodeNode = parentNode.get("code");
+        if (errorCodeNode != null) {
+            throw new UnexpectedEndpointResponseException(exchangeName, errorCodeNode.asText(), parentNode.get("message").asText());
+        }
+        Set<Ticker> tickers = new HashSet<>();
+        parentNode.fields().forEachRemaining(entry -> {
+            Ticker ticker = new Ticker(ExchangeName.GATE);
+            boolean parsePairResult = setSymbols(entry.getKey(), "_", ticker);
+            if (!parsePairResult) {
+                return;
+            }
+            JsonNode innerNode = entry.getValue();
+            ticker.setPriceAsk(new BigDecimal(innerNode.get("lowestAsk").asText()));
+            ticker.setPriceBid(new BigDecimal(innerNode.get("highestBid").asText()));
             tickers.add(ticker);
         });
         return tickers;
