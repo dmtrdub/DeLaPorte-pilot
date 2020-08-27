@@ -35,6 +35,7 @@ public class TickerContainer {
     private final Set<Ticker> coinoneTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<Ticker> exmoTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<Ticker> gateTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<Ticker> huobiTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private Set<Ticker> tickerSet(ExchangeName exchangeName) {
         switch (exchangeName) {
@@ -62,6 +63,8 @@ public class TickerContainer {
                 return exmoTickers;
             case GATE:
                 return gateTickers;
+            case HUOBI:
+                return huobiTickers;
         }
         return Collections.emptySet();
     }
@@ -75,7 +78,9 @@ public class TickerContainer {
     }
 
     public Stream<Ticker> getAllStream() {
-        return Stream.of(bigONETickers, binanceTickers, bitBayTickers, bitfinexTickers, bithumbTickers, bitmartTickers, bitmaxTickers, bittrexTickers, bwTickers, coinoneTickers, exmoTickers, gateTickers).flatMap(Collection::stream);
+        return Stream.of(bigONETickers, binanceTickers, bitBayTickers, bitfinexTickers, bithumbTickers, bitmartTickers,
+                         bitmaxTickers, bittrexTickers, bwTickers, coinoneTickers, exmoTickers, gateTickers,
+                         huobiTickers).flatMap(Collection::stream);
     }
 
     public Set<Ticker> getTickers(ExchangeName exchangeName, boolean includeStale) {

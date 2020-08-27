@@ -41,6 +41,7 @@ public class RestClient implements InitializingBean {
     private static final String NO_TICKERS_FOUND_IN_RESPONSE_MSG = "No tickers found in response!";
     private static final String PRICE_TYPE_ASK = "ASK";
     private static final String PRICE_TYPE_BID = "BID";
+    public static final String NO_SYMBOL_DATA_FOUND_IN_RESPONSE_MSG = "No symbol data found in response!";
 
     private static HttpTransport transport;
     private static HttpRequestFactory requestFactory;
@@ -102,6 +103,7 @@ public class RestClient implements InitializingBean {
             case COINONE:
             case EXMO:
             case GATE:
+            case HUOBI:
                 log.warn("Exchange: {} does not have a dedicated endpoint to check connection!", fullName);
                 return;
             default:
@@ -126,15 +128,15 @@ public class RestClient implements InitializingBean {
 
     public void fetchAdditionalSymbolData(Exchange exchange) throws IOException {
         switch (exchange.getName()) {
-            case BW: {
+            case BW:
                 fetchBWAdditionalSymbolData(exchange);
                 break;
-            }
-
-            case BINANCE: {
+            case BINANCE:
                 fetchBinanceAdditionalSymbolData(exchange);
                 break;
-            }
+            case HUOBI:
+                fetchHuobiAdditionalSymbolData(exchange);
+                break;
             default:
                 break;
         }
@@ -183,6 +185,10 @@ public class RestClient implements InitializingBean {
                     break;
                 case GATE:
                     result = fetchGateTickers(exchange);
+                    break;
+                case HUOBI:
+                    result = fetchHuobiTickers(exchange);
+                    break;
             }
             log.trace("Successfully fetched {} tickers from {} exchange", result.size(), exchange.getFullName());
             if (exchange.isFaulty()) {
@@ -209,6 +215,11 @@ public class RestClient implements InitializingBean {
         symbolAdditionalData.put(ExchangeName.BW, data);
     }
 
+    private void fetchHuobiAdditionalSymbolData(Exchange exchange) throws IOException {
+        Map<String, String> data = fetchHuobiSymbols(exchange);
+        symbolAdditionalData.put(ExchangeName.HUOBI, data);
+    }
+
     private Map<String, String> fetchBWMarketIdPairData(Exchange bwExchange) throws IOException {
         String exchangeName = bwExchange.getFullName();
         String resp = executeRequest(bwExchange.getBaseEndpoint(),
@@ -216,15 +227,10 @@ public class RestClient implements InitializingBean {
 
         ObjectMapper objectMapper = new ObjectMapper();
         JsonNode parentNode = objectMapper.readTree(resp);
-        JsonNode statusNode = parentNode.get("resMsg");
-        int code = statusNode.get("code").asInt();
-        if (code != 1) {
-            String message = statusNode.get("message").asText();
-            throw new UnexpectedEndpointResponseException(exchangeName, String.valueOf(code), message);
-        }
+        checkBWStatus(exchangeName, parentNode);
         JsonNode dataNode = parentNode.get("datas");
         if (dataNode.isEmpty() || "null".equalsIgnoreCase(dataNode.asText())) {
-            throw new UnexpectedEndpointResponseException(exchangeName, "No symbol data found in response!");
+            throw new UnexpectedEndpointResponseException(exchangeName, NO_SYMBOL_DATA_FOUND_IN_RESPONSE_MSG);
         }
         Map<String, String> result = new HashMap<>();
         for (JsonNode innerNode : dataNode) {
@@ -249,7 +255,7 @@ public class RestClient implements InitializingBean {
         JsonNode parentNode = objectMapper.readTree(resp);
         JsonNode symbolsNode = parentNode.get("symbols");
         if (symbolsNode == null || symbolsNode.isEmpty()) {
-            throw new UnexpectedEndpointResponseException(exchangeName, "No symbol data found in response!");
+            throw new UnexpectedEndpointResponseException(exchangeName, NO_SYMBOL_DATA_FOUND_IN_RESPONSE_MSG);
         }
         Map<String, String> result = new HashMap<>();
         for (JsonNode innerNode : symbolsNode) {
@@ -262,6 +268,33 @@ public class RestClient implements InitializingBean {
             }
             String base = innerNode.get("baseAsset").asText();
             String target = innerNode.get("quoteAsset").asText();
+            result.put(pair, base + Constants.DEFAULT_PAIR_DELIMITER + target);
+        }
+        return result;
+    }
+
+    private Map<String, String> fetchHuobiSymbols(Exchange huobiExchange) throws IOException {
+        String exchangeName = huobiExchange.getFullName();
+        String resp = executeRequest(huobiExchange.getBaseEndpoint(), "v1/common/symbols", exchangeName);
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode parentNode = objectMapper.readTree(resp);
+        checkHuobiStatus(exchangeName, parentNode);
+        JsonNode symbolsNode = parentNode.get("data");
+        if (symbolsNode == null || symbolsNode.isEmpty()) {
+            throw new UnexpectedEndpointResponseException(exchangeName, NO_SYMBOL_DATA_FOUND_IN_RESPONSE_MSG);
+        }
+        Map<String, String> result = new HashMap<>();
+        for (JsonNode innerNode : symbolsNode) {
+            String pair = innerNode.get("symbol").asText();
+            String status = innerNode.get("state").asText();
+            if (!"online".equalsIgnoreCase(status)) {
+                log.trace("Symbol {} on {} exchange has unacceptable status {}. Skipping symbol info...", pair,
+                          exchangeName, status);
+                continue;
+            }
+            String base = innerNode.get("base-currency").asText();
+            String target = innerNode.get("quote-currency").asText();
             result.put(pair, base + Constants.DEFAULT_PAIR_DELIMITER + target);
         }
         return result;
@@ -613,12 +646,7 @@ public class RestClient implements InitializingBean {
         String exchangeName = exchange.getFullName();
         String resp = executeRequest(exchange.getBaseEndpoint(), "api/data/v1/tickers", exchangeName);
         JsonNode parentNode = new ObjectMapper().readTree(resp);
-        JsonNode statusNode = parentNode.get("resMsg");
-        int code = statusNode.get("code").asInt();
-        if (code != 1) {
-            String message = statusNode.get("message").asText();
-            throw new UnexpectedEndpointResponseException(exchangeName, String.valueOf(code), message);
-        }
+        checkBWStatus(exchangeName, parentNode);
         JsonNode dataNode = parentNode.get("datas");
         if (dataNode.isEmpty() || "null".equalsIgnoreCase(dataNode.asText())) {
             throw new UnexpectedEndpointResponseException(exchangeName, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
@@ -629,7 +657,7 @@ public class RestClient implements InitializingBean {
             String marketId = innerNode.get(0).asText();
             String pair = symbolAdditionalData.get(exchange.getName()).get(marketId);
             if (StringUtils.isEmpty(pair)) {
-                log.warn("{} exchange: Cannot find pair by marketId ({}). Skipping...", exchangeName, marketId);
+                log.debug("{} exchange: Cannot find pair by marketId ({}). Skipping...", exchangeName, marketId);
                 continue;
             }
             Ticker ticker = new Ticker(ExchangeName.BW);
@@ -718,8 +746,7 @@ public class RestClient implements InitializingBean {
     /**
      * @param exchange
      *
-     * @see
-     * <a href="https://www.gate.io/en/api2#tickers">GATE.IO REST API - Tickers</a>
+     * @see <a href="https://www.gate.io/en/api2#tickers">GATE.IO REST API - Tickers</a>
      */
     private Set<Ticker> fetchGateTickers(Exchange exchange) throws IOException {
         String exchangeName = exchange.getFullName();
@@ -730,7 +757,8 @@ public class RestClient implements InitializingBean {
         }
         JsonNode errorCodeNode = parentNode.get("code");
         if (errorCodeNode != null) {
-            throw new UnexpectedEndpointResponseException(exchangeName, errorCodeNode.asText(), parentNode.get("message").asText());
+            throw new UnexpectedEndpointResponseException(exchangeName, errorCodeNode.asText(),
+                                                          parentNode.get("message").asText());
         }
         Set<Ticker> tickers = new HashSet<>();
         parentNode.fields().forEachRemaining(entry -> {
@@ -745,6 +773,58 @@ public class RestClient implements InitializingBean {
             tickers.add(ticker);
         });
         return tickers;
+    }
+
+    /**
+     * @param exchange
+     *
+     * @see <a href="https://huobiapi.github.io/docs/spot/v1/en/#get-latest-tickers-for-all-pairs">HUOBI REST API -
+     * Tickers</a>
+     */
+    private Set<Ticker> fetchHuobiTickers(Exchange exchange) throws IOException {
+        String exchangeName = exchange.getFullName();
+        String resp = executeRequest(exchange.getBaseEndpoint(), "market/tickers", exchangeName);
+        JsonNode parentNode = new ObjectMapper().readTree(resp);
+        if (parentNode == null || parentNode.isEmpty()) {
+            throw new UnexpectedEndpointResponseException(exchangeName, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
+        }
+        checkHuobiStatus(exchangeName, parentNode);
+        JsonNode dataNode = parentNode.get("data");
+        if (dataNode.isEmpty() || "null".equalsIgnoreCase(dataNode.asText())) {
+            throw new UnexpectedEndpointResponseException(exchangeName, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
+        }
+        Set<Ticker> tickers = new HashSet<>();
+        for (JsonNode innerNode : dataNode) {
+            String symbol = innerNode.get("symbol").asText();
+            String pair = symbolAdditionalData.get(exchange.getName()).get(symbol);
+            if (StringUtils.isEmpty(pair)) {
+                continue;
+            }
+            Ticker ticker = new Ticker(ExchangeName.HUOBI);
+            setSymbols(pair, ticker);
+            ticker.setPriceAsk(new BigDecimal(innerNode.get("ask").asText()));
+            ticker.setPriceBid(new BigDecimal(innerNode.get("bid").asText()));
+            tickers.add(ticker);
+        }
+        return tickers;
+    }
+
+    private void checkBWStatus(String exchangeName, JsonNode parentNode) {
+        JsonNode statusNode = parentNode.get("resMsg");
+        int code = statusNode.get("code").asInt();
+        if (code != 1) {
+            String message = statusNode.get("message").asText();
+            throw new UnexpectedEndpointResponseException(exchangeName, String.valueOf(code), message);
+        }
+    }
+
+    private void checkHuobiStatus(String exchangeName, JsonNode parentNode) {
+        JsonNode statusNode = parentNode.get("status");
+        String status = statusNode.asText();
+        if ("error".equalsIgnoreCase(status)) {
+            throw new UnexpectedEndpointResponseException(exchangeName, parentNode.get("err-code").asText(),
+                                                          parentNode.get("err-msg").asText());
+        }
     }
 
     private String executeRequest(String baseUrl, String endpointUrl, String exchangeName) throws IOException {

@@ -12,7 +12,8 @@ public enum ExchangeName {
     BW("BW.com"),
     COINONE("Coinone"),
     EXMO("Exmo"),
-    GATE("Gate.io");
+    GATE("Gate.io"),
+    HUOBI("Huobi Global");
 
     private final String fullName;
 
