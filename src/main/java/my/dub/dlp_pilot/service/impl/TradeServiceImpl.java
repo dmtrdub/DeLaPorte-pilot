@@ -85,7 +85,7 @@ public class TradeServiceImpl implements TradeService {
 
         Trade trade = createTrade(tickerShort, tickerLong, currentPercentageDiff);
         tradeContainer.addTrade(trade);
-        log.debug("New {} created and added to container. Current price difference: {}; average price difference: {}",
+        log.info("New {} created and added to container. Current price difference: {}; average price difference: {}",
                   trade.toShortString(), priceDifference.getCurrentValue().stripTrailingZeros().toPlainString(),
                   priceDifference.getAvgValue().stripTrailingZeros().toPlainString());
     }
@@ -205,7 +205,7 @@ public class TradeServiceImpl implements TradeService {
                 log.error("{} was not removed from container!", trade.toShortString());
             }
 
-            log.debug("{} closed. Reason: {}", trade.toShortString(), trade.getResultType());
+            log.info("{} closed. Reason: {}", trade.toShortString(), trade.getResultType());
             if (TradeResultType.DETRIMENTAL.equals(tradeResultType)) {
                 recordDetrimental(trade);
             }

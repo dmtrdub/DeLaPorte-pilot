@@ -62,25 +62,27 @@ public class PriceDifferenceServiceImpl implements PriceDifferenceService {
                 PriceDifference priceDifference =
                         createPriceDifference(ticker, equivalentTicker, base, target, exchangeName1, exchangeName2);
                 boolean added = container.add(priceDifference);
-                checkState(added,
-                           "Price Difference should have been added to container! " + priceDifference.toShortString());
+                checkState(added,"Price Difference should have been added to container! "
+                        + priceDifference.toShortString());
                 log.trace("New {} added to container", priceDifference.toShortString());
                 return;
             }
             final PriceDifference priceDifference = priceDifferenceOptional.get();
-            if (!DateUtils.isDurationLonger(priceDifference.getLastRecordDateTime(), DateUtils.currentDateTime(),
-                                            parameters.getDataCaptureIntervalDuration())) {
-                return;
-            }
-            List<BigDecimal> values = priceDifference.getValues();
-            if (!testRunService.isInitialDataCapture()) {
-                values.remove(0);
-            }
             BigDecimal currentPriceDifference = getCurrentPriceDiffValue(ticker, equivalentTicker);
-            values.add(currentPriceDifference);
-            BigDecimal currentAverage = Calculations.average(priceDifference.getValues());
-            priceDifference.setAvgValue(currentAverage);
-
+            BigDecimal currentAverage;
+            // update average price difference if interval exceeds
+            if (DateUtils.isDurationLonger(priceDifference.getLastRecordDateTime(), DateUtils.currentDateTime(),
+                                           parameters.getDataCaptureIntervalDuration())) {
+                List<BigDecimal> values = priceDifference.getValues();
+                if (!testRunService.isInitialDataCapture()) {
+                    values.remove(0);
+                }
+                values.add(currentPriceDifference);
+                currentAverage = Calculations.average(priceDifference.getValues());
+                priceDifference.setAvgValue(currentAverage);
+            } else {
+                currentAverage = Calculations.average(priceDifference.getValues());
+            }
             handleValidPriceDifference(priceDifference, ticker, equivalentTicker, currentPriceDifference,
                                        currentAverage);
         });
