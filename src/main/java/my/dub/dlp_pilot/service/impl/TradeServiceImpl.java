@@ -3,6 +3,7 @@ package my.dub.dlp_pilot.service.impl;
 import static com.google.common.base.Preconditions.checkState;
 import static my.dub.dlp_pilot.util.Calculations.average;
 import static my.dub.dlp_pilot.util.Calculations.income;
+import static my.dub.dlp_pilot.util.Calculations.isZero;
 import static my.dub.dlp_pilot.util.Calculations.originalValueFromPercent;
 import static my.dub.dlp_pilot.util.Calculations.originalValueFromPercentSum;
 import static my.dub.dlp_pilot.util.Calculations.percentageDifference;
@@ -33,7 +34,6 @@ import my.dub.dlp_pilot.service.ExchangeService;
 import my.dub.dlp_pilot.service.TestRunService;
 import my.dub.dlp_pilot.service.TickerService;
 import my.dub.dlp_pilot.service.TradeService;
-import my.dub.dlp_pilot.util.Calculations;
 import my.dub.dlp_pilot.util.DateUtils;
 import org.hibernate.exception.LockAcquisitionException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -182,10 +182,16 @@ public class TradeServiceImpl implements TradeService {
     }
 
     private boolean isDetrimentalSyncCondition(BigDecimal pnlShort, BigDecimal pnlLong) {
-        return !Calculations.isZero(parameters.getExitSyncOnPnlPercentageDiff()) && (pnlShort.compareTo(pnlLong) > 0
-                && percentageDifference(pnlLong, pnlShort).compareTo(parameters.getExitSyncOnPnlPercentageDiff()) < 0)
-                || (pnlLong.compareTo(pnlShort) > 0
-                && percentageDifference(pnlShort, pnlLong).compareTo(parameters.getExitSyncOnPnlPercentageDiff()) < 0);
+        if (isZero(parameters.getExitSyncOnPnlPercentageDiff())) {
+            return false;
+        }
+        BigDecimal absPnlShort = pnlShort.abs();
+        BigDecimal absPnlLong = pnlLong.abs();
+        return (absPnlShort.compareTo(absPnlLong) > 0
+                && percentageDifference(absPnlShort, absPnlLong).compareTo(parameters.getExitSyncOnPnlPercentageDiff())
+                > 0) || (absPnlLong.compareTo(absPnlShort) > 0
+                && percentageDifference(absPnlLong, absPnlShort).compareTo(parameters.getExitSyncOnPnlPercentageDiff())
+                > 0);
     }
 
     private synchronized void handleClose(Trade trade, Ticker tickerShort, Ticker tickerLong,
