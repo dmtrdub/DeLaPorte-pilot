@@ -17,7 +17,7 @@ public interface ExchangeService {
 
     BigDecimal getTotalExpenses(ExchangeName exchangeName, BigDecimal tradeAmount);
 
-    void updateCachedExchangeFault(Exchange exchange, boolean faulty);
+    void updateExchangeFault(ExchangeName exchangeName, boolean faulty);
 
     boolean isExchangeFaulty(ExchangeName exchangeName);
 }

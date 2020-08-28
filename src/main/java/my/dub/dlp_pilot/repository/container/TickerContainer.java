@@ -69,12 +69,8 @@ public class TickerContainer {
         return Collections.emptySet();
     }
 
-    public Set<Ticker> getAll(boolean includeStale) {
-        Stream<Ticker> tickerStream = getAllStream();
-        if (!includeStale) {
-            tickerStream = tickerStream.filter(ticker -> !ticker.isStale());
-        }
-        return tickerStream.collect(Collectors.toSet());
+    public Set<Ticker> getAll() {
+        return getAllStream().collect(Collectors.toSet());
     }
 
     public Stream<Ticker> getAllStream() {
@@ -83,14 +79,10 @@ public class TickerContainer {
                          huobiTickers).flatMap(Collection::stream);
     }
 
-    public Set<Ticker> getTickers(ExchangeName exchangeName, boolean includeStale) {
+    public Set<Ticker> getTickers(ExchangeName exchangeName) {
         checkNotNull(exchangeName, "ExchangeName cannot be null when searching Tickers!");
 
-        Set<Ticker> result = tickerSet(exchangeName);
-        if (!includeStale) {
-            return result.stream().filter(ticker -> !ticker.isStale()).collect(Collectors.toSet());
-        }
-        return result;
+        return tickerSet(exchangeName);
     }
 
     public Optional<Ticker> getTicker(ExchangeName exchangeName, String base, String target) {

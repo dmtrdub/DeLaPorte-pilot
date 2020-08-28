@@ -15,10 +15,11 @@ public interface TickerService {
 
     Set<Ticker> getTickers(ExchangeName exchangeName);
 
-    Set<Ticker> checkAndGetTickers();
+    Set<Ticker> getAllTickers();
 
     Optional<Ticker> getTicker(ExchangeName exchangeName, String base, String target);
 
-    Ticker findValidEquivalentTickerFromSet(Ticker originalTicker, Set<Ticker> tickerSet);
+    Optional<Ticker> findValidEquivalentTickerFromSet(Ticker originalTicker, Set<Ticker> tickerSet);
 
+    boolean checkStale(Ticker ticker1, Ticker ticker2);
 }

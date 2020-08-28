@@ -44,14 +44,16 @@ public class PriceDifferenceServiceImpl implements PriceDifferenceService {
 
     @Override
     public void handlePriceDifference(ExchangeName exchangeName) {
-        Set<Ticker> allTickers = tickerService.checkAndGetTickers();
+        Set<Ticker> allTickers = tickerService.getAllTickers();
         Set<Ticker> tickersToCompare = tickerService.getTickers(exchangeName);
         allTickers.removeAll(tickersToCompare);
         allTickers.forEach(ticker -> {
-            Ticker equivalentTicker = tickerService.findValidEquivalentTickerFromSet(ticker, tickersToCompare);
-            if (equivalentTicker == null) {
+            Optional<Ticker> equivalentTickerOptional =
+                    tickerService.findValidEquivalentTickerFromSet(ticker, tickersToCompare);
+            if (equivalentTickerOptional.isEmpty()) {
                 return;
             }
+            Ticker equivalentTicker = equivalentTickerOptional.get();
             String base = ticker.getBase();
             String target = ticker.getTarget();
             ExchangeName exchangeName1 = ticker.getExchangeName();
@@ -62,8 +64,8 @@ public class PriceDifferenceServiceImpl implements PriceDifferenceService {
                 PriceDifference priceDifference =
                         createPriceDifference(ticker, equivalentTicker, base, target, exchangeName1, exchangeName2);
                 boolean added = container.add(priceDifference);
-                checkState(added,"Price Difference should have been added to container! "
-                        + priceDifference.toShortString());
+                checkState(added,
+                           "Price Difference should have been added to container! " + priceDifference.toShortString());
                 log.trace("New {} added to container", priceDifference.toShortString());
                 return;
             }

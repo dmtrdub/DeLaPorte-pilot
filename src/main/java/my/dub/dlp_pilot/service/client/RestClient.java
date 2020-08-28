@@ -43,8 +43,7 @@ public class RestClient implements InitializingBean {
     private static final String PRICE_TYPE_BID = "BID";
     public static final String NO_SYMBOL_DATA_FOUND_IN_RESPONSE_MSG = "No symbol data found in response!";
 
-    private static HttpTransport transport;
-    private static HttpRequestFactory requestFactory;
+    private HttpRequestFactory requestFactory;
 
     private final Map<ExchangeName, Map<String, String>> symbolAdditionalData = new ConcurrentHashMap<>();
 
@@ -54,28 +53,18 @@ public class RestClient implements InitializingBean {
         this.exchangeService = exchangeService;
     }
 
-    private static HttpTransport transport() {
-        if (null == transport) {
-            transport = new NetHttpTransport();
-        }
-        return transport;
-    }
-
-    private static HttpRequestFactory reqFactory() {
-        if (null == requestFactory) {
-            requestFactory = transport().createRequestFactory();
-        }
-        return requestFactory;
-    }
-
     @Override
     public void afterPropertiesSet() {
-        Set<Exchange> exchanges = exchangeService.loadAll();
+        HttpTransport transport = new NetHttpTransport();
+        requestFactory = transport.createRequestFactory();
+    }
+
+    public void initConnection(Set<Exchange> exchanges) {
         pingAll(exchanges);
         fetchAllAdditionalSymbolData(exchanges);
     }
 
-    public void pingAll(Set<Exchange> exchanges) {
+    private void pingAll(Set<Exchange> exchanges) {
         exchanges.forEach(exchange -> {
             try {
                 ping(exchange);
@@ -86,7 +75,7 @@ public class RestClient implements InitializingBean {
         });
     }
 
-    public void ping(Exchange exchange) throws IOException {
+    private void ping(Exchange exchange) throws IOException {
         String baseEndpoint = exchange.getBaseEndpoint();
         String pingUrl;
         ExchangeName exchangeName = exchange.getName();
@@ -110,12 +99,12 @@ public class RestClient implements InitializingBean {
                 pingUrl = baseEndpoint + "ping";
         }
 
-        HttpRequest req = reqFactory().buildGetRequest(new GenericUrl(pingUrl));
+        HttpRequest req = requestFactory.buildGetRequest(new GenericUrl(pingUrl));
         int responseCode = req.execute().getStatusCode();
         log.info("Checked connection with Exchange: {}. Status code: {}", fullName, responseCode);
     }
 
-    public void fetchAllAdditionalSymbolData(Set<Exchange> exchanges) {
+    private void fetchAllAdditionalSymbolData(Set<Exchange> exchanges) {
         exchanges.forEach(exchange -> {
             try {
                 fetchAdditionalSymbolData(exchange);
@@ -126,7 +115,7 @@ public class RestClient implements InitializingBean {
         });
     }
 
-    public void fetchAdditionalSymbolData(Exchange exchange) throws IOException {
+    private void fetchAdditionalSymbolData(Exchange exchange) throws IOException {
         switch (exchange.getName()) {
             case BW:
                 fetchBWAdditionalSymbolData(exchange);
@@ -191,15 +180,13 @@ public class RestClient implements InitializingBean {
                     break;
             }
             log.trace("Successfully fetched {} tickers from {} exchange", result.size(), exchange.getFullName());
-            if (exchange.isFaulty()) {
-                exchangeService.updateCachedExchangeFault(exchange, false);
-            }
+            exchangeService.updateExchangeFault(exchangeName, false);
         } catch (UnexpectedEndpointResponseException | UnexpectedResponseStatusCodeException e) {
             log.error(e.getMessage());
-            exchangeService.updateCachedExchangeFault(exchange, true);
+            exchangeService.updateExchangeFault(exchangeName, true);
         } catch (IOException e) {
             log.error("Unable to fetch tickers on {} exchange! Details: {}", exchangeName, e.toString());
-            exchangeService.updateCachedExchangeFault(exchange, true);
+            exchangeService.updateExchangeFault(exchangeName, true);
         }
 
         return result;
@@ -829,7 +816,7 @@ public class RestClient implements InitializingBean {
 
     private String executeRequest(String baseUrl, String endpointUrl, String exchangeName) throws IOException {
         String fullUrl = baseUrl + endpointUrl;
-        HttpRequest req = reqFactory().buildGetRequest(new GenericUrl(fullUrl));
+        HttpRequest req = requestFactory.buildGetRequest(new GenericUrl(fullUrl));
         HttpResponse response = req.execute();
         int statusCode = response.getStatusCode();
         if (statusCode != 200) {

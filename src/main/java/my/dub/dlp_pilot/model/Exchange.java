@@ -1,9 +1,12 @@
 package my.dub.dlp_pilot.model;
 
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
+import static my.dub.dlp_pilot.Constants.FEE_SCALE;
+import static my.dub.dlp_pilot.Constants.PERCENTAGE_SCALE;
 
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.util.HashSet;
+import java.util.Set;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.EnumType;
@@ -16,13 +19,9 @@ import javax.persistence.Transient;
 import javax.persistence.UniqueConstraint;
 import javax.validation.constraints.Digits;
 import javax.validation.constraints.Max;
-import java.io.Serializable;
-import java.math.BigDecimal;
-import java.util.HashSet;
-import java.util.Set;
-
-import static my.dub.dlp_pilot.Constants.FEE_SCALE;
-import static my.dub.dlp_pilot.Constants.PERCENTAGE_SCALE;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 
 
 @Data
@@ -67,10 +66,6 @@ public class Exchange implements Serializable {
     @EqualsAndHashCode.Exclude
     @Transient
     private transient Set<Ticker> tickers = new HashSet<>();
-
-    @EqualsAndHashCode.Exclude
-    @Transient
-    private transient boolean faulty;
 
     public String getFullName() {
         return name.getFullName();

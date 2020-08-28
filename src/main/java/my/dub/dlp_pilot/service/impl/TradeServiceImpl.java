@@ -91,7 +91,7 @@ public class TradeServiceImpl implements TradeService {
     }
 
     private boolean canEnterTrade(Ticker ticker1, Ticker ticker2) {
-        if (ticker1.isStale() && ticker2.isStale()) {
+        if (tickerService.checkStale(ticker1, ticker2)) {
             return false;
         }
         String base = ticker1.getBase();

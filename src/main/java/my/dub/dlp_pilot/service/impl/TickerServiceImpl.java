@@ -55,18 +55,12 @@ public class TickerServiceImpl implements TickerService {
 
     @Override
     public Set<Ticker> getTickers(ExchangeName exchangeName) {
-        return tickerContainer.getTickers(exchangeName, true);
+        return tickerContainer.getTickers(exchangeName);
     }
 
     @Override
-    public Set<Ticker> checkAndGetTickers() {
-        tickerContainer.getAllStream().forEach(ticker -> {
-            if (!ticker.isStale() && DateUtils.durationSeconds(ticker.getDateTime()) >= parameters
-                    .getStaleDifferenceSeconds()) {
-                ticker.setStale(true);
-            }
-        });
-        return tickerContainer.getAll(true);
+    public Set<Ticker> getAllTickers() {
+        return tickerContainer.getAll();
     }
 
     @Override
@@ -75,13 +69,29 @@ public class TickerServiceImpl implements TickerService {
     }
 
     @Override
-    public Ticker findValidEquivalentTickerFromSet(Ticker originalTicker, Set<Ticker> tickerSet) {
+    public Optional<Ticker> findValidEquivalentTickerFromSet(Ticker originalTicker, Set<Ticker> tickerSet) {
         checkNotNull(originalTicker, "Ticker that has to be compared cannot be null!");
         if (originalTicker.isPriceInvalid()) {
-            return null;
+            return Optional.empty();
         }
         return tickerSet.stream()
                 .filter(ticker -> !ticker.isPriceInvalid() && ticker.getBase().equals(originalTicker.getBase())
-                        && ticker.getTarget().equals(originalTicker.getTarget())).findAny().orElse(null);
+                        && ticker.getTarget().equals(originalTicker.getTarget())).findAny();
+    }
+
+    @Override
+    public boolean checkStale(Ticker ticker1, Ticker ticker2) {
+        checkNotNull(ticker1, "Ticker1 that has to be checked as stale cannot be null!");
+        checkNotNull(ticker2, "Ticker2 that has to be checked as stale cannot be null!");
+
+        return checkTickerStale(ticker1) && checkTickerStale(ticker2);
+    }
+
+    private boolean checkTickerStale(Ticker ticker) {
+        if (!ticker.isStale() && DateUtils.durationSeconds(ticker.getDateTime()) >= parameters
+                .getStaleDifferenceSeconds()) {
+            ticker.setStale(true);
+        }
+        return ticker.isStale();
     }
 }

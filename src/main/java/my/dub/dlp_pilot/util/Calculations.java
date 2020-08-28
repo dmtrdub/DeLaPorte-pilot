@@ -1,6 +1,7 @@
 package my.dub.dlp_pilot.util;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Arrays;
@@ -33,18 +34,6 @@ public final class Calculations {
         return percentageDifference(priceShort, priceLong);
     }
 
-    public static BigDecimal expectedClosePriceLong(BigDecimal priceShort, BigDecimal priceLong,
-                                                    BigDecimal exitPercentageDiff) {
-        if (priceShort == null || priceLong == null || exitPercentageDiff == null || isZero(priceShort) ||
-            isZero(priceLong)) {
-            return BigDecimal.ZERO;
-        }
-        BigDecimal shortPriceVar = priceShort.multiply(HUNDRED);
-        BigDecimal denom = shortPriceVar.divide(priceLong, Constants.PRICE_SCALE, RoundingMode.HALF_UP)
-                                        .subtract(exitPercentageDiff);
-        return shortPriceVar.divide(denom, Constants.PRICE_SCALE, RoundingMode.HALF_UP);
-    }
-
     public static BigDecimal originalValueFromPercent(BigDecimal target, BigDecimal percentage) {
         return percentage.divide(HUNDRED, Constants.PERCENTAGE_SCALE, RoundingMode.HALF_UP).multiply(target)
                          .stripTrailingZeros();
@@ -73,16 +62,6 @@ public final class Calculations {
     public static BigDecimal income(BigDecimal pnl1, BigDecimal pnl2, BigDecimal... expenses) {
         BigDecimal totalExpenses = Arrays.stream(expenses).reduce(BigDecimal.ZERO, BigDecimal::add);
         return pnl1.add(pnl2).subtract(totalExpenses);
-    }
-
-    public static BigDecimal getDecimal(String value, int scale) {
-        BigDecimal decimal = new BigDecimal(value);
-        return decimal.setScale(scale, RoundingMode.HALF_UP);
-    }
-
-    public static BigDecimal getDecimal(double value, int scale) {
-        BigDecimal decimal = BigDecimal.valueOf(value);
-        return decimal.setScale(scale, RoundingMode.HALF_UP);
     }
 
     public static boolean isZero(BigDecimal value) {

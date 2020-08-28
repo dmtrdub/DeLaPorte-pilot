@@ -8,6 +8,7 @@ import my.dub.dlp_pilot.configuration.ParametersComponent;
 import my.dub.dlp_pilot.exception.TestRunEndException;
 import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.ExchangeName;
+import my.dub.dlp_pilot.service.client.RestClient;
 import my.dub.dlp_pilot.service.impl.FileResultServiceImpl;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,7 @@ public class ScheduledService implements InitializingBean {
     private final TickerService tickerService;
     private final TradeService tradeService;
     private final PriceDifferenceService priceDifferenceService;
+    private final RestClient restClient;
     private final TestRunService testRunService;
     private final FileResultServiceImpl fileResultService;
 
@@ -33,12 +35,13 @@ public class ScheduledService implements InitializingBean {
 
     @Autowired
     public ScheduledService(ExchangeService exchangeService, TickerService tickerService, TradeService tradeService,
-            PriceDifferenceService priceDifferenceService, TestRunService testRunService,
+            PriceDifferenceService priceDifferenceService, RestClient restClient, TestRunService testRunService,
             FileResultServiceImpl fileResultService, ParametersComponent parameters) {
         this.exchangeService = exchangeService;
         this.tickerService = tickerService;
         this.tradeService = tradeService;
         this.priceDifferenceService = priceDifferenceService;
+        this.restClient = restClient;
         this.testRunService = testRunService;
         this.fileResultService = fileResultService;
         this.parameters = parameters;
@@ -56,10 +59,11 @@ public class ScheduledService implements InitializingBean {
         if (CollectionUtils.isEmpty(exchanges)) {
             throw new IllegalArgumentException("There are no exchanges to work with!");
         }
+        restClient.initConnection(exchanges);
         int exchangesCount = exchanges.size();
         ThreadPoolTaskScheduler taskScheduler = new ThreadPoolTaskScheduler();
         taskScheduler.setPoolSize(exchangesCount + 2);
-        taskScheduler.setThreadNamePrefix("scheduled-");
+        taskScheduler.setThreadNamePrefix("exchange-");
         taskScheduler.setErrorHandler(t -> {
             if (t instanceof TestRunEndException) {
                 if (tradeService.isAllTradesClosed()) {

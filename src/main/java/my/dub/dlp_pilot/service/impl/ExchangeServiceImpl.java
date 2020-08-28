@@ -4,7 +4,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.math.BigDecimal;
 import java.util.Collections;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -24,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ExchangeServiceImpl implements ExchangeService, InitializingBean {
 
     private final Set<Exchange> exchanges = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<ExchangeName> faultyExchangeNames = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private final ExchangeRepository repository;
 
@@ -72,22 +72,16 @@ public class ExchangeServiceImpl implements ExchangeService, InitializingBean {
     }
 
     @Override
-    public void updateCachedExchangeFault(Exchange exchange, boolean faulty) {
-        if (faulty == exchange.isFaulty()) {
-            return;
-        }
-        exchange.setFaulty(faulty);
-        boolean removed = exchanges.removeIf(exch -> Objects.equals(exch.getId(), exchange.getId()) && Objects
-                .equals(exch.getName(), exchange.getName()));
-        if (removed) {
-            exchanges.add(exchange);
+    public void updateExchangeFault(ExchangeName exchangeName, boolean faulty) {
+        if (faulty && !faultyExchangeNames.contains(exchangeName)) {
+            faultyExchangeNames.add(exchangeName);
+        } else if (!faulty) {
+            faultyExchangeNames.remove(exchangeName);
         }
     }
 
     @Override
     public boolean isExchangeFaulty(ExchangeName exchangeName) {
-        Exchange exchange = findByName(exchangeName);
-
-        return exchange.isFaulty();
+        return faultyExchangeNames.contains(exchangeName);
     }
 }

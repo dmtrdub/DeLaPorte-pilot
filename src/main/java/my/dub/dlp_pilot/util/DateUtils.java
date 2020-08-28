@@ -18,10 +18,6 @@ public final class DateUtils {
     private static final String FORMAT_PATTERN = "dd.MM.yyyy-HH:mm:ss";
     private static final String FORMAT_PATTERN_SHORT = "ddMMyy-HHmm";
 
-    public static ZonedDateTime getDateTimeFromFormattedString(String dateTime) {
-        return ZonedDateTime.ofInstant(Instant.parse(dateTime), DEFAULT_ZONE_OFFSET);
-    }
-
     public static ZonedDateTime getDateTimeFromEpochMilli(long epoch) {
         return ZonedDateTime.ofInstant(Instant.ofEpochMilli(epoch), DEFAULT_ZONE_OFFSET);
     }
@@ -49,13 +45,6 @@ public final class DateUtils {
         return duration.compareTo(toCompare) > 0;
     }
 
-    public static long durationMinutes(Temporal start, Temporal end) {
-        if (start == null || end == null) {
-            return 0;
-        }
-        return Duration.between(start, end).toMinutes();
-    }
-
     public static long durationMinutes(Temporal start) {
         if (start == null) {
             return 0;
@@ -70,13 +59,6 @@ public final class DateUtils {
         return Duration.between(start, currentDateTime()).toSeconds();
     }
 
-    public static long durationSeconds(Temporal start, Temporal end) {
-        if (start == null || end == null) {
-            return 0;
-        }
-        return Duration.between(start, end).toSeconds();
-    }
-
     public static String durationSecondsDetailed(Temporal start, Temporal end) {
         if (start == null || end == null) {
             return "0";
@@ -85,9 +67,7 @@ public final class DateUtils {
         return String.format("%d.%3d", duration.toSeconds(), duration.toMillisPart()).replaceAll("\\s+", "");
     }
 
-    public static Duration parseDuration(
-            @NonNull
-                    String input) {
+    public static Duration parseDuration(@NonNull String input) {
         if (StringUtils.isEmpty(input)) {
             return Duration.ZERO;
         }
@@ -101,9 +81,7 @@ public final class DateUtils {
         }
     }
 
-    public static String formatDuration(
-            @NonNull
-                    Duration duration) {
+    public static String formatDuration(@NonNull Duration duration) {
         return duration.toString().substring(2).replaceAll("(\\d[HMS])(?!$)", "$1 ").toLowerCase();
     }
 }
