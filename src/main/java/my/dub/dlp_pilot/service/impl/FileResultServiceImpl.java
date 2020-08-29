@@ -1,19 +1,19 @@
 package my.dub.dlp_pilot.service.impl;
 
+import static com.google.common.base.Preconditions.checkState;
+import static my.dub.dlp_pilot.util.Calculations.decimalResult;
+import static my.dub.dlp_pilot.util.Calculations.decimalResults;
+
 import java.io.IOException;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.ZonedDateTime;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import my.dub.dlp_pilot.Constants;
 import my.dub.dlp_pilot.configuration.ParametersComponent;
 import my.dub.dlp_pilot.exception.TestRunEndException;
 import my.dub.dlp_pilot.model.Position;
@@ -62,13 +62,14 @@ public class FileResultServiceImpl implements FileResultService {
     @Override
     public void write() {
         Set<Trade> completedTrades = tradeService.getCompletedTradesNotWrittenToFile();
-        Set<String> linesToWrite = completedTrades.stream().map(this::getTradeResultString).collect(Collectors.toSet());
-        if (CollectionUtils.isEmpty(linesToWrite)) {
-            if (testRunService.isTestRunEnd()) {
+        if (CollectionUtils.isEmpty(completedTrades)) {
+            if (testRunService.checkTestRunEnd()) {
+                checkState(tradeService.isAllTradesClosed(), "Cannot exit test run if some trades are still opened!");
                 throw new TestRunEndException();
             }
             return;
         }
+        Set<String> linesToWrite = completedTrades.stream().map(this::getTradeResultString).collect(Collectors.toSet());
         try {
             Files.write(filePath, linesToWrite, StandardOpenOption.APPEND);
             tradeService.updateTradesWrittenToFile(completedTrades);
@@ -103,13 +104,5 @@ public class FileResultServiceImpl implements FileResultService {
                            dynamicResult, DateUtils.formatDateTime(startTime), DateUtils.formatDateTime(endTime),
                            DateUtils.durationSecondsDetailed(startTime, endTime), trade.getResultType().name(),
                            positionShort.getExchange().getFullName(), positionLong.getExchange().getFullName());
-    }
-
-    private String decimalResult(BigDecimal decimal) {
-        return decimal.setScale(Constants.MAX_RESULT_SCALE, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString();
-    }
-
-    private List<String> decimalResults(BigDecimal... decimals) {
-        return Arrays.stream(decimals).map(this::decimalResult).collect(Collectors.toList());
     }
 }

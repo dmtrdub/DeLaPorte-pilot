@@ -50,7 +50,7 @@ public class TestRunServiceImpl implements TestRunService {
         testRun.setStartTime(startTime);
         int dataCaptureDurationSeconds = parameters.getDataCapturePeriodSeconds();
         tradeStopDateTime = startTime.plus(parameters.getTestRunDuration()).plusSeconds(dataCaptureDurationSeconds);
-        testRun.setEndTime(tradeStopDateTime.plusSeconds(parameters.getExitMaxDelaySeconds()));
+        testRun.setEndTime(tradeStopDateTime.plusSeconds(parameters.getExitDelaySeconds()));
         currentTestRun = repository.save(testRun);
         testRunEndDateTime = currentTestRun.getEndTime();
         initDataCaptureEndDateTime = startTime.plusSeconds(dataCaptureDurationSeconds);
@@ -62,24 +62,24 @@ public class TestRunServiceImpl implements TestRunService {
     }
 
     @Override
-    public boolean isTradeStopped() {
-        if (tradeStopDateTime != null && !tradeStop.get()) {
+    public boolean checkTradeStopped() {
+        if (!tradeStop.get()) {
             tradeStop.set(!DateUtils.currentDateTime().isBefore(tradeStopDateTime));
         }
         return tradeStop.get();
     }
 
     @Override
-    public boolean isTestRunEnd() {
-        if (testRunEndDateTime != null && !testRunEnd.get()) {
+    public boolean checkTestRunEnd() {
+        if (!testRunEnd.get()) {
             testRunEnd.set(!DateUtils.currentDateTime().isBefore(testRunEndDateTime));
         }
         return testRunEnd.get();
     }
 
     @Override
-    public boolean isInitialDataCapture() {
-        if (initDataCaptureEndDateTime != null && initialDataCapture.get()) {
+    public boolean checkInitialDataCapture() {
+        if (initialDataCapture.get()) {
             initialDataCapture.set(!DateUtils.currentDateTime().isAfter(initDataCaptureEndDateTime));
         }
         return initialDataCapture.get();
@@ -87,7 +87,7 @@ public class TestRunServiceImpl implements TestRunService {
 
     @Override
     public void checkExitFile() {
-        if (isTradeStopped()) {
+        if (checkTradeStopped()) {
             return;
         }
         String forcedExitFilePath = parameters.getForcedExitFilePath();
@@ -102,10 +102,10 @@ public class TestRunServiceImpl implements TestRunService {
             List<String> lines = Files.readAllLines(exitFile.toPath());
             if (lines.stream().anyMatch(line -> line.contains(parameters.getExitCode()))) {
                 tradeStopDateTime = DateUtils.currentDateTime();
-                testRunEndDateTime = tradeStopDateTime.plusSeconds(parameters.getExitMaxDelaySeconds());
+                testRunEndDateTime = tradeStopDateTime.plusSeconds(parameters.getExitDelaySeconds());
                 log.info("Found force exit file {} containing valid exit code! Stopping trades now. "
-                                 + "Test Run will end at {}",
-                        exitFile.getName(), DateUtils.formatDateTime(testRunEndDateTime));
+                                 + "Test Run will end at {}", exitFile.getName(),
+                         DateUtils.formatDateTime(testRunEndDateTime));
                 Files.delete(exitFile.toPath());
             }
         } catch (IOException e) {

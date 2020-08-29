@@ -8,11 +8,11 @@ public interface TestRunService {
 
     TestRun getCurrentTestRun();
 
-    boolean isTradeStopped();
+    boolean checkTradeStopped();
 
-    boolean isTestRunEnd();
+    boolean checkTestRunEnd();
 
-    boolean isInitialDataCapture();
+    boolean checkInitialDataCapture();
 
     void checkExitFile();
 }

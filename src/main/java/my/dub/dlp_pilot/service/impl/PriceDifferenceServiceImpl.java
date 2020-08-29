@@ -76,7 +76,7 @@ public class PriceDifferenceServiceImpl implements PriceDifferenceService {
             if (DateUtils.isDurationLonger(priceDifference.getLastRecordDateTime(), DateUtils.currentDateTime(),
                                            parameters.getDataCaptureIntervalDuration())) {
                 List<BigDecimal> values = priceDifference.getValues();
-                if (!testRunService.isInitialDataCapture()) {
+                if (!testRunService.checkInitialDataCapture()) {
                     values.remove(0);
                 }
                 values.add(currentPriceDifference);
@@ -92,8 +92,11 @@ public class PriceDifferenceServiceImpl implements PriceDifferenceService {
 
     private void handleValidPriceDifference(PriceDifference priceDifference, Ticker ticker1, Ticker ticker2,
             BigDecimal currentPriceDifference, BigDecimal currentAverage) {
-        if (!testRunService.isInitialDataCapture() && !testRunService.isTradeStopped() && !testRunService.isTestRunEnd()
-                && currentPriceDifference.compareTo(BigDecimal.ZERO) > 0
+        if (testRunService.checkInitialDataCapture() || testRunService.checkTradeStopped() || testRunService
+                .checkTestRunEnd()) {
+            return;
+        }
+        if (currentPriceDifference.compareTo(BigDecimal.ZERO) > 0
                 && currentPriceDifference.compareTo(currentAverage) > 0) {
             // set breakthrough price + time if first breakthrough occurs, or when data capture period has passed
             if (priceDifference.getBreakThroughAvgPriceDiff() == null || (

@@ -65,8 +65,8 @@ public class ParametersComponent implements InitializingBean {
     private String forcedExitFilePath;
     @Value("${test_run_forced_exit_code}")
     private String exitCode;
-    @Value("${test_run_max_delay_on_exit_seconds}")
-    private int exitMaxDelaySeconds;
+    @Value("${test_run_delay_on_exit_seconds}")
+    private int exitDelaySeconds;
 
     private Duration dataCaptureIntervalDuration;
     private BigDecimal entryProfitPercentage;
@@ -102,6 +102,7 @@ public class ParametersComponent implements InitializingBean {
         tradeMinutesTimeout = tradeMinutesTimeout > 0 ? tradeMinutesTimeout : 0;
         parallelTradesNumber = parallelTradesNumber > 0 ? parallelTradesNumber : 0;
         suspenseAfterDetrimentalSeconds = suspenseAfterDetrimentalSeconds > 0 ? suspenseAfterDetrimentalSeconds : 0;
+        exitDelaySeconds = exitDelaySeconds > 0 ? exitDelaySeconds : 0;
         testRunDuration = DateUtils.parseDuration(testRunDurationParam.toUpperCase());
         if (Duration.ZERO.equals(testRunDuration)) {
             log.warn("Test run duration is 0!");
@@ -160,9 +161,6 @@ public class ParametersComponent implements InitializingBean {
         }
         if (StringUtils.isNotEmpty(forcedExitFilePath) && StringUtils.isBlank(exitCode)) {
             throw new IllegalArgumentException("Exit code cannot be empty if forced exit is enabled!");
-        }
-        if (exitMaxDelaySeconds < 1) {
-            throw new IllegalArgumentException("Max delay before end of test run cannot be < 1 seconds!");
         }
     }
 

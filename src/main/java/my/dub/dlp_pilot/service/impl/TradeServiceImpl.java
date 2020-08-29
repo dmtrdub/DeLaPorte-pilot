@@ -86,45 +86,19 @@ public class TradeServiceImpl implements TradeService {
         Trade trade = createTrade(tickerShort, tickerLong, currentPercentageDiff);
         tradeContainer.addTrade(trade);
         log.info("New {} created and added to container. Current price difference: {}; average price difference: {}",
-                  trade.toShortString(), priceDifference.getCurrentValue().stripTrailingZeros().toPlainString(),
-                  priceDifference.getAvgValue().stripTrailingZeros().toPlainString());
-    }
-
-    private boolean canEnterTrade(Ticker ticker1, Ticker ticker2) {
-        if (tickerService.checkStale(ticker1, ticker2)) {
-            return false;
-        }
-        String base = ticker1.getBase();
-        String target = ticker1.getTarget();
-        if (tradeContainer.isSimilarPresent(base, target, ticker1.getExchangeName(), ticker2.getExchangeName())) {
-            return false;
-        }
-        if (exchangeService.isExchangeFaulty(ticker1.getExchangeName()) || exchangeService
-                .isExchangeFaulty(ticker2.getExchangeName())) {
-            return false;
-        }
-        if (tradeContainer
-                .checkHasDetrimentalRecord(ticker1.getExchangeName(), ticker2.getExchangeName(), base, target)) {
-            return false;
-        }
-        int parallelTradesNumber = parameters.getParallelTradesNumber();
-        if (parallelTradesNumber != 0) {
-            Pair<Long, Long> tradesCount =
-                    tradeContainer.tradesCount(ticker1.getExchangeName(), ticker2.getExchangeName());
-            return tradesCount.getFirst() <= parallelTradesNumber && tradesCount.getSecond() <= parallelTradesNumber;
-        }
-        return true;
+                 trade.toShortString(), priceDifference.getCurrentValue().stripTrailingZeros().toPlainString(),
+                 priceDifference.getAvgValue().stripTrailingZeros().toPlainString());
     }
 
     @Override
     @Transactional
     @Retryable(LockAcquisitionException.class)
     public void handleTrades(ExchangeName exchangeName) {
-        if (testRunService.isInitialDataCapture()) {
+        if (testRunService.checkInitialDataCapture()) {
             return;
         }
         Set<Trade> tradesInProgress = tradeContainer.getTrades(exchangeName);
-        boolean isTestRunEnd = testRunService.isTestRunEnd();
+        boolean isTestRunEnd = testRunService.checkTestRunEnd();
         tradesInProgress.forEach(trade -> {
             Position positionShort = trade.getPositionShort();
             Position positionLong = trade.getPositionLong();
@@ -179,6 +153,32 @@ public class TradeServiceImpl implements TradeService {
     @Override
     public boolean isAllTradesClosed() {
         return tradeContainer.isEmpty();
+    }
+
+    private boolean canEnterTrade(Ticker ticker1, Ticker ticker2) {
+        if (tickerService.checkStale(ticker1, ticker2)) {
+            return false;
+        }
+        String base = ticker1.getBase();
+        String target = ticker1.getTarget();
+        if (tradeContainer.isSimilarPresent(base, target, ticker1.getExchangeName(), ticker2.getExchangeName())) {
+            return false;
+        }
+        if (exchangeService.isExchangeFaulty(ticker1.getExchangeName()) || exchangeService
+                .isExchangeFaulty(ticker2.getExchangeName())) {
+            return false;
+        }
+        if (tradeContainer
+                .checkHasDetrimentalRecord(ticker1.getExchangeName(), ticker2.getExchangeName(), base, target)) {
+            return false;
+        }
+        int parallelTradesNumber = parameters.getParallelTradesNumber();
+        if (parallelTradesNumber != 0) {
+            Pair<Long, Long> tradesCount =
+                    tradeContainer.tradesCount(ticker1.getExchangeName(), ticker2.getExchangeName());
+            return tradesCount.getFirst() <= parallelTradesNumber && tradesCount.getSecond() <= parallelTradesNumber;
+        }
+        return true;
     }
 
     private boolean isDetrimentalSyncCondition(BigDecimal pnlShort, BigDecimal pnlLong) {

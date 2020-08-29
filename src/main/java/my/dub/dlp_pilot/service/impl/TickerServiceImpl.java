@@ -39,7 +39,7 @@ public class TickerServiceImpl implements TickerService {
 
     @Override
     public void fetchAndSave(Exchange exchange) {
-        if (testRunService.isTradeStopped()) {
+        if (testRunService.checkTestRunEnd()) {
             return;
         }
         save(exchange.getName(), restClient.fetchTickers(exchange));
