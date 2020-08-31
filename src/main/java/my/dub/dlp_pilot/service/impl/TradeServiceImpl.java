@@ -76,7 +76,8 @@ public class TradeServiceImpl implements TradeService {
 
         BigDecimal currentPercentageDiff =
                 percentageDifferencePrice(tickerShort.getPriceBid(), tickerLong.getPriceAsk());
-        if (currentPercentageDiff.compareTo(parameters.getEntryMaxPercentage()) > 0) {
+        if (currentPercentageDiff.compareTo(parameters.getEntryMinPercentageDiff()) < 0
+                || currentPercentageDiff.compareTo(parameters.getEntryMaxPercentageDiff()) > 0) {
             return;
         }
         if (isOpenDetrimental(tickerShort, tickerLong) || !isOpenProfitable(priceDifference, tickerShort, tickerLong)) {

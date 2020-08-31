@@ -37,8 +37,10 @@ public class ParametersComponent implements InitializingBean {
     private int priceDataInvalidateAfterSeconds;
     @Value("${trade_entry_profit_percentage}")
     private double entryProfitPercentageDouble;
-    @Value("${trade_entry_max_percentage}")
-    private double entryMaxPercentageDouble;
+    @Value("${trade_entry_min_percentage_diff}")
+    private double entryMinPercentageDiffDouble;
+    @Value("${trade_entry_max_percentage_diff}")
+    private double entryMaxPercentageDiffDouble;
     @Value("${trade_exit_profit_percentage}")
     private double exitProfitPercentageDouble;
     @Value("${trade_decrease_exit_profit_percentage_after_seconds}")
@@ -70,7 +72,8 @@ public class ParametersComponent implements InitializingBean {
 
     private Duration dataCaptureIntervalDuration;
     private BigDecimal entryProfitPercentage;
-    private BigDecimal entryMaxPercentage;
+    private BigDecimal entryMinPercentageDiff;
+    private BigDecimal entryMaxPercentageDiff;
     private BigDecimal exitProfitPercentage;
     private BigDecimal exitProfitPercentageDecreaseBy;
     private BigDecimal exitSyncOnPnlPercentageDiff;
@@ -90,7 +93,10 @@ public class ParametersComponent implements InitializingBean {
         }
         priceDataInvalidateAfterSeconds = priceDataInvalidateAfterSeconds > 0 ? priceDataInvalidateAfterSeconds : 0;
         entryProfitPercentage = BigDecimal.valueOf(entryProfitPercentageDouble);
-        entryMaxPercentage = BigDecimal.valueOf(entryMaxPercentageDouble);
+        entryMinPercentageDiffDouble = entryMinPercentageDiffDouble > 0 ? entryMinPercentageDiffDouble : 0;
+        entryMinPercentageDiff = BigDecimal.valueOf(entryMinPercentageDiffDouble);
+        entryMaxPercentageDiffDouble = entryMaxPercentageDiffDouble > 0 ? entryMaxPercentageDiffDouble : 0;
+        entryMaxPercentageDiff = BigDecimal.valueOf(entryMaxPercentageDiffDouble);
         exitProfitPercentage = BigDecimal.valueOf(exitProfitPercentageDouble);
         exitProfitPercentageDecreaseBy = BigDecimal.valueOf(exitProfitPercentageDecreaseByDouble);
         entryAmounts = Arrays.stream(entryAmountsUsdParam).mapToDouble(Double::parseDouble).boxed().distinct().sorted()
@@ -121,8 +127,9 @@ public class ParametersComponent implements InitializingBean {
         if (entryProfitPercentageDouble < 0.0d) {
             throw new IllegalArgumentException("Trade entry min percentage cannot be < 0!");
         }
-        if (entryMaxPercentageDouble <= entryProfitPercentageDouble) {
-            throw new IllegalArgumentException("Trade entry max percentage cannot be <= entry min percentage!");
+        if (entryMinPercentageDiffDouble != 0.0d && entryMinPercentageDiffDouble > entryMaxPercentageDiffDouble) {
+            throw new IllegalArgumentException(
+                    "Trade entry min percentage diff cannot be > entry max percentage diff!");
         }
         if (exitProfitPercentageDecreaseByDouble >= exitProfitPercentageDouble) {
             throw new IllegalArgumentException("Trade exit percentage diff decrease cannot be >= exit percentage!");
