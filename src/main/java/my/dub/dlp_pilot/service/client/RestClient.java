@@ -755,8 +755,18 @@ public class RestClient implements InitializingBean {
                 return;
             }
             JsonNode innerNode = entry.getValue();
-            ticker.setPriceAsk(new BigDecimal(innerNode.get("lowestAsk").asText()));
-            ticker.setPriceBid(new BigDecimal(innerNode.get("highestBid").asText()));
+            /*workaround for java.lang.NumberFormatException: Character n is neither a decimal digit number, decimal
+            point, nor "e" notation exponential mark*/
+            BigDecimal ask = parsePrice(innerNode.get("lowestAsk"), exchangeName);
+            if (ask == null) {
+                return;
+            }
+            ticker.setPriceAsk(ask);
+            BigDecimal bid = parsePrice(innerNode.get("highestBid"), exchangeName);
+            if (bid == null) {
+                return;
+            }
+            ticker.setPriceBid(bid);
             tickers.add(ticker);
         });
         return tickers;
@@ -874,6 +884,16 @@ public class RestClient implements InitializingBean {
         }
         if (dateTime.isBefore(DateUtils.currentDateTime())) {
             ticker.setDateTime(dateTime);
+        }
+    }
+
+    private BigDecimal parsePrice(JsonNode priceNode, String exchangeName) {
+        String price = priceNode.asText();
+        try {
+            return new BigDecimal(price);
+        } catch (NumberFormatException e) {
+            log.debug("Wrong price value found in response ({}) from {} exchange", price, exchangeName);
+            return null;
         }
     }
 }
