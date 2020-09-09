@@ -36,7 +36,7 @@ import org.springframework.util.StringUtils;
 
 @Slf4j
 @Component
-public class RestClient implements InitializingBean {
+public class ApiClient implements InitializingBean {
 
     private static final String NO_TICKERS_FOUND_IN_RESPONSE_MSG = "No tickers found in response!";
     private static final String PRICE_TYPE_ASK = "ASK";
@@ -49,7 +49,7 @@ public class RestClient implements InitializingBean {
 
     private final ExchangeService exchangeService;
 
-    public RestClient(ExchangeService exchangeService) {
+    public ApiClient(ExchangeService exchangeService) {
         this.exchangeService = exchangeService;
     }
 

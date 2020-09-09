@@ -2,7 +2,7 @@ insert into local.exchange (name, deposit_fee_usd, withdraw_fee_usd, taker_fee_p
                             trust_score, base_endpoint, api_request_rate_min)
 values ('BIGONE', 0, 0.0005, 0.1, 7, 'https://big.one/api/v3/', 100),
        ('BINANCE', 0, 0.0005, 0.1, 10, 'https://api.binance.com/api/v3/', 100),
-       ('BITBAY', 0, 0.0002, 0.1, 7, 'https://api.bitbay.net/rest/', 60),
+       ('BITBAY', 0, 0.0002, 0.1, 7, 'https://api.bitbay.net/rest/', 55),
        ('BITFINEX', 0, 0, 0.2, 10, 'https://api-pub.bitfinex.com/v2/', 30),
        ('BITHUMB', 0, 0.0005, 0.15, 7, 'https://global-openapi.bithumb.pro/openapi/v1/', 100) /*double-check request rate*/,
        ('BITMART', 0, 0.00005, 0.2, 6, 'https://openapi.bitmart.com/v2/', 60),

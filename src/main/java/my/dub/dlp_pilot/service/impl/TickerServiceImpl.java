@@ -13,7 +13,7 @@ import my.dub.dlp_pilot.model.Ticker;
 import my.dub.dlp_pilot.repository.container.TickerContainer;
 import my.dub.dlp_pilot.service.TestRunService;
 import my.dub.dlp_pilot.service.TickerService;
-import my.dub.dlp_pilot.service.client.RestClient;
+import my.dub.dlp_pilot.service.client.ApiClient;
 import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -24,15 +24,15 @@ import org.springframework.util.CollectionUtils;
 public class TickerServiceImpl implements TickerService {
 
     private final TickerContainer tickerContainer;
-    private final RestClient restClient;
+    private final ApiClient apiClient;
     private final TestRunService testRunService;
     private final ParametersComponent parameters;
 
     @Autowired
-    public TickerServiceImpl(TickerContainer tickerContainer, RestClient restClient, TestRunService testRunService,
+    public TickerServiceImpl(TickerContainer tickerContainer, ApiClient apiClient, TestRunService testRunService,
             ParametersComponent parameters) {
         this.tickerContainer = tickerContainer;
-        this.restClient = restClient;
+        this.apiClient = apiClient;
         this.testRunService = testRunService;
         this.parameters = parameters;
     }
@@ -42,7 +42,7 @@ public class TickerServiceImpl implements TickerService {
         if (testRunService.checkTestRunEnd()) {
             return;
         }
-        save(exchange.getName(), restClient.fetchTickers(exchange));
+        save(exchange.getName(), apiClient.fetchTickers(exchange));
     }
 
     @Override
