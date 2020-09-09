@@ -5,12 +5,9 @@ public enum ExchangeName {
     BINANCE("Binance"),
     BITBAY("BitBay"),
     BITFINEX("Bitfinex"),
-    BITHUMB("Bithumb Global"),
     BITMART("Bitmart"),
     BITMAX("BitMax"),
     BITTREX("Bittrex"),
-    BW("BW.com"),
-    COINONE("Coinone"),
     EXMO("Exmo"),
     GATE("Gate.io"),
     HUOBI("Huobi Global");

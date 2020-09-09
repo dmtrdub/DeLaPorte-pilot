@@ -103,7 +103,7 @@ public class PriceDifferenceServiceImpl implements PriceDifferenceService {
                     parameters.getPriceDataInvalidateAfterSeconds() != 0
                             && DateUtils.durationSeconds(priceDifference.getBreakThroughDateTime()) > parameters
                             .getPriceDataInvalidateAfterSeconds())) {
-                log.trace("Updated breakthrough price difference ({}) for {}", currentAverage,
+                log.trace("Updated breakthrough price difference ({}) for {}", currentAverage.toPlainString(),
                           priceDifference.toShortString());
                 priceDifference.setCurrentBreakThroughPrice(currentAverage);
             }

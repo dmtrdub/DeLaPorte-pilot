@@ -39,9 +39,19 @@ import org.springframework.util.StringUtils;
 public class ApiClient implements InitializingBean {
 
     private static final String NO_TICKERS_FOUND_IN_RESPONSE_MSG = "No tickers found in response!";
+    private static final String NO_SYMBOL_DATA_FOUND_IN_RESPONSE_MSG = "No symbol data found in response!";
+
     private static final String PRICE_TYPE_ASK = "ASK";
     private static final String PRICE_TYPE_BID = "BID";
-    public static final String NO_SYMBOL_DATA_FOUND_IN_RESPONSE_MSG = "No symbol data found in response!";
+
+    private static final String MESSAGE = "message";
+    private static final String SYMBOL = "symbol";
+    private static final String STATUS = "status";
+    private static final String CODE = "code";
+    private static final String DATA = "data";
+    private static final String CLOSE = "close";
+    private static final String ERROR = "error";
+    private static final String TICKER = "ticker";
 
     private HttpRequestFactory requestFactory;
 
@@ -84,12 +94,8 @@ public class ApiClient implements InitializingBean {
             case BITFINEX:
                 pingUrl = baseEndpoint + "platform/status";
                 break;
-            case BITHUMB:
-                pingUrl = baseEndpoint + "serverTime";
-                break;
             case BITBAY:
             case BITMAX:
-            case COINONE:
             case EXMO:
             case GATE:
             case HUOBI:
@@ -117,9 +123,6 @@ public class ApiClient implements InitializingBean {
 
     private void fetchAdditionalSymbolData(Exchange exchange) throws IOException {
         switch (exchange.getName()) {
-            case BW:
-                fetchBWAdditionalSymbolData(exchange);
-                break;
             case BINANCE:
                 fetchBinanceAdditionalSymbolData(exchange);
                 break;
@@ -151,9 +154,6 @@ public class ApiClient implements InitializingBean {
                 case BITFINEX:
                     result = fetchBitfinexTickers(exchange);
                     break;
-                case BITHUMB:
-                    result = fetchBithumbTickers(exchange);
-                    break;
                 case BITMART:
                     result = fetchBitmartTickers(exchange);
                     break;
@@ -162,12 +162,6 @@ public class ApiClient implements InitializingBean {
                     break;
                 case BITTREX:
                     result = fetchBittrexTickers(exchange);
-                    break;
-                case BW:
-                    result = fetchBWTickers(exchange);
-                    break;
-                case COINONE:
-                    result = fetchCoinoneTickers(exchange);
                     break;
                 case EXMO:
                     result = fetchExmoTickers(exchange);
@@ -197,41 +191,9 @@ public class ApiClient implements InitializingBean {
         symbolAdditionalData.put(ExchangeName.BINANCE, data);
     }
 
-    private void fetchBWAdditionalSymbolData(Exchange exchange) throws IOException {
-        Map<String, String> data = fetchBWMarketIdPairData(exchange);
-        symbolAdditionalData.put(ExchangeName.BW, data);
-    }
-
     private void fetchHuobiAdditionalSymbolData(Exchange exchange) throws IOException {
         Map<String, String> data = fetchHuobiSymbols(exchange);
         symbolAdditionalData.put(ExchangeName.HUOBI, data);
-    }
-
-    private Map<String, String> fetchBWMarketIdPairData(Exchange bwExchange) throws IOException {
-        String exchangeName = bwExchange.getFullName();
-        String resp = executeRequest(bwExchange.getBaseEndpoint(),
-                                     "exchange/config/controller/website/marketcontroller/getByWebId", exchangeName);
-
-        ObjectMapper objectMapper = new ObjectMapper();
-        JsonNode parentNode = objectMapper.readTree(resp);
-        checkBWStatus(exchangeName, parentNode);
-        JsonNode dataNode = parentNode.get("datas");
-        if (dataNode.isEmpty() || "null".equalsIgnoreCase(dataNode.asText())) {
-            throw new UnexpectedEndpointResponseException(exchangeName, NO_SYMBOL_DATA_FOUND_IN_RESPONSE_MSG);
-        }
-        Map<String, String> result = new HashMap<>();
-        for (JsonNode innerNode : dataNode) {
-            String pair = innerNode.get("name").asText();
-            int state = innerNode.get("state").asInt();
-            if (state != 1) {
-                log.trace("Symbol {} on {} exchange has unacceptable state {}. Skipping symbol info...", pair,
-                          exchangeName, state);
-                continue;
-            }
-            String marketId = innerNode.get("marketId").asText();
-            result.put(marketId, pair);
-        }
-        return result;
     }
 
     private Map<String, String> fetchBinanceSymbols(Exchange binanceExchange) throws IOException {
@@ -246,8 +208,8 @@ public class ApiClient implements InitializingBean {
         }
         Map<String, String> result = new HashMap<>();
         for (JsonNode innerNode : symbolsNode) {
-            String pair = innerNode.get("symbol").asText();
-            String status = innerNode.get("status").asText();
+            String pair = innerNode.get(SYMBOL).asText();
+            String status = innerNode.get(STATUS).asText();
             if (List.of("HALT", "BREAK").contains(status)) {
                 log.trace("Symbol {} on {} exchange has unacceptable status {}. Skipping symbol info...", pair,
                           exchangeName, status);
@@ -267,13 +229,13 @@ public class ApiClient implements InitializingBean {
         ObjectMapper objectMapper = new ObjectMapper();
         JsonNode parentNode = objectMapper.readTree(resp);
         checkHuobiStatus(exchangeName, parentNode);
-        JsonNode symbolsNode = parentNode.get("data");
+        JsonNode symbolsNode = parentNode.get(DATA);
         if (symbolsNode == null || symbolsNode.isEmpty()) {
             throw new UnexpectedEndpointResponseException(exchangeName, NO_SYMBOL_DATA_FOUND_IN_RESPONSE_MSG);
         }
         Map<String, String> result = new HashMap<>();
         for (JsonNode innerNode : symbolsNode) {
-            String pair = innerNode.get("symbol").asText();
+            String pair = innerNode.get(SYMBOL).asText();
             String status = innerNode.get("state").asText();
             if (!"online".equalsIgnoreCase(status)) {
                 log.trace("Symbol {} on {} exchange has unacceptable status {}. Skipping symbol info...", pair,
@@ -298,13 +260,13 @@ public class ApiClient implements InitializingBean {
         String exchangeName = exchange.getFullName();
         String resp = executeRequest(exchange.getBaseEndpoint(), "asset_pairs/tickers", exchangeName);
         JsonNode parentNode = new ObjectMapper().readTree(resp);
-        JsonNode statusNode = parentNode.get("code");
+        JsonNode statusNode = parentNode.get(CODE);
         String status = statusNode.asText();
         if (!Objects.equals(status, "0")) {
-            String message = statusNode.get("message").asText();
+            String message = statusNode.get(MESSAGE).asText();
             throw new UnexpectedEndpointResponseException(exchangeName, status, message);
         }
-        JsonNode dataNode = parentNode.get("data");
+        JsonNode dataNode = parentNode.get(DATA);
         if (dataNode == null || dataNode.isEmpty()) {
             throw new UnexpectedEndpointResponseException(exchangeName, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
         }
@@ -315,6 +277,11 @@ public class ApiClient implements InitializingBean {
             if (!parsePairResult) {
                 continue;
             }
+            BigDecimal closePrice = parsePrice(innerNode.get(CLOSE), exchangeName);
+            if (closePrice == null) {
+                continue;
+            }
+            ticker.setClosePrice(closePrice);
             JsonNode askNode = innerNode.get("ask");
             if (askNode == null || askNode.get("price") == null) {
                 logInvalidPriceData(exchangeName, ticker.getPair(), PRICE_TYPE_ASK);
@@ -343,7 +310,7 @@ public class ApiClient implements InitializingBean {
         String exchangeName = exchange.getFullName();
         String resp = executeRequest(exchange.getBaseEndpoint(), "ticker/bookTicker", exchangeName);
         JsonNode parentNode = new ObjectMapper().readTree(resp);
-        JsonNode statusNode = parentNode.get("code");
+        JsonNode statusNode = parentNode.get(CODE);
 
         if (statusNode != null) {
             String message = statusNode.get("msg").asText();
@@ -355,7 +322,7 @@ public class ApiClient implements InitializingBean {
         Set<Ticker> tickers = new HashSet<>();
         for (JsonNode innerNode : parentNode) {
             Ticker ticker = new Ticker(ExchangeName.BINANCE);
-            String pair = innerNode.get("symbol").asText();
+            String pair = innerNode.get(SYMBOL).asText();
             String dividedPair = symbolAdditionalData.get(exchange.getName()).get(pair);
             if (dividedPair == null) {
                 continue;
@@ -364,18 +331,16 @@ public class ApiClient implements InitializingBean {
             if (!parsePairResult) {
                 continue;
             }
-            if (innerNode.get("askPrice") != null) {
-                ticker.setPriceAsk(new BigDecimal(innerNode.get("askPrice").asText()));
-            } else {
-                logInvalidPriceData(exchangeName, ticker.getPair(), PRICE_TYPE_ASK);
+            BigDecimal askPrice = parsePrice(innerNode.get("askPrice"), exchangeName);
+            if (askPrice == null) {
                 continue;
             }
-            if (innerNode.get("bidPrice") != null) {
-                ticker.setPriceBid(new BigDecimal(innerNode.get("bidPrice").asText()));
-            } else {
-                logInvalidPriceData(exchangeName, ticker.getPair(), PRICE_TYPE_BID);
+            ticker.setPriceAsk(askPrice);
+            BigDecimal bidPrice = parsePrice(innerNode.get("bidPrice"), exchangeName);
+            if (bidPrice == null) {
                 continue;
             }
+            ticker.setPriceBid(bidPrice);
             tickers.add(ticker);
         }
         return tickers;
@@ -391,7 +356,7 @@ public class ApiClient implements InitializingBean {
         String resp = executeRequest(exchange.getBaseEndpoint(), "trading/ticker", exchangeName);
         ObjectMapper objectMapper = new ObjectMapper();
         JsonNode parentNode = objectMapper.readTree(resp);
-        JsonNode statusNode = parentNode.get("status");
+        JsonNode statusNode = parentNode.get(STATUS);
 
         String status = statusNode.asText();
         if (!"Ok".equalsIgnoreCase(status)) {
@@ -407,22 +372,25 @@ public class ApiClient implements InitializingBean {
         Set<Ticker> tickers = new HashSet<>();
         for (JsonNode innerNode : itemsNode) {
             Ticker ticker = new Ticker(ExchangeName.BITBAY);
-            boolean parsePairResult = setSymbols(innerNode.get("market").get("code").asText(), "-", ticker);
+            boolean parsePairResult = setSymbols(innerNode.get("market").get(CODE).asText(), "-", ticker);
             if (!parsePairResult) {
                 continue;
             }
-            String priceBid = innerNode.get("highestBid").asText();
-            if (StringUtils.isEmpty(priceBid) || "null".equalsIgnoreCase(priceBid)) {
-                logInvalidPriceData(exchangeName, ticker.getPair(), PRICE_TYPE_BID);
+            BigDecimal closePrice = parsePrice(innerNode.get("rate"), exchangeName);
+            if (closePrice == null) {
                 continue;
             }
-            String priceAsk = innerNode.get("lowestAsk").asText();
-            if (StringUtils.isEmpty(priceAsk) || "null".equalsIgnoreCase(priceAsk)) {
-                logInvalidPriceData(exchangeName, ticker.getPair(), PRICE_TYPE_ASK);
+            ticker.setClosePrice(closePrice);
+            BigDecimal bidPrice = parsePrice(innerNode.get("highestBid"), exchangeName);
+            if (bidPrice == null) {
                 continue;
             }
-            ticker.setPriceBid(new BigDecimal(priceBid));
-            ticker.setPriceAsk(new BigDecimal(priceAsk));
+            ticker.setPriceBid(bidPrice);
+            BigDecimal askPrice = parsePrice(innerNode.get("lowestAsk"), exchangeName);
+            if (askPrice == null) {
+                continue;
+            }
+            ticker.setPriceAsk(askPrice);
             setTickerDateTime(innerNode, ticker, "time", ChronoUnit.MILLIS);
             tickers.add(ticker);
         }
@@ -444,13 +412,13 @@ public class ApiClient implements InitializingBean {
             throw new UnexpectedEndpointResponseException(exchangeName, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
         }
         JsonNode first = parentNode.get(0);
-        if (first != null && "error".equalsIgnoreCase(first.asText())) {
+        if (first != null && ERROR.equalsIgnoreCase(first.asText())) {
             throw new UnexpectedEndpointResponseException(exchangeName, parentNode.get(2).asText(),
                                                           parentNode.get(3).asText());
         }
         Set<Ticker> tickers = new HashSet<>();
         for (JsonNode innerNode : parentNode) {
-            if (innerNode == null || innerNode.isEmpty() || innerNode.size() < 4) {
+            if (innerNode == null || innerNode.size() < 4) {
                 log.trace("Inner node does not contain full ticker data in response for exchange {}!", exchangeName);
                 continue;
             }
@@ -469,42 +437,7 @@ public class ApiClient implements InitializingBean {
             ticker.setTarget(target);
             ticker.setPriceBid(new BigDecimal(innerNode.get(1).asText()));
             ticker.setPriceAsk(new BigDecimal(innerNode.get(3).asText()));
-            tickers.add(ticker);
-        }
-        return tickers;
-    }
-
-    /**
-     * @param exchange
-     *
-     * @see
-     * <a href="https://github.com/bithumb-pro/bithumb.pro-official-api-docs/blob/master/rest-api.md#1-ticker">Bithumb
-     * REST API - Ticker</a>
-     */
-    private Set<Ticker> fetchBithumbTickers(Exchange exchange) throws IOException {
-        String exchangeName = exchange.getFullName();
-        String resp = executeRequest(exchange.getBaseEndpoint(), "spot/ticker?symbol=ALL", exchangeName);
-        ObjectMapper objectMapper = new ObjectMapper();
-        JsonNode parentNode = objectMapper.readTree(resp);
-        int code = parentNode.get("code").asInt();
-        if (code != 0) {
-            String message = parentNode.get("msg").asText();
-            throw new UnexpectedEndpointResponseException(exchangeName, String.valueOf(code), message);
-        }
-        JsonNode data = parentNode.get("data");
-        if (data == null || data.isEmpty()) {
-            throw new UnexpectedEndpointResponseException(exchangeName, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
-        }
-        Set<Ticker> tickers = new HashSet<>();
-        for (JsonNode innerNode : data) {
-            Ticker ticker = new Ticker(ExchangeName.BITHUMB);
-            boolean parsePairResult = setSymbols(innerNode.get("s").asText(), "-", ticker);
-            if (!parsePairResult) {
-                continue;
-            }
-            //TODO: use orderbook
-            ticker.setPriceAsk(new BigDecimal(innerNode.get("c").asText()));
-            ticker.setPriceBid(new BigDecimal(innerNode.get("c").asText()));
+            ticker.setClosePrice(new BigDecimal(innerNode.get(7).asText()));
             tickers.add(ticker);
         }
         return tickers;
@@ -518,13 +451,13 @@ public class ApiClient implements InitializingBean {
      */
     private Set<Ticker> fetchBitmartTickers(Exchange exchange) throws IOException {
         String exchangeName = exchange.getFullName();
-        String resp = executeRequest(exchange.getBaseEndpoint(), "ticker", exchangeName);
+        String resp = executeRequest(exchange.getBaseEndpoint(), TICKER, exchangeName);
         ObjectMapper objectMapper = new ObjectMapper();
         JsonNode parentNode = objectMapper.readTree(resp);
         if (parentNode == null || parentNode.isEmpty()) {
             throw new UnexpectedEndpointResponseException(exchangeName, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
         }
-        JsonNode message = parentNode.get("message");
+        JsonNode message = parentNode.get(MESSAGE);
         if (message != null) {
             JsonNode codeResp = parentNode.get("errno");
             String code = codeResp == null ? "" : codeResp.asText();
@@ -537,6 +470,7 @@ public class ApiClient implements InitializingBean {
             if (!parsePairResult) {
                 continue;
             }
+            ticker.setClosePrice(new BigDecimal(innerNode.get("current_price").asText()));
             ticker.setPriceAsk(new BigDecimal(innerNode.get("ask_1").asText()));
             ticker.setPriceBid(new BigDecimal(innerNode.get("bid_1").asText()));
             tickers.add(ticker);
@@ -551,26 +485,31 @@ public class ApiClient implements InitializingBean {
      */
     private Set<Ticker> fetchBitmaxTickers(Exchange exchange) throws IOException {
         String exchangeName = exchange.getFullName();
-        String resp = executeRequest(exchange.getBaseEndpoint(), "ticker", exchangeName);
+        String resp = executeRequest(exchange.getBaseEndpoint(), TICKER, exchangeName);
         ObjectMapper objectMapper = new ObjectMapper();
         JsonNode parentNode = objectMapper.readTree(resp);
 
-        int code = parentNode.get("code").asInt();
+        int code = parentNode.get(CODE).asInt();
         if (code != 0) {
-            String message = parentNode.get("message").asText();
+            String message = parentNode.get(MESSAGE).asText();
             throw new UnexpectedEndpointResponseException(exchangeName, String.valueOf(code), message);
         }
-        JsonNode data = parentNode.get("data");
+        JsonNode data = parentNode.get(DATA);
         if (data == null || data.isEmpty()) {
             throw new UnexpectedEndpointResponseException(exchangeName, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
         }
         Set<Ticker> tickers = new HashSet<>();
         for (JsonNode innerNode : data) {
             Ticker ticker = new Ticker(ExchangeName.BITMAX);
-            boolean parsePairResult = setSymbols(innerNode.get("symbol").asText(), "/", ticker);
+            boolean parsePairResult = setSymbols(innerNode.get(SYMBOL).asText(), "/", ticker);
             if (!parsePairResult) {
                 continue;
             }
+            BigDecimal closePrice = parsePrice(innerNode.get(CLOSE), exchangeName);
+            if (closePrice == null) {
+                continue;
+            }
+            ticker.setClosePrice(closePrice);
             JsonNode askNode = innerNode.get("ask");
             if (askNode == null || askNode.isEmpty()) {
                 logInvalidPriceData(exchangeName, ticker.getPair(), PRICE_TYPE_ASK);
@@ -602,7 +541,7 @@ public class ApiClient implements InitializingBean {
         if (parentNode == null || parentNode.isEmpty()) {
             throw new UnexpectedEndpointResponseException(exchangeName, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
         }
-        JsonNode codeResp = parentNode.get("code");
+        JsonNode codeResp = parentNode.get(CODE);
         if (codeResp != null) {
             String code = codeResp.asText();
             String message = parentNode.get("detail") != null ? parentNode.get("detail").asText() : "";
@@ -611,86 +550,13 @@ public class ApiClient implements InitializingBean {
         Set<Ticker> tickers = new HashSet<>();
         for (JsonNode innerNode : parentNode) {
             Ticker ticker = new Ticker(ExchangeName.BITTREX);
-            boolean parsePairResult = setSymbols(innerNode.get("symbol").asText(), "-", ticker);
+            boolean parsePairResult = setSymbols(innerNode.get(SYMBOL).asText(), "-", ticker);
             if (!parsePairResult) {
                 continue;
             }
+            ticker.setClosePrice(new BigDecimal(innerNode.get("lastTradeRate").asText()));
             ticker.setPriceAsk(new BigDecimal(innerNode.get("askRate").asText()));
             ticker.setPriceBid(new BigDecimal(innerNode.get("bidRate").asText()));
-            tickers.add(ticker);
-        }
-        return tickers;
-    }
-
-    /**
-     * @param exchange
-     *
-     * @see
-     * <a href="https://github.com/bw-exchange/api_docs_en/wiki/REST_api_reference#interface-description-get--tickers-single-symbol">BW
-     * REST API - Ticker</a>
-     */
-    private Set<Ticker> fetchBWTickers(Exchange exchange) throws IOException {
-        String exchangeName = exchange.getFullName();
-        String resp = executeRequest(exchange.getBaseEndpoint(), "api/data/v1/tickers", exchangeName);
-        JsonNode parentNode = new ObjectMapper().readTree(resp);
-        checkBWStatus(exchangeName, parentNode);
-        JsonNode dataNode = parentNode.get("datas");
-        if (dataNode.isEmpty() || "null".equalsIgnoreCase(dataNode.asText())) {
-            throw new UnexpectedEndpointResponseException(exchangeName, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
-        }
-
-        Set<Ticker> tickers = new HashSet<>();
-        for (JsonNode innerNode : dataNode) {
-            String marketId = innerNode.get(0).asText();
-            String pair = symbolAdditionalData.get(exchange.getName()).get(marketId);
-            if (StringUtils.isEmpty(pair)) {
-                log.debug("{} exchange: Cannot find pair by marketId ({}). Skipping...", exchangeName, marketId);
-                continue;
-            }
-            Ticker ticker = new Ticker(ExchangeName.BW);
-            boolean parsePairResult = setSymbols(pair, "_", ticker);
-            if (!parsePairResult) {
-                continue;
-            }
-            //TODO: use orderbook
-            ticker.setPriceBid(new BigDecimal(innerNode.get(1).asText()));
-            ticker.setPriceAsk(new BigDecimal(innerNode.get(1).asText()));
-            tickers.add(ticker);
-        }
-        return tickers;
-    }
-
-    /**
-     * NOTE: only KRW target symbol is supported!
-     *
-     * @param exchange
-     *
-     * @see <a href="https://doc.coinone.co.kr/#operation/public_api_ticker_utc">Coinone REST API - Ticker</a>
-     */
-    private Set<Ticker> fetchCoinoneTickers(Exchange exchange) throws IOException {
-        String exchangeName = exchange.getFullName();
-        String resp = executeRequest(exchange.getBaseEndpoint(), "ticker_utc?currency=all", exchangeName);
-        JsonNode parentNode = new ObjectMapper().readTree(resp);
-        if (parentNode == null || parentNode.isEmpty()) {
-            throw new UnexpectedEndpointResponseException(exchangeName, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
-        }
-        int code = parentNode.get("errorCode").asInt();
-        if (code != 0) {
-            String errorMsg = parentNode.get("errorMsg").asText();
-            throw new UnexpectedEndpointResponseException(exchangeName, String.valueOf(code), errorMsg);
-        }
-
-        Set<Ticker> tickers = new HashSet<>();
-        for (JsonNode innerNode : parentNode) {
-            if (innerNode.isTextual()) {
-                continue;
-            }
-            Ticker ticker = new Ticker(ExchangeName.COINONE);
-            ticker.setBase(innerNode.get("currency").asText().toUpperCase());
-            ticker.setTarget("KRW");
-            //TODO: use orderbook
-            ticker.setPriceBid(new BigDecimal(innerNode.get("last").asText()));
-            ticker.setPriceAsk(new BigDecimal(innerNode.get("last").asText()));
             tickers.add(ticker);
         }
         return tickers;
@@ -705,12 +571,12 @@ public class ApiClient implements InitializingBean {
      */
     private Set<Ticker> fetchExmoTickers(Exchange exchange) throws IOException {
         String exchangeName = exchange.getFullName();
-        String resp = executeRequest(exchange.getBaseEndpoint(), "ticker", exchangeName);
+        String resp = executeRequest(exchange.getBaseEndpoint(), TICKER, exchangeName);
         JsonNode parentNode = new ObjectMapper().readTree(resp);
         if (parentNode == null || parentNode.isEmpty()) {
             throw new UnexpectedEndpointResponseException(exchangeName, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
         }
-        JsonNode errorNode = parentNode.get("error");
+        JsonNode errorNode = parentNode.get(ERROR);
         if (errorNode != null) {
             throw new UnexpectedEndpointResponseException(exchangeName, errorNode.asText());
         }
@@ -722,6 +588,7 @@ public class ApiClient implements InitializingBean {
                 return;
             }
             JsonNode innerNode = entry.getValue();
+            ticker.setClosePrice(new BigDecimal(innerNode.get("last_trade").asText()));
             ticker.setPriceAsk(new BigDecimal(innerNode.get("sell_price").asText()));
             ticker.setPriceBid(new BigDecimal(innerNode.get("buy_price").asText()));
             setTickerDateTime(innerNode, ticker, "updated", ChronoUnit.SECONDS);
@@ -742,10 +609,10 @@ public class ApiClient implements InitializingBean {
         if (parentNode == null || parentNode.isEmpty()) {
             throw new UnexpectedEndpointResponseException(exchangeName, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
         }
-        JsonNode errorCodeNode = parentNode.get("code");
+        JsonNode errorCodeNode = parentNode.get(CODE);
         if (errorCodeNode != null) {
             throw new UnexpectedEndpointResponseException(exchangeName, errorCodeNode.asText(),
-                                                          parentNode.get("message").asText());
+                                                          parentNode.get(MESSAGE).asText());
         }
         Set<Ticker> tickers = new HashSet<>();
         parentNode.fields().forEachRemaining(entry -> {
@@ -755,8 +622,11 @@ public class ApiClient implements InitializingBean {
                 return;
             }
             JsonNode innerNode = entry.getValue();
-            /*workaround for java.lang.NumberFormatException: Character n is neither a decimal digit number, decimal
-            point, nor "e" notation exponential mark*/
+            BigDecimal close = parsePrice(innerNode.get("last"), exchangeName);
+            if (close == null) {
+                return;
+            }
+            ticker.setClosePrice(close);
             BigDecimal ask = parsePrice(innerNode.get("lowestAsk"), exchangeName);
             if (ask == null) {
                 return;
@@ -786,19 +656,20 @@ public class ApiClient implements InitializingBean {
             throw new UnexpectedEndpointResponseException(exchangeName, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
         }
         checkHuobiStatus(exchangeName, parentNode);
-        JsonNode dataNode = parentNode.get("data");
-        if (dataNode.isEmpty() || "null".equalsIgnoreCase(dataNode.asText())) {
+        JsonNode dataNode = parentNode.get(DATA);
+        if (dataNode.isEmpty() || dataNode.isEmpty()) {
             throw new UnexpectedEndpointResponseException(exchangeName, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
         }
         Set<Ticker> tickers = new HashSet<>();
         for (JsonNode innerNode : dataNode) {
-            String symbol = innerNode.get("symbol").asText();
+            String symbol = innerNode.get(SYMBOL).asText();
             String pair = symbolAdditionalData.get(exchange.getName()).get(symbol);
             if (StringUtils.isEmpty(pair)) {
                 continue;
             }
             Ticker ticker = new Ticker(ExchangeName.HUOBI);
             setSymbols(pair, ticker);
+            ticker.setClosePrice(new BigDecimal(innerNode.get(CLOSE).asText()));
             ticker.setPriceAsk(new BigDecimal(innerNode.get("ask").asText()));
             ticker.setPriceBid(new BigDecimal(innerNode.get("bid").asText()));
             tickers.add(ticker);
@@ -806,19 +677,10 @@ public class ApiClient implements InitializingBean {
         return tickers;
     }
 
-    private void checkBWStatus(String exchangeName, JsonNode parentNode) {
-        JsonNode statusNode = parentNode.get("resMsg");
-        int code = statusNode.get("code").asInt();
-        if (code != 1) {
-            String message = statusNode.get("message").asText();
-            throw new UnexpectedEndpointResponseException(exchangeName, String.valueOf(code), message);
-        }
-    }
-
     private void checkHuobiStatus(String exchangeName, JsonNode parentNode) {
-        JsonNode statusNode = parentNode.get("status");
+        JsonNode statusNode = parentNode.get(STATUS);
         String status = statusNode.asText();
-        if ("error".equalsIgnoreCase(status)) {
+        if (ERROR.equalsIgnoreCase(status)) {
             throw new UnexpectedEndpointResponseException(exchangeName, parentNode.get("err-code").asText(),
                                                           parentNode.get("err-msg").asText());
         }
@@ -888,11 +750,15 @@ public class ApiClient implements InitializingBean {
     }
 
     private BigDecimal parsePrice(JsonNode priceNode, String exchangeName) {
+        if (priceNode == null) {
+            log.trace("Null or empty price node found in response from {} exchange. Skipping...", exchangeName);
+            return null;
+        }
         String price = priceNode.asText();
         try {
             return new BigDecimal(price);
         } catch (NumberFormatException e) {
-            log.debug("Wrong price value found in response ({}) from {} exchange", price, exchangeName);
+            log.trace("Wrong price value found in response ({}) from {} exchange. Skipping...", price, exchangeName);
             return null;
         }
     }

@@ -27,12 +27,9 @@ public class TickerContainer {
     private final Set<Ticker> binanceTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<Ticker> bitBayTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<Ticker> bitfinexTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
-    private final Set<Ticker> bithumbTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<Ticker> bitmartTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<Ticker> bitmaxTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<Ticker> bittrexTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
-    private final Set<Ticker> bwTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
-    private final Set<Ticker> coinoneTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<Ticker> exmoTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<Ticker> gateTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<Ticker> huobiTickers = Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -47,18 +44,12 @@ public class TickerContainer {
                 return bitBayTickers;
             case BITFINEX:
                 return bitfinexTickers;
-            case BITHUMB:
-                return bithumbTickers;
             case BITMART:
                 return bitmartTickers;
             case BITMAX:
                 return bitmaxTickers;
             case BITTREX:
                 return bittrexTickers;
-            case BW:
-                return bwTickers;
-            case COINONE:
-                return coinoneTickers;
             case EXMO:
                 return exmoTickers;
             case GATE:
@@ -74,9 +65,8 @@ public class TickerContainer {
     }
 
     public Stream<Ticker> getAllStream() {
-        return Stream.of(bigONETickers, binanceTickers, bitBayTickers, bitfinexTickers, bithumbTickers, bitmartTickers,
-                         bitmaxTickers, bittrexTickers, bwTickers, coinoneTickers, exmoTickers, gateTickers,
-                         huobiTickers).flatMap(Collection::stream);
+        return Stream.of(bigONETickers, binanceTickers, bitBayTickers, bitfinexTickers, bitmartTickers, bitmaxTickers,
+                         bittrexTickers, exmoTickers, gateTickers, huobiTickers).flatMap(Collection::stream);
     }
 
     public Set<Ticker> getTickers(ExchangeName exchangeName) {
@@ -110,8 +100,10 @@ public class TickerContainer {
             if (existingTicker != null) {
                 BigDecimal existingPriceAsk = existingTicker.getPriceAsk();
                 BigDecimal existingPriceBid = existingTicker.getPriceBid();
-                if (existingPriceAsk.compareTo(newTicker.getPriceAsk()) != 0
-                        || existingPriceBid.compareTo(newTicker.getPriceBid()) != 0) {
+                BigDecimal existingClosePrice = existingTicker.getClosePrice();
+                if ((existingPriceAsk.compareTo(newTicker.getPriceAsk()) != 0
+                        || existingPriceBid.compareTo(newTicker.getPriceBid()) != 0) && existingClosePrice != null
+                        && existingClosePrice.compareTo(newTicker.getClosePrice()) != 0) {
                     newTicker.setPreviousPriceAsk(existingPriceAsk);
                     newTicker.setPreviousPriceBid(existingPriceBid);
                     tickerSet.remove(existingTicker);

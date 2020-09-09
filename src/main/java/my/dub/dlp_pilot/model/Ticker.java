@@ -20,6 +20,9 @@ public class Ticker extends PriceData {
 
     private BigDecimal priceAsk;
 
+    // close price recorded for stale check (not required field)
+    private BigDecimal closePrice;
+
     @EqualsAndHashCode.Exclude
     private boolean stale;
 
@@ -47,8 +50,7 @@ public class Ticker extends PriceData {
     }
 
     public boolean isPriceInvalid() {
-        return priceAsk == null || priceBid == null || Calculations.isNotPositive(priceAsk) ||
-                Calculations.isNotPositive(priceBid) || previousPriceAsk == null || previousPriceBid == null ||
-                Calculations.isNotPositive(previousPriceAsk) || Calculations.isNotPositive(previousPriceBid);
+        return priceAsk == null || priceBid == null || Calculations.isNotPositive(priceAsk) || Calculations
+                .isNotPositive(priceBid);
     }
 }
