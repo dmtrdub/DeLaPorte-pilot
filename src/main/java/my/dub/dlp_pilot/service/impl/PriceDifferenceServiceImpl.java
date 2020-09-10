@@ -98,15 +98,6 @@ public class PriceDifferenceServiceImpl implements PriceDifferenceService {
         }
         if (currentPriceDifference.compareTo(BigDecimal.ZERO) > 0
                 && currentPriceDifference.compareTo(currentAverage) > 0) {
-            // set breakthrough price + time if first breakthrough occurs, or when data capture period has passed
-            if (priceDifference.getBreakThroughAvgPriceDiff() == null || (
-                    parameters.getPriceDataInvalidateAfterSeconds() != 0
-                            && DateUtils.durationSeconds(priceDifference.getBreakThroughDateTime()) > parameters
-                            .getPriceDataInvalidateAfterSeconds())) {
-                log.trace("Updated breakthrough price difference ({}) for {}", currentAverage.toPlainString(),
-                          priceDifference.toShortString());
-                priceDifference.setCurrentBreakThroughPrice(currentAverage);
-            }
             tradeService.checkTradeOpen(priceDifference, ticker1, ticker2);
         }
     }

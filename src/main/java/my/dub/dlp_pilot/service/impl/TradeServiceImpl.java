@@ -156,27 +156,27 @@ public class TradeServiceImpl implements TradeService {
         return tradeContainer.isEmpty();
     }
 
-    private boolean canEnterTrade(Ticker ticker1, Ticker ticker2) {
-        if (tickerService.checkStale(ticker1, ticker2)) {
+    private boolean canEnterTrade(Ticker tickerShort, Ticker tickerLong) {
+        if (tickerService.checkStale(tickerShort, tickerLong)) {
             return false;
         }
-        String base = ticker1.getBase();
-        String target = ticker1.getTarget();
-        if (tradeContainer.isSimilarPresent(base, target, ticker1.getExchangeName(), ticker2.getExchangeName())) {
+        String base = tickerShort.getBase();
+        String target = tickerShort.getTarget();
+        if (tradeContainer.isSimilarPresent(base, target, tickerShort.getExchangeName(), tickerLong.getExchangeName())) {
             return false;
         }
-        if (exchangeService.isExchangeFaulty(ticker1.getExchangeName()) || exchangeService
-                .isExchangeFaulty(ticker2.getExchangeName())) {
+        if (exchangeService.isExchangeFaulty(tickerShort.getExchangeName()) || exchangeService
+                .isExchangeFaulty(tickerLong.getExchangeName())) {
             return false;
         }
         if (tradeContainer
-                .checkHasDetrimentalRecord(ticker1.getExchangeName(), ticker2.getExchangeName(), base, target)) {
+                .checkHasDetrimentalRecord(tickerShort.getExchangeName(), tickerLong.getExchangeName(), base, target)) {
             return false;
         }
         int parallelTradesNumber = parameters.getParallelTradesNumber();
         if (parallelTradesNumber != 0) {
             Pair<Long, Long> tradesCount =
-                    tradeContainer.tradesCount(ticker1.getExchangeName(), ticker2.getExchangeName());
+                    tradeContainer.tradesCount(tickerShort.getExchangeName(), tickerLong.getExchangeName());
             return tradesCount.getFirst() <= parallelTradesNumber && tradesCount.getSecond() <= parallelTradesNumber;
         }
         return true;
@@ -250,8 +250,7 @@ public class TradeServiceImpl implements TradeService {
         BigDecimal amountUsd = parameters.getMinEntryAmount();
         BigDecimal expensesShort = exchangeService.getTotalExpenses(tickerShort.getExchangeName(), amountUsd);
         BigDecimal expensesLong = exchangeService.getTotalExpenses(tickerLong.getExchangeName(), amountUsd);
-        BigDecimal expectedProfitPriceDiff =
-                priceDifference.getCurrentValue().subtract(priceDifference.getBreakThroughAvgPriceDiff());
+        BigDecimal expectedProfitPriceDiff = priceDifference.getCurrentValue().subtract(priceDifference.getAvgValue());
         BigDecimal income =
                 income(pnl(expectedProfitPriceDiff, avgOpenPrice, amountUsd), BigDecimal.ZERO, expensesShort,
                        expensesLong);
