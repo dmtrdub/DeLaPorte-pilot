@@ -5,7 +5,6 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.time.temporal.Temporal;
 import org.springframework.lang.NonNull;
 import org.springframework.util.StringUtils;
@@ -59,6 +58,13 @@ public final class DateUtils {
         return Duration.between(start, currentDateTime()).toSeconds();
     }
 
+    public static long durationMillis(Temporal start) {
+        if (start == null) {
+            return 0;
+        }
+        return Duration.between(start, currentDateTime()).toMillis();
+    }
+
     public static String durationSecondsDetailed(Temporal start, Temporal end) {
         if (start == null || end == null) {
             return "0";
@@ -68,17 +74,13 @@ public final class DateUtils {
     }
 
     public static Duration parseDuration(@NonNull String input) {
-        if (StringUtils.isEmpty(input)) {
+        if (StringUtils.isEmpty(input) || "0".equals(input)) {
             return Duration.ZERO;
         }
-        try {
-            if (!input.startsWith("PT")) {
-                input = "PT" + input;
-            }
-            return Duration.parse(input);
-        } catch (DateTimeParseException e) {
-            return Duration.ZERO;
+        if (!input.startsWith("PT")) {
+            input = "PT" + input;
         }
+        return Duration.parse(input);
     }
 
     public static String formatDuration(@NonNull Duration duration) {

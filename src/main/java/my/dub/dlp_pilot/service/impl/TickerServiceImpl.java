@@ -6,7 +6,7 @@ import java.util.Collection;
 import java.util.Optional;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
-import my.dub.dlp_pilot.configuration.ParametersComponent;
+import my.dub.dlp_pilot.configuration.ParametersHolder;
 import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.Ticker;
@@ -26,11 +26,11 @@ public class TickerServiceImpl implements TickerService {
     private final TickerContainer tickerContainer;
     private final ApiClient apiClient;
     private final TestRunService testRunService;
-    private final ParametersComponent parameters;
+    private final ParametersHolder parameters;
 
     @Autowired
     public TickerServiceImpl(TickerContainer tickerContainer, ApiClient apiClient, TestRunService testRunService,
-            ParametersComponent parameters) {
+            ParametersHolder parameters) {
         this.tickerContainer = tickerContainer;
         this.apiClient = apiClient;
         this.testRunService = testRunService;
@@ -88,8 +88,8 @@ public class TickerServiceImpl implements TickerService {
     }
 
     private boolean checkTickerStale(Ticker ticker) {
-        if (!ticker.isStale() && DateUtils.durationSeconds(ticker.getDateTime()) >= parameters
-                .getStaleDifferenceSeconds()) {
+        if (!ticker.isStale() && DateUtils.durationMillis(ticker.getDateTime()) >= parameters.getStaleIntervalDuration()
+                .toMillis()) {
             ticker.setStale(true);
         }
         return ticker.isStale();

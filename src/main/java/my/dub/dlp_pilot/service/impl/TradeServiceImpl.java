@@ -11,13 +11,15 @@ import static my.dub.dlp_pilot.util.Calculations.percentageDifferencePrice;
 import static my.dub.dlp_pilot.util.Calculations.pnl;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import my.dub.dlp_pilot.configuration.ParametersComponent;
+import my.dub.dlp_pilot.configuration.ParametersHolder;
 import my.dub.dlp_pilot.exception.MissingEntityException;
 import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.ExchangeName;
@@ -51,12 +53,12 @@ public class TradeServiceImpl implements TradeService {
     private final TradeContainer tradeContainer;
     private final TickerService tickerService;
     private final ExchangeService exchangeService;
-    private final ParametersComponent parameters;
+    private final ParametersHolder parameters;
     private final TestRunService testRunService;
 
     @Autowired
     public TradeServiceImpl(TradeRepository repository, TradeContainer tradeContainer, TickerService tickerService,
-            ExchangeService exchangeService, ParametersComponent parameters, TestRunService testRunService) {
+            ExchangeService exchangeService, ParametersHolder parameters, TestRunService testRunService) {
         this.repository = repository;
         this.tradeContainer = tradeContainer;
         this.tickerService = tickerService;
@@ -114,8 +116,9 @@ public class TradeServiceImpl implements TradeService {
             if (isTestRunEnd) {
                 handleClose(trade, tickerShort, tickerLong, TradeResultType.TEST_RUN_END);
             } else {
-                int tradeMinutesTimeout = parameters.getTradeMinutesTimeout();
-                if (tradeMinutesTimeout != 0 && DateUtils.durationMinutes(trade.getStartTime()) > tradeMinutesTimeout) {
+                Duration tradeTimeoutDuration = parameters.getTradeTimeoutDuration();
+                if (!tradeTimeoutDuration.isZero()
+                        && DateUtils.durationMillis(trade.getStartTime()) > tradeTimeoutDuration.toMillis()) {
                     handleClose(trade, tickerShort, tickerLong, TradeResultType.TIMED_OUT);
                 } else {
                     Pair<BigDecimal, BigDecimal> pnlSides =
@@ -162,7 +165,8 @@ public class TradeServiceImpl implements TradeService {
         }
         String base = tickerShort.getBase();
         String target = tickerShort.getTarget();
-        if (tradeContainer.isSimilarPresent(base, target, tickerShort.getExchangeName(), tickerLong.getExchangeName())) {
+        if (tradeContainer
+                .isSimilarPresent(base, target, tickerShort.getExchangeName(), tickerLong.getExchangeName())) {
             return false;
         }
         if (exchangeService.isExchangeFaulty(tickerShort.getExchangeName()) || exchangeService
@@ -183,15 +187,15 @@ public class TradeServiceImpl implements TradeService {
     }
 
     private boolean isDetrimentalSyncCondition(BigDecimal pnlShort, BigDecimal pnlLong) {
-        if (isZero(parameters.getExitSyncOnPnlPercentageDiff())) {
+        if (isZero(parameters.getPostponeDetrimentalExitPnlPercentageDiff())) {
             return false;
         }
         BigDecimal absPnlShort = pnlShort.abs();
         BigDecimal absPnlLong = pnlLong.abs();
         return (absPnlShort.compareTo(absPnlLong) > 0
-                && percentageDifference(absPnlShort, absPnlLong).compareTo(parameters.getExitSyncOnPnlPercentageDiff())
+                && percentageDifference(absPnlShort, absPnlLong).compareTo(parameters.getPostponeDetrimentalExitPnlPercentageDiff())
                 > 0) || (absPnlLong.compareTo(absPnlShort) > 0
-                && percentageDifference(absPnlLong, absPnlShort).compareTo(parameters.getExitSyncOnPnlPercentageDiff())
+                && percentageDifference(absPnlLong, absPnlShort).compareTo(parameters.getPostponeDetrimentalExitPnlPercentageDiff())
                 > 0);
     }
 
@@ -221,10 +225,9 @@ public class TradeServiceImpl implements TradeService {
 
     private boolean isExistingSuccessful(BigDecimal income, ZonedDateTime tradeStartTime) {
         BigDecimal amountUsd = parameters.getMinEntryAmount();
-        BigDecimal exitPercentage = parameters.getExitProfitPercentage(DateUtils.durationSeconds(tradeStartTime));
-        BigDecimal entryProfitValue = originalValueFromPercent(amountUsd, parameters.getEntryProfitPercentage());
-        BigDecimal exitProfitValue = originalValueFromPercent(amountUsd, exitPercentage);
-        return income.subtract(entryProfitValue).subtract(exitProfitValue).compareTo(BigDecimal.ZERO) >= 0;
+        BigDecimal exitPercentage = parameters.getProfitPercentageOnExitSum(DateUtils.durationSeconds(tradeStartTime));
+        BigDecimal profitValue = originalValueFromPercent(amountUsd, exitPercentage);
+        return income.subtract(profitValue).compareTo(BigDecimal.ZERO) >= 0;
     }
 
     private boolean isExistingDetrimental(BigDecimal income) {
@@ -281,10 +284,10 @@ public class TradeServiceImpl implements TradeService {
     }
 
     private void recordDetrimental(Trade trade) {
-        int suspenseAfterDetrimentalSeconds = parameters.getSuspenseAfterDetrimentalSeconds();
         ExchangeName exchangeShort = trade.getPositionShort().getExchange().getName();
         ExchangeName exchangeLong = trade.getPositionLong().getExchange().getName();
-        ZonedDateTime invalidationDateTime = trade.getEndTime().plusSeconds(suspenseAfterDetrimentalSeconds);
+        ZonedDateTime invalidationDateTime = trade.getEndTime()
+                .plus(parameters.getSuspenseAfterDetrimentalTradeDuration().toMillis(), ChronoUnit.MILLIS);
         String base = trade.getBase();
         String target = trade.getTarget();
         tradeContainer.addDetrimentalRecord(exchangeShort, exchangeLong, base, target, invalidationDateTime);

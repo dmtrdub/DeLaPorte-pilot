@@ -14,7 +14,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import my.dub.dlp_pilot.configuration.ParametersComponent;
+import my.dub.dlp_pilot.configuration.ParametersHolder;
 import my.dub.dlp_pilot.exception.TestRunEndException;
 import my.dub.dlp_pilot.model.Position;
 import my.dub.dlp_pilot.model.TestRun;
@@ -34,14 +34,14 @@ public class FileResultServiceImpl implements FileResultService {
 
     private final TradeService tradeService;
     private final TestRunService testRunService;
-    private final ParametersComponent parameters;
+    private final ParametersHolder parameters;
 
     private String header;
     private Path filePath;
 
     @Autowired
     public FileResultServiceImpl(TradeService tradeService, TestRunService testRunService,
-            ParametersComponent parameters) {
+            ParametersHolder parameters) {
         this.tradeService = tradeService;
         this.testRunService = testRunService;
         this.parameters = parameters;

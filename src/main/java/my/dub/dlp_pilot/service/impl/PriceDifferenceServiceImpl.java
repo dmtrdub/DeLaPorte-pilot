@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
-import my.dub.dlp_pilot.configuration.ParametersComponent;
+import my.dub.dlp_pilot.configuration.ParametersHolder;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.PriceDifference;
 import my.dub.dlp_pilot.model.Ticker;
@@ -30,11 +30,11 @@ public class PriceDifferenceServiceImpl implements PriceDifferenceService {
     private final TickerService tickerService;
     private final TestRunService testRunService;
     private final TradeService tradeService;
-    private final ParametersComponent parameters;
+    private final ParametersHolder parameters;
 
     @Autowired
     public PriceDifferenceServiceImpl(TickerService tickerService, PriceDifferenceContainer container,
-            TestRunService testRunService, TradeService tradeService, ParametersComponent parameters) {
+            TestRunService testRunService, TradeService tradeService, ParametersHolder parameters) {
         this.tickerService = tickerService;
         this.container = container;
         this.testRunService = testRunService;

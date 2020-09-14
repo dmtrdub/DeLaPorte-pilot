@@ -4,7 +4,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
-import my.dub.dlp_pilot.configuration.ParametersComponent;
+import my.dub.dlp_pilot.configuration.ParametersHolder;
 import my.dub.dlp_pilot.exception.TestRunEndException;
 import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.ExchangeName;
@@ -31,12 +31,12 @@ public class ScheduledService implements InitializingBean {
     private final TestRunService testRunService;
     private final FileResultServiceImpl fileResultService;
 
-    private final ParametersComponent parameters;
+    private final ParametersHolder parameters;
 
     @Autowired
     public ScheduledService(ExchangeService exchangeService, TickerService tickerService, TradeService tradeService,
             PriceDifferenceService priceDifferenceService, ApiClient apiClient, TestRunService testRunService,
-            FileResultServiceImpl fileResultService, ParametersComponent parameters) {
+            FileResultServiceImpl fileResultService, ParametersHolder parameters) {
         this.exchangeService = exchangeService;
         this.tickerService = tickerService;
         this.tradeService = tradeService;
@@ -76,18 +76,18 @@ public class ScheduledService implements InitializingBean {
             }
         });
         taskScheduler.initialize();
+        long initDelayMillis = parameters.getInitDelayDuration().toMillis();
         exchanges.forEach(exchange -> {
-            int delayMillis = calculateFixedDelayInMillis(exchange);
-            log.info("Fixed Operation delay set to {} ms for {} exchange", delayMillis, exchange.getFullName());
-            taskScheduler
-                    .scheduleWithFixedDelay(() -> run(exchange), Instant.now().plusMillis(parameters.getInitDelayMs()),
-                                            Duration.ofMillis(delayMillis));
+            int opIntervalMillis = calculateFixedDelayInMillis(exchange);
+            log.info("Fixed Operation interval set to {} ms for {} exchange", opIntervalMillis, exchange.getFullName());
+            taskScheduler.scheduleWithFixedDelay(() -> run(exchange), Instant.now().plusMillis(
+                    initDelayMillis), Duration.ofMillis(opIntervalMillis));
         });
         taskScheduler.scheduleWithFixedDelay(fileResultService::write,
-                                             Instant.now().plusMillis(parameters.getInitDelayMs() * 2),
+                                             Instant.now().plusMillis(initDelayMillis* 2),
                                              Duration.ofSeconds(30));
         taskScheduler.scheduleWithFixedDelay(testRunService::checkExitFile,
-                                             Instant.now().plusMillis(parameters.getInitDelayMs() * 4),
+                                             Instant.now().plusMillis(initDelayMillis * 4),
                                              Duration.ofSeconds(60));
     }
 
