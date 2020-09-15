@@ -1,20 +1,33 @@
 package my.dub.dlp_pilot.model;
 
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
+import static my.dub.dlp_pilot.Constants.DEFAULT_PAIR_DELIMITER;
+import static my.dub.dlp_pilot.Constants.PERCENTAGE_SCALE;
+import static my.dub.dlp_pilot.Constants.PRICE_SCALE;
 
-import javax.persistence.*;
-import javax.validation.constraints.Digits;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 import java.util.List;
-
-import static my.dub.dlp_pilot.Constants.DEFAULT_PAIR_DELIMITER;
-import static my.dub.dlp_pilot.Constants.PERCENTAGE_SCALE;
-import static my.dub.dlp_pilot.Constants.PRICE_SCALE;
+import javax.persistence.CascadeType;
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
+import javax.persistence.FetchType;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.JoinColumn;
+import javax.persistence.ManyToOne;
+import javax.persistence.OneToMany;
+import javax.persistence.OneToOne;
+import javax.persistence.Table;
+import javax.validation.constraints.Digits;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
+import my.dub.dlp_pilot.util.DateUtils;
 
 @Data
 @NoArgsConstructor
@@ -85,10 +98,10 @@ public class Trade implements Serializable {
 
     public String toShortString() {
         String first =
-                "Trade{pair=" + getPair() + ", fixedExpensesUsd=" + fixedExpensesUsd + ", startTime=" + startTime +
+                "Trade{pair=" + getPair() + ", fixedExpensesUsd=" + fixedExpensesUsd + ", startTime=" + DateUtils.formatDateTime(startTime) +
                         ", entryPercentageDiff=" + entryPercentageDiff;
         if (!TradeResultType.IN_PROGRESS.equals(resultType)) {
-            first = first + ", endTime=" + endTime + ", resultType=" + resultType;
+            first = first + ", endTime=" + DateUtils.formatDateTime(endTime) + ", resultType=" + resultType;
         }
         return first + ", positionShort=" + positionShort.toShortString() + ", positionLong=" +
                 positionLong.toShortString() + '}';

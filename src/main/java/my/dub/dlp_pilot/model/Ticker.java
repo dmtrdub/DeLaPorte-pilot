@@ -13,7 +13,7 @@ public class Ticker extends PriceData {
 
     public Ticker(ExchangeName exchangeName) {
         super(exchangeName);
-        dateTime = DateUtils.currentDateTime();
+        dateTime = DateUtils.currentDateTimeUTC();
     }
 
     private BigDecimal priceBid;

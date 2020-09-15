@@ -227,7 +227,7 @@ public class ParametersHolder implements InitializingBean {
     }
 
     private void logParams() {
-        log.info("--- APPLICATION PARAMETERS ---\n");
+        log.info("--- APPLICATION PARAMETERS ---");
 
         log.info("Price data stale interval:  {}", formatDuration(staleIntervalDuration));
         log.info("Price data capture period:  {}", formatDuration(dataCapturePeriodDuration));
@@ -262,7 +262,8 @@ public class ParametersHolder implements InitializingBean {
         log.info("Test Run result file (.csv) path:  {}", pathToResultDir);
         log.info("Test Run force exit code:  {}", exitCode);
         log.info("Test Run force exit file path:  {}", forcedExitFilePath);
-        log.info("Test Run delay on exit period:  {}\n", formatDuration(exitDelayDuration));
+        log.info("Test Run delay on exit period:  {}", formatDuration(exitDelayDuration));
+        log.info("Test run Duration:  {}\n", formatDuration(testRunDuration));
     }
 
     private boolean isInvalidRequiredDurationParam(Duration param) {

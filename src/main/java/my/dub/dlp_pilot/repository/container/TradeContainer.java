@@ -101,7 +101,7 @@ public class TradeContainer {
         if (existingRecord == null) {
             return false;
         }
-        if (DateUtils.currentDateTime().isAfter(existingRecord.getInvalidationDateTime())) {
+        if (DateUtils.currentDateTimeUTC().isAfter(existingRecord.getInvalidationDateTime())) {
             detrimentalRecords.remove(existingRecord);
             return false;
         }

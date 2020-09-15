@@ -657,7 +657,7 @@ public class ApiClient implements InitializingBean {
         }
         checkHuobiStatus(exchangeName, parentNode);
         JsonNode dataNode = parentNode.get(DATA);
-        if (dataNode.isEmpty() || dataNode.isEmpty()) {
+        if (dataNode == null || dataNode.isEmpty()) {
             throw new UnexpectedEndpointResponseException(exchangeName, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
         }
         Set<Ticker> tickers = new HashSet<>();
@@ -744,7 +744,7 @@ public class ApiClient implements InitializingBean {
         } else {
             dateTime = DateUtils.getDateTimeFromEpochMilli(epoch);
         }
-        if (dateTime.isBefore(DateUtils.currentDateTime())) {
+        if (dateTime.isBefore(DateUtils.currentDateTimeUTC())) {
             ticker.setDateTime(dateTime);
         }
     }

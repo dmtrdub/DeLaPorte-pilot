@@ -13,7 +13,6 @@ import static my.dub.dlp_pilot.util.Calculations.pnl;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -192,11 +191,10 @@ public class TradeServiceImpl implements TradeService {
         }
         BigDecimal absPnlShort = pnlShort.abs();
         BigDecimal absPnlLong = pnlLong.abs();
-        return (absPnlShort.compareTo(absPnlLong) > 0
-                && percentageDifference(absPnlShort, absPnlLong).compareTo(parameters.getPostponeDetrimentalExitPnlPercentageDiff())
-                > 0) || (absPnlLong.compareTo(absPnlShort) > 0
-                && percentageDifference(absPnlLong, absPnlShort).compareTo(parameters.getPostponeDetrimentalExitPnlPercentageDiff())
-                > 0);
+        return (absPnlShort.compareTo(absPnlLong) > 0 && percentageDifference(absPnlShort, absPnlLong)
+                .compareTo(parameters.getPostponeDetrimentalExitPnlPercentageDiff()) > 0) || (
+                absPnlLong.compareTo(absPnlShort) > 0 && percentageDifference(absPnlLong, absPnlShort)
+                        .compareTo(parameters.getPostponeDetrimentalExitPnlPercentageDiff()) > 0);
     }
 
     private synchronized void handleClose(Trade trade, Ticker tickerShort, Ticker tickerLong,
@@ -286,8 +284,8 @@ public class TradeServiceImpl implements TradeService {
     private void recordDetrimental(Trade trade) {
         ExchangeName exchangeShort = trade.getPositionShort().getExchange().getName();
         ExchangeName exchangeLong = trade.getPositionLong().getExchange().getName();
-        ZonedDateTime invalidationDateTime = trade.getEndTime()
-                .plus(parameters.getSuspenseAfterDetrimentalTradeDuration().toMillis(), ChronoUnit.MILLIS);
+        ZonedDateTime invalidationDateTime =
+                trade.getEndTime().plus(parameters.getSuspenseAfterDetrimentalTradeDuration());
         String base = trade.getBase();
         String target = trade.getTarget();
         tradeContainer.addDetrimentalRecord(exchangeShort, exchangeLong, base, target, invalidationDateTime);
@@ -305,7 +303,7 @@ public class TradeServiceImpl implements TradeService {
         Position positionLong = trade.getPositionLong();
         positionLong.setClosePrice(priceLong);
 
-        trade.setEndTime(DateUtils.currentDateTime());
+        trade.setEndTime(DateUtils.currentDateTimeUTC());
         trade.setResultType(resultType);
         List<TradeDynamicResultData> resultData = parameters.getEntryAmounts().stream()
                 .map(amount -> createDynamicResultData(trade, positionShort, positionLong, amount))
@@ -328,7 +326,7 @@ public class TradeServiceImpl implements TradeService {
         trade.setFixedExpensesUsd(exchangeShort.getFixedFeesUsd().add(exchangeLong.getFixedFeesUsd()));
         trade.setTestRun(testRunService.getCurrentTestRun());
         trade.setWrittenToFile(false);
-        trade.setStartTime(DateUtils.currentDateTime());
+        trade.setStartTime(DateUtils.currentDateTimeUTC());
         return trade;
     }
 

@@ -2,6 +2,7 @@ package my.dub.dlp_pilot.util;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -25,7 +26,7 @@ public final class DateUtils {
         return ZonedDateTime.ofInstant(Instant.ofEpochSecond(epoch), DEFAULT_ZONE_OFFSET);
     }
 
-    public static ZonedDateTime currentDateTime() {
+    public static ZonedDateTime currentDateTimeUTC() {
         return ZonedDateTime.now(DEFAULT_ZONE_OFFSET);
     }
 
@@ -34,7 +35,12 @@ public final class DateUtils {
         return dateTime.format(formatter);
     }
 
-    public static String formatDateTimeShort(ZonedDateTime dateTime) {
+    public static String formatDateTime(LocalDateTime dateTime) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(FORMAT_PATTERN);
+        return dateTime.format(formatter);
+    }
+
+    public static String formatDateTimeShort(LocalDateTime dateTime) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern(FORMAT_PATTERN_SHORT);
         return dateTime.format(formatter);
     }
@@ -48,21 +54,21 @@ public final class DateUtils {
         if (start == null) {
             return 0;
         }
-        return Duration.between(start, currentDateTime()).toMinutes();
+        return Duration.between(start, currentDateTimeUTC()).toMinutes();
     }
 
     public static long durationSeconds(Temporal start) {
         if (start == null) {
             return 0;
         }
-        return Duration.between(start, currentDateTime()).toSeconds();
+        return Duration.between(start, currentDateTimeUTC()).toSeconds();
     }
 
     public static long durationMillis(Temporal start) {
         if (start == null) {
             return 0;
         }
-        return Duration.between(start, currentDateTime()).toMillis();
+        return Duration.between(start, currentDateTimeUTC()).toMillis();
     }
 
     public static String durationSecondsDetailed(Temporal start, Temporal end) {

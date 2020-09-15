@@ -73,7 +73,7 @@ public class PriceDifferenceServiceImpl implements PriceDifferenceService {
             BigDecimal currentPriceDifference = getCurrentPriceDiffValue(ticker, equivalentTicker);
             BigDecimal currentAverage;
             // update average price difference if interval exceeds
-            if (DateUtils.isDurationLonger(priceDifference.getLastRecordDateTime(), DateUtils.currentDateTime(),
+            if (DateUtils.isDurationLonger(priceDifference.getLastRecordDateTime(), DateUtils.currentDateTimeUTC(),
                                            parameters.getDataCaptureIntervalDuration())) {
                 List<BigDecimal> values = priceDifference.getValues();
                 if (!testRunService.checkInitialDataCapture()) {
@@ -110,7 +110,7 @@ public class PriceDifferenceServiceImpl implements PriceDifferenceService {
         priceDifference.setExchangeName(exchangeName1);
         priceDifference.setExchangeName2(exchangeName2);
         priceDifference.getValues().add(getCurrentPriceDiffValue(ticker, equivalentTicker));
-        priceDifference.setLastRecordDateTime(DateUtils.currentDateTime());
+        priceDifference.setLastRecordDateTime(DateUtils.currentDateTimeUTC());
         return priceDifference;
     }
 

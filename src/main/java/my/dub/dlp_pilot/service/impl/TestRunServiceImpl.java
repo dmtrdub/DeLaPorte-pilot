@@ -3,7 +3,8 @@ package my.dub.dlp_pilot.service.impl;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.time.ZonedDateTime;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.slf4j.Slf4j;
@@ -25,9 +26,9 @@ public class TestRunServiceImpl implements TestRunService {
     private final ParametersHolder parameters;
 
     private TestRun currentTestRun;
-    private ZonedDateTime tradeStopDateTime;
-    private ZonedDateTime testRunEndDateTime;
-    private ZonedDateTime initDataCaptureEndDateTime;
+    private LocalDateTime tradeStopDateTime;
+    private LocalDateTime testRunEndDateTime;
+    private LocalDateTime initDataCaptureEndDateTime;
 
     private final AtomicBoolean tradeStop = new AtomicBoolean();
     private final AtomicBoolean testRunEnd = new AtomicBoolean();
@@ -46,14 +47,15 @@ public class TestRunServiceImpl implements TestRunService {
         String configuration = parameters.getConfiguration()
                 .orElseThrow(() -> new IllegalArgumentException("Empty configuration passed to Test Run!"));
         testRun.setConfigParams(configuration);
-        ZonedDateTime startTime = DateUtils.currentDateTime();
+        LocalDateTime startTime = LocalDateTime.now();
         testRun.setStartTime(startTime);
-        long dataCaptureMillis = parameters.getDataCapturePeriodDuration().toMillis();
-        tradeStopDateTime = startTime.plus(parameters.getTestRunDuration()).plusSeconds(dataCaptureMillis);
+        Duration dataCapturePeriodDuration = parameters.getDataCapturePeriodDuration();
+        tradeStopDateTime = startTime.plus(parameters.getTestRunDuration()).plus(dataCapturePeriodDuration);
         testRun.setEndTime(tradeStopDateTime.plus(parameters.getExitDelayDuration()));
         currentTestRun = repository.save(testRun);
         testRunEndDateTime = currentTestRun.getEndTime();
-        initDataCaptureEndDateTime = startTime.plusSeconds(dataCaptureMillis);
+        initDataCaptureEndDateTime = startTime.plus(dataCapturePeriodDuration);
+        log.info("TEST RUN ENDING AT: {}\n", DateUtils.formatDateTime(testRunEndDateTime));
     }
 
     @Override
@@ -64,7 +66,7 @@ public class TestRunServiceImpl implements TestRunService {
     @Override
     public boolean checkTradeStopped() {
         if (!tradeStop.get()) {
-            tradeStop.set(!DateUtils.currentDateTime().isBefore(tradeStopDateTime));
+            tradeStop.set(!LocalDateTime.now().isBefore(tradeStopDateTime));
         }
         return tradeStop.get();
     }
@@ -72,7 +74,7 @@ public class TestRunServiceImpl implements TestRunService {
     @Override
     public boolean checkTestRunEnd() {
         if (!testRunEnd.get()) {
-            testRunEnd.set(!DateUtils.currentDateTime().isBefore(testRunEndDateTime));
+            testRunEnd.set(!LocalDateTime.now().isBefore(testRunEndDateTime));
         }
         return testRunEnd.get();
     }
@@ -80,7 +82,7 @@ public class TestRunServiceImpl implements TestRunService {
     @Override
     public boolean checkInitialDataCapture() {
         if (initialDataCapture.get()) {
-            initialDataCapture.set(!DateUtils.currentDateTime().isAfter(initDataCaptureEndDateTime));
+            initialDataCapture.set(!LocalDateTime.now().isAfter(initDataCaptureEndDateTime));
         }
         return initialDataCapture.get();
     }
@@ -101,7 +103,7 @@ public class TestRunServiceImpl implements TestRunService {
         try {
             List<String> lines = Files.readAllLines(exitFile.toPath());
             if (lines.stream().anyMatch(line -> line.contains(parameters.getExitCode()))) {
-                tradeStopDateTime = DateUtils.currentDateTime();
+                tradeStopDateTime = LocalDateTime.now();
                 testRunEndDateTime = tradeStopDateTime.plus(parameters.getExitDelayDuration());
                 log.info("Found force exit file {} containing valid exit code! Stopping trades now. "
                                  + "Test Run will end at {}", exitFile.getName(),
