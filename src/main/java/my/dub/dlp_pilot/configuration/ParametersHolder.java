@@ -3,7 +3,6 @@ package my.dub.dlp_pilot.configuration;
 import static my.dub.dlp_pilot.util.DateUtils.formatDuration;
 import static my.dub.dlp_pilot.util.DateUtils.parseDuration;
 
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -19,8 +18,8 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
-import org.springframework.util.ResourceUtils;
 
 @Component
 @Getter
@@ -119,7 +118,7 @@ public class ParametersHolder implements InitializingBean {
     public Optional<String> getConfiguration() {
         Properties prop = new Properties();
         try {
-            prop.load(new FileInputStream(ResourceUtils.getFile("classpath:application.properties")));
+            prop.load(new ClassPathResource("application.properties").getInputStream());
         } catch (IOException e) {
             log.error("Unable to load application.properties file! Details: " + e.getMessage());
             return Optional.empty();
