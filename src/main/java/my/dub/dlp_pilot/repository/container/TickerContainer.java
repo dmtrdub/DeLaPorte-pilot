@@ -100,10 +100,12 @@ public class TickerContainer {
             if (existingTicker != null) {
                 BigDecimal existingPriceAsk = existingTicker.getPriceAsk();
                 BigDecimal existingPriceBid = existingTicker.getPriceBid();
-                BigDecimal existingClosePrice = existingTicker.getClosePrice();
                 if ((existingPriceAsk.compareTo(newTicker.getPriceAsk()) != 0
-                        || existingPriceBid.compareTo(newTicker.getPriceBid()) != 0) && existingClosePrice != null
-                        && existingClosePrice.compareTo(newTicker.getClosePrice()) != 0) {
+                        || existingPriceBid.compareTo(newTicker.getPriceBid()) != 0)) {
+                    BigDecimal existingClosePrice = existingTicker.getClosePrice();
+                    if (existingClosePrice != null && existingClosePrice.compareTo(newTicker.getClosePrice()) == 0) {
+                        return;
+                    }
                     newTicker.setPreviousPriceAsk(existingPriceAsk);
                     newTicker.setPreviousPriceBid(existingPriceBid);
                     tickerSet.remove(existingTicker);

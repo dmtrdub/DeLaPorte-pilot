@@ -5,8 +5,6 @@ import static my.dub.dlp_pilot.Constants.PERCENTAGE_SCALE;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
-import java.util.HashSet;
-import java.util.Set;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.EnumType;
@@ -15,14 +13,11 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
-import javax.persistence.Transient;
 import javax.persistence.UniqueConstraint;
 import javax.validation.constraints.Digits;
 import javax.validation.constraints.Max;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
-
 
 @Data
 @NoArgsConstructor
@@ -57,15 +52,21 @@ public class Exchange implements Serializable {
     @Max(value = 100)
     private BigDecimal takerFeePercentage;
 
+    @Column(name = "bars_per_request", nullable = false, columnDefinition = "default 1")
+    private Integer maxBarsPerRequest;
+
     @Column(name = "trust_score", nullable = false, columnDefinition = "default 1")
     private Integer trustScore;
 
     @Column(name = "api_request_rate_min", nullable = false, columnDefinition = "default 1")
     private int apiRequestsPerMin;
 
-    @EqualsAndHashCode.Exclude
-    @Transient
-    private transient Set<Ticker> tickers = new HashSet<>();
+    @Column(name = "api_request_rate_min_preload", nullable = false, columnDefinition = "default 1")
+    private int apiRequestsPerMinPreload;
+
+    // if true - bars are loaded from oldest to newest in selected range
+    @Column(name = "asc_preload", nullable = false, columnDefinition = "default 1")
+    private Boolean ascendingPreload;
 
     public String getFullName() {
         return name.getFullName();

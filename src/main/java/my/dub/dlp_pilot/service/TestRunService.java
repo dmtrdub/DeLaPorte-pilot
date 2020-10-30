@@ -1,18 +1,30 @@
 package my.dub.dlp_pilot.service;
 
+import my.dub.dlp_pilot.model.Exchange;
+import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.TestRun;
 
 public interface TestRunService {
 
-    void createAndSave();
+    void init();
+
+    boolean runPreload(Exchange exchange);
+
+    void onPreloadComplete(ExchangeName exchangeName);
+
+    boolean runRefreshLoad(ExchangeName exchange);
+
+    void onRefreshLoadComplete(ExchangeName exchangeName);
+
+    void runTest(ExchangeName exchangeName);
+
+    void prepareRunTest();
+
+    void onExit();
 
     TestRun getCurrentTestRun();
 
-    boolean checkTradeStopped();
-
     boolean checkTestRunEnd();
-
-    boolean checkInitialDataCapture();
 
     void checkExitFile();
 }

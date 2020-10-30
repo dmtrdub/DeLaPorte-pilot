@@ -1,13 +1,9 @@
 package my.dub.dlp_pilot.service.client;
 
+import static my.dub.dlp_pilot.util.ApiClientUtils.executeRequest;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.api.client.http.GenericUrl;
-import com.google.api.client.http.HttpRequest;
-import com.google.api.client.http.HttpRequestFactory;
-import com.google.api.client.http.HttpResponse;
-import com.google.api.client.http.HttpTransport;
-import com.google.api.client.http.javanet.NetHttpTransport;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
@@ -15,28 +11,29 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.Constants;
-import my.dub.dlp_pilot.exception.rest.UnexpectedEndpointResponseException;
-import my.dub.dlp_pilot.exception.rest.UnexpectedResponseStatusCodeException;
+import my.dub.dlp_pilot.exception.client.UnexpectedEndpointResponseException;
+import my.dub.dlp_pilot.exception.client.UnexpectedResponseStatusCodeException;
 import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.Ticker;
 import my.dub.dlp_pilot.service.ExchangeService;
 import my.dub.dlp_pilot.util.DateUtils;
-import org.springframework.beans.factory.InitializingBean;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
+/**
+ * @deprecated use implementations of {@link my.dub.dlp_pilot.service.ExchangeClientService}
+ */
 @Slf4j
 @Component
-public class ApiClient implements InitializingBean {
+@Deprecated(forRemoval = true)
+public class ApiClient {
 
     private static final String NO_TICKERS_FOUND_IN_RESPONSE_MSG = "No tickers found in response!";
     private static final String NO_SYMBOL_DATA_FOUND_IN_RESPONSE_MSG = "No symbol data found in response!";
@@ -53,8 +50,6 @@ public class ApiClient implements InitializingBean {
     private static final String ERROR = "error";
     private static final String TICKER = "ticker";
 
-    private HttpRequestFactory requestFactory;
-
     private final Map<ExchangeName, Map<String, String>> symbolAdditionalData = new ConcurrentHashMap<>();
 
     private final ExchangeService exchangeService;
@@ -63,51 +58,8 @@ public class ApiClient implements InitializingBean {
         this.exchangeService = exchangeService;
     }
 
-    @Override
-    public void afterPropertiesSet() {
-        HttpTransport transport = new NetHttpTransport();
-        requestFactory = transport.createRequestFactory();
-    }
-
     public void initConnection(Set<Exchange> exchanges) {
-        pingAll(exchanges);
         fetchAllAdditionalSymbolData(exchanges);
-    }
-
-    private void pingAll(Set<Exchange> exchanges) {
-        exchanges.forEach(exchange -> {
-            try {
-                ping(exchange);
-            } catch (IOException e) {
-                log.error("Unable test connection with Exchange: {}! Caused by: {}", exchange.getFullName(),
-                          e.getMessage());
-            }
-        });
-    }
-
-    private void ping(Exchange exchange) throws IOException {
-        String baseEndpoint = exchange.getBaseEndpoint();
-        String pingUrl;
-        ExchangeName exchangeName = exchange.getName();
-        String fullName = exchangeName.getFullName();
-        switch (exchangeName) {
-            case BITFINEX:
-                pingUrl = baseEndpoint + "platform/status";
-                break;
-            case BITBAY:
-            case BITMAX:
-            case EXMO:
-            case GATE:
-            case HUOBI:
-                log.warn("Exchange: {} does not have a dedicated endpoint to check connection!", fullName);
-                return;
-            default:
-                pingUrl = baseEndpoint + "ping";
-        }
-
-        HttpRequest req = requestFactory.buildGetRequest(new GenericUrl(pingUrl));
-        int responseCode = req.execute().getStatusCode();
-        log.info("Checked connection with Exchange: {}. Status code: {}", fullName, responseCode);
     }
 
     private void fetchAllAdditionalSymbolData(Set<Exchange> exchanges) {
@@ -122,15 +74,8 @@ public class ApiClient implements InitializingBean {
     }
 
     private void fetchAdditionalSymbolData(Exchange exchange) throws IOException {
-        switch (exchange.getName()) {
-            case BINANCE:
-                fetchBinanceAdditionalSymbolData(exchange);
-                break;
-            case HUOBI:
-                fetchHuobiAdditionalSymbolData(exchange);
-                break;
-            default:
-                break;
+        if (exchange.getName() == ExchangeName.HUOBI) {
+            fetchHuobiAdditionalSymbolData(exchange);
         }
         if (!CollectionUtils.isEmpty(symbolAdditionalData.get(exchange.getName()))) {
             log.debug("Successfully fetched additional symbol data for {} exchange", exchange.getFullName());
@@ -142,12 +87,6 @@ public class ApiClient implements InitializingBean {
         ExchangeName exchangeName = exchange.getName();
         try {
             switch (exchangeName) {
-                case BIGONE:
-                    result = fetchBigONETickers(exchange);
-                    break;
-                case BINANCE:
-                    result = fetchBinanceTickers(exchange);
-                    break;
                 case BITBAY:
                     result = fetchBitBayTickers(exchange);
                     break;
@@ -173,8 +112,7 @@ public class ApiClient implements InitializingBean {
                     result = fetchHuobiTickers(exchange);
                     break;
             }
-            log.trace("Successfully fetched {} tickers from {} exchange", result.size(), exchange.getFullName());
-            exchangeService.updateExchangeFault(exchangeName, false);
+
         } catch (UnexpectedEndpointResponseException | UnexpectedResponseStatusCodeException e) {
             log.error(e.getMessage());
             exchangeService.updateExchangeFault(exchangeName, true);
@@ -186,40 +124,9 @@ public class ApiClient implements InitializingBean {
         return result;
     }
 
-    private void fetchBinanceAdditionalSymbolData(Exchange exchange) throws IOException {
-        Map<String, String> data = fetchBinanceSymbols(exchange);
-        symbolAdditionalData.put(ExchangeName.BINANCE, data);
-    }
-
     private void fetchHuobiAdditionalSymbolData(Exchange exchange) throws IOException {
         Map<String, String> data = fetchHuobiSymbols(exchange);
         symbolAdditionalData.put(ExchangeName.HUOBI, data);
-    }
-
-    private Map<String, String> fetchBinanceSymbols(Exchange binanceExchange) throws IOException {
-        String exchangeName = binanceExchange.getFullName();
-        String resp = executeRequest(binanceExchange.getBaseEndpoint(), "exchangeInfo", exchangeName);
-
-        ObjectMapper objectMapper = new ObjectMapper();
-        JsonNode parentNode = objectMapper.readTree(resp);
-        JsonNode symbolsNode = parentNode.get("symbols");
-        if (symbolsNode == null || symbolsNode.isEmpty()) {
-            throw new UnexpectedEndpointResponseException(exchangeName, NO_SYMBOL_DATA_FOUND_IN_RESPONSE_MSG);
-        }
-        Map<String, String> result = new HashMap<>();
-        for (JsonNode innerNode : symbolsNode) {
-            String pair = innerNode.get(SYMBOL).asText();
-            String status = innerNode.get(STATUS).asText();
-            if (List.of("HALT", "BREAK").contains(status)) {
-                log.trace("Symbol {} on {} exchange has unacceptable status {}. Skipping symbol info...", pair,
-                          exchangeName, status);
-                continue;
-            }
-            String base = innerNode.get("baseAsset").asText();
-            String target = innerNode.get("quoteAsset").asText();
-            result.put(pair, base + Constants.DEFAULT_PAIR_DELIMITER + target);
-        }
-        return result;
     }
 
     private Map<String, String> fetchHuobiSymbols(Exchange huobiExchange) throws IOException {
@@ -247,103 +154,6 @@ public class ApiClient implements InitializingBean {
             result.put(pair, base + Constants.DEFAULT_PAIR_DELIMITER + target);
         }
         return result;
-    }
-
-    /**
-     * @param exchange
-     *
-     * @return
-     *
-     * @see <a href="https://open.big.one/docs/spot_tickers.html#ticker">BigONE REST API - Ticker</a>
-     */
-    private Set<Ticker> fetchBigONETickers(Exchange exchange) throws IOException {
-        String exchangeName = exchange.getFullName();
-        String resp = executeRequest(exchange.getBaseEndpoint(), "asset_pairs/tickers", exchangeName);
-        JsonNode parentNode = new ObjectMapper().readTree(resp);
-        JsonNode statusNode = parentNode.get(CODE);
-        String status = statusNode.asText();
-        if (!Objects.equals(status, "0")) {
-            String message = statusNode.get(MESSAGE).asText();
-            throw new UnexpectedEndpointResponseException(exchangeName, status, message);
-        }
-        JsonNode dataNode = parentNode.get(DATA);
-        if (dataNode == null || dataNode.isEmpty()) {
-            throw new UnexpectedEndpointResponseException(exchangeName, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
-        }
-        Set<Ticker> tickers = new HashSet<>();
-        for (JsonNode innerNode : dataNode) {
-            Ticker ticker = new Ticker(ExchangeName.BIGONE);
-            boolean parsePairResult = setSymbols(innerNode.get("asset_pair_name").asText(), "-", ticker);
-            if (!parsePairResult) {
-                continue;
-            }
-            BigDecimal closePrice = parsePrice(innerNode.get(CLOSE), exchangeName);
-            if (closePrice == null) {
-                continue;
-            }
-            ticker.setClosePrice(closePrice);
-            JsonNode askNode = innerNode.get("ask");
-            if (askNode == null || askNode.get("price") == null) {
-                logInvalidPriceData(exchangeName, ticker.getPair(), PRICE_TYPE_ASK);
-                continue;
-            }
-            ticker.setPriceAsk(new BigDecimal(askNode.get("price").asText()));
-            JsonNode bidNode = innerNode.get("bid");
-            if (bidNode == null || bidNode.get("price") == null) {
-                logInvalidPriceData(exchangeName, ticker.getPair(), PRICE_TYPE_BID);
-                continue;
-            }
-            ticker.setPriceBid(new BigDecimal(bidNode.get("price").asText()));
-            tickers.add(ticker);
-        }
-        return tickers;
-    }
-
-    /**
-     * @param exchange
-     *
-     * @see
-     * <a href="https://github.com/binance-exchange/binance-official-api-docs/blob/master/rest-api.md#symbol-order-book-ticker">Binance
-     * REST API - Order Book</a>
-     */
-    private Set<Ticker> fetchBinanceTickers(Exchange exchange) throws IOException {
-        String exchangeName = exchange.getFullName();
-        String resp = executeRequest(exchange.getBaseEndpoint(), "ticker/bookTicker", exchangeName);
-        JsonNode parentNode = new ObjectMapper().readTree(resp);
-        JsonNode statusNode = parentNode.get(CODE);
-
-        if (statusNode != null) {
-            String message = statusNode.get("msg").asText();
-            throw new UnexpectedEndpointResponseException(exchangeName, statusNode.asText(), message);
-        }
-        if (parentNode.isEmpty()) {
-            throw new UnexpectedEndpointResponseException(exchangeName, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
-        }
-        Set<Ticker> tickers = new HashSet<>();
-        for (JsonNode innerNode : parentNode) {
-            Ticker ticker = new Ticker(ExchangeName.BINANCE);
-            String pair = innerNode.get(SYMBOL).asText();
-            String dividedPair = symbolAdditionalData.get(exchange.getName()).get(pair);
-            if (dividedPair == null) {
-                continue;
-            }
-            boolean parsePairResult = setSymbols(dividedPair, ticker);
-            if (!parsePairResult) {
-                continue;
-            }
-            BigDecimal askPrice = parsePrice(innerNode.get("askPrice"), exchangeName);
-            if (askPrice == null) {
-                continue;
-            }
-            ticker.setPriceAsk(askPrice);
-            BigDecimal bidPrice = parsePrice(innerNode.get("bidPrice"), exchangeName);
-            if (bidPrice == null) {
-                continue;
-            }
-            ticker.setPriceBid(bidPrice);
-            tickers.add(ticker);
-        }
-        return tickers;
     }
 
     /**
@@ -686,17 +496,6 @@ public class ApiClient implements InitializingBean {
         }
     }
 
-    private String executeRequest(String baseUrl, String endpointUrl, String exchangeName) throws IOException {
-        String fullUrl = baseUrl + endpointUrl;
-        HttpRequest req = requestFactory.buildGetRequest(new GenericUrl(fullUrl));
-        HttpResponse response = req.execute();
-        int statusCode = response.getStatusCode();
-        if (statusCode != 200) {
-            throw new UnexpectedResponseStatusCodeException(exchangeName, statusCode, fullUrl);
-        }
-        return response.parseAsString();
-    }
-
     private boolean setSymbols(String input, Ticker ticker) {
         return setSymbols(input, Constants.DEFAULT_PAIR_DELIMITER, ticker);
     }
@@ -740,9 +539,9 @@ public class ApiClient implements InitializingBean {
         ZonedDateTime dateTime;
         long epoch = innerNode.get(fieldName).asLong();
         if (ChronoUnit.SECONDS.equals(epochChronoUnit)) {
-            dateTime = DateUtils.getDateTimeFromEpochSecond(epoch);
+            dateTime = DateUtils.dateTimeFromEpochSecond(epoch);
         } else {
-            dateTime = DateUtils.getDateTimeFromEpochMilli(epoch);
+            dateTime = DateUtils.dateTimeFromEpochMilli(epoch);
         }
         if (dateTime.isBefore(DateUtils.currentDateTimeUTC())) {
             ticker.setDateTime(dateTime);

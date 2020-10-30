@@ -2,46 +2,49 @@ package my.dub.dlp_pilot.service;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ScheduledFuture;
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.configuration.ParametersHolder;
 import my.dub.dlp_pilot.exception.TestRunEndException;
 import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.ExchangeName;
-import my.dub.dlp_pilot.service.client.ApiClient;
 import my.dub.dlp_pilot.service.impl.FileResultServiceImpl;
+import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Scope;
 import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
-import org.springframework.stereotype.Component;
-import org.springframework.util.CollectionUtils;
+import org.springframework.scheduling.support.TaskUtils;
+import org.springframework.stereotype.Service;
 
 @Slf4j
-@Component
+@Service
 @Scope(proxyMode = ScopedProxyMode.TARGET_CLASS)
 public class ScheduledService implements InitializingBean {
 
     private final ExchangeService exchangeService;
-    private final TickerService tickerService;
     private final TradeService tradeService;
-    private final PriceDifferenceService priceDifferenceService;
-    private final ApiClient apiClient;
     private final TestRunService testRunService;
     private final FileResultServiceImpl fileResultService;
-
     private final ParametersHolder parameters;
 
+    private final Map<ExchangeName, ScheduledFuture<?>> taskSchedulerLoadFutures = new ConcurrentHashMap<>();
+    private final Map<ExchangeName, LocalDateTime> loadStartDateTimes = new ConcurrentHashMap<>();
+    private final ThreadPoolTaskScheduler loadTaskScheduler = new ThreadPoolTaskScheduler();
+
+    private CountDownLatch countDownLatch;
+
     @Autowired
-    public ScheduledService(ExchangeService exchangeService, TickerService tickerService, TradeService tradeService,
-            PriceDifferenceService priceDifferenceService, ApiClient apiClient, TestRunService testRunService,
+    public ScheduledService(ExchangeService exchangeService, TradeService tradeService, TestRunService testRunService,
             FileResultServiceImpl fileResultService, ParametersHolder parameters) {
         this.exchangeService = exchangeService;
-        this.tickerService = tickerService;
         this.tradeService = tradeService;
-        this.priceDifferenceService = priceDifferenceService;
-        this.apiClient = apiClient;
         this.testRunService = testRunService;
         this.fileResultService = fileResultService;
         this.parameters = parameters;
@@ -49,56 +52,138 @@ public class ScheduledService implements InitializingBean {
 
     @Override
     public void afterPropertiesSet() {
-        start();
+        init();
+        startPreload();
+        startTest();
     }
 
-    private void start() {
-        testRunService.createAndSave();
-        fileResultService.init();
-        Set<Exchange> exchanges = exchangeService.loadAll();
-        if (CollectionUtils.isEmpty(exchanges)) {
+    private void init() {
+        Set<Exchange> exchanges = exchangeService.findAll();
+        if (exchanges == null || exchanges.size() < 2) {
             throw new IllegalArgumentException("There are no exchanges to work with!");
         }
-        apiClient.initConnection(exchanges);
+        testRunService.init();
+    }
+
+    private void startPreload() {
+        log.info("Starting Preload!");
+        Set<Exchange> exchanges = exchangeService.findAll();
+        int exchangesCount = exchanges.size();
+        loadTaskScheduler.setPoolSize(exchangesCount);
+        loadTaskScheduler.setThreadNamePrefix("load-");
+        loadTaskScheduler.setErrorHandler(t -> {
+            log.error("Unexpected error occurred in scheduled task.", t);
+            log.warn("De La Porte is exiting prematurely!");
+            shutdownNow(loadTaskScheduler);
+            System.exit(-1);
+        });
+        loadTaskScheduler.initialize();
+        countDownLatch = new CountDownLatch(exchangesCount);
+        exchanges.forEach(exchange -> {
+            int opIntervalMillis = calculatePreloadFixedDelayInMillis(exchange);
+            log.info("Preload Operation interval set to {} ms for {} exchange", opIntervalMillis,
+                     exchange.getFullName());
+            taskSchedulerLoadFutures.put(exchange.getName(), loadTaskScheduler
+                    .scheduleWithFixedDelay(runPreloadTask(exchange), Duration.ofMillis(opIntervalMillis)));
+            loadStartDateTimes.put(exchange.getName(), LocalDateTime.now());
+        });
+        try {
+            countDownLatch.await();
+            log.info("Preload completed!");
+        } catch (InterruptedException e) {
+            log.error("Main thread has been interrupted before completing the preload!");
+            log.warn("De La Porte is exiting prematurely!");
+            Thread.currentThread().interrupt();
+            shutdownNow(loadTaskScheduler);
+            System.exit(-1);
+        }
+        loadTaskScheduler.setErrorHandler(TaskUtils.LOG_AND_SUPPRESS_ERROR_HANDLER);
+    }
+
+    private Runnable runPreloadTask(Exchange exchange) {
+        return () -> {
+            boolean finished = testRunService.runPreload(exchange);
+            if (finished) {
+                countDownLatch.countDown();
+                ExchangeName name = exchange.getName();
+                taskSchedulerLoadFutures.remove(name).cancel(true);
+                log.info("{} has finished preload task", name);
+                testRunService.onPreloadComplete(name);
+                setNextLoadTask(exchange);
+            }
+        };
+    }
+
+    private Runnable runRefreshLoadTask(Exchange exchange) {
+        return () -> {
+            ExchangeName exchangeName = exchange.getName();
+            loadStartDateTimes.putIfAbsent(exchangeName, LocalDateTime.now());
+            boolean finished = testRunService.runRefreshLoad(exchangeName);
+            if (finished) {
+                taskSchedulerLoadFutures.remove(exchangeName).cancel(true);
+                testRunService.onRefreshLoadComplete(exchangeName);
+                setNextLoadTask(exchange);
+            }
+        };
+    }
+
+    private void setNextLoadTask(Exchange exchange) {
+        int opIntervalMillis = calculateRefreshLoadFixedDelayInMillis(exchange);
+        ExchangeName exchangeName = exchange.getName();
+        Instant taskStartTime = DateUtils.toInstant(
+                loadStartDateTimes.get(exchangeName).plus(parameters.getDataCaptureTimeFrame().getDuration()));
+        taskSchedulerLoadFutures.put(exchangeName, loadTaskScheduler
+                .scheduleWithFixedDelay(runRefreshLoadTask(exchange), taskStartTime,
+                                        Duration.ofMillis(opIntervalMillis)));
+        loadStartDateTimes.remove(exchangeName);
+    }
+
+    private void startTest() {
+        testRunService.prepareRunTest();
+        fileResultService.init();
+        log.info("Starting Test Run!");
+        Set<Exchange> exchanges = exchangeService.findAll();
         int exchangesCount = exchanges.size();
         ThreadPoolTaskScheduler taskScheduler = new ThreadPoolTaskScheduler();
         taskScheduler.setPoolSize(exchangesCount + 2);
-        taskScheduler.setThreadNamePrefix("exchange-");
+        taskScheduler.setThreadNamePrefix("test_run-");
         taskScheduler.setErrorHandler(t -> {
             if (t instanceof TestRunEndException) {
                 if (tradeService.isAllTradesClosed()) {
+                    testRunService.onExit();
                     log.info("De La Porte is exiting...");
-                    taskScheduler.getScheduledExecutor().shutdownNow();
-                    taskScheduler.getScheduledThreadPoolExecutor().shutdownNow();
+                    shutdownNow(taskScheduler);
+                    shutdownNow(loadTaskScheduler);
                 }
             } else {
                 log.error("Unexpected error occurred in scheduled task", t);
             }
         });
         taskScheduler.initialize();
-        long initDelayMillis = parameters.getInitDelayDuration().toMillis();
         exchanges.forEach(exchange -> {
-            int opIntervalMillis = calculateFixedDelayInMillis(exchange);
+            int opIntervalMillis = calculateTestRunFixedDelayInMillis(exchange);
             log.info("Fixed Operation interval set to {} ms for {} exchange", opIntervalMillis, exchange.getFullName());
-            taskScheduler.scheduleWithFixedDelay(() -> run(exchange), Instant.now().plusMillis(
-                    initDelayMillis), Duration.ofMillis(opIntervalMillis));
+            taskScheduler.scheduleWithFixedDelay(() -> testRunService.runTest(exchange.getName()),
+                                                 Duration.ofMillis(opIntervalMillis));
         });
-        taskScheduler.scheduleWithFixedDelay(fileResultService::write,
-                                             Instant.now().plusMillis(initDelayMillis* 2),
-                                             Duration.ofSeconds(30));
-        taskScheduler.scheduleWithFixedDelay(testRunService::checkExitFile,
-                                             Instant.now().plusMillis(initDelayMillis * 4),
-                                             Duration.ofSeconds(60));
+        taskScheduler.scheduleWithFixedDelay(fileResultService::write, Duration.ofSeconds(30));
+        taskScheduler.scheduleWithFixedDelay(testRunService::checkExitFile, Duration.ofSeconds(60));
     }
 
-    private void run(Exchange exchange) {
-        tickerService.fetchAndSave(exchange);
-        ExchangeName exchangeName = exchange.getName();
-        priceDifferenceService.handlePriceDifference(exchangeName);
-        tradeService.handleTrades(exchangeName);
+    private void shutdownNow(ThreadPoolTaskScheduler taskScheduler) {
+        taskScheduler.getScheduledExecutor().shutdownNow();
+        taskScheduler.getScheduledThreadPoolExecutor().shutdownNow();
     }
 
-    private int calculateFixedDelayInMillis(Exchange exchange) {
+    private int calculateTestRunFixedDelayInMillis(Exchange exchange) {
         return 60000 / exchange.getApiRequestsPerMin();
+    }
+
+    private int calculatePreloadFixedDelayInMillis(Exchange exchange) {
+        return 60000 / exchange.getApiRequestsPerMinPreload();
+    }
+
+    private int calculateRefreshLoadFixedDelayInMillis(Exchange exchange) {
+        return 60000 / (exchange.getApiRequestsPerMinPreload() - exchange.getApiRequestsPerMin());
     }
 }

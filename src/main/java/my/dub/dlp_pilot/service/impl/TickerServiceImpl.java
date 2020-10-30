@@ -2,54 +2,35 @@ package my.dub.dlp_pilot.service.impl;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import java.util.Collection;
+import java.time.Duration;
 import java.util.Optional;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
-import my.dub.dlp_pilot.configuration.ParametersHolder;
-import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.Ticker;
 import my.dub.dlp_pilot.repository.container.TickerContainer;
-import my.dub.dlp_pilot.service.TestRunService;
 import my.dub.dlp_pilot.service.TickerService;
-import my.dub.dlp_pilot.service.client.ApiClient;
+import my.dub.dlp_pilot.service.client.ClientService;
 import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.util.CollectionUtils;
 
 @Slf4j
 @Service
 public class TickerServiceImpl implements TickerService {
 
     private final TickerContainer tickerContainer;
-    private final ApiClient apiClient;
-    private final TestRunService testRunService;
-    private final ParametersHolder parameters;
+    private final ClientService clientService;
 
     @Autowired
-    public TickerServiceImpl(TickerContainer tickerContainer, ApiClient apiClient, TestRunService testRunService,
-            ParametersHolder parameters) {
+    public TickerServiceImpl(TickerContainer tickerContainer, ClientService clientService) {
         this.tickerContainer = tickerContainer;
-        this.apiClient = apiClient;
-        this.testRunService = testRunService;
-        this.parameters = parameters;
+        this.clientService = clientService;
     }
 
     @Override
-    public void fetchAndSave(Exchange exchange) {
-        if (testRunService.checkTestRunEnd()) {
-            return;
-        }
-        save(exchange.getName(), apiClient.fetchTickers(exchange));
-    }
-
-    @Override
-    public void save(ExchangeName exchangeName, Collection<Ticker> tickers) {
-        if (CollectionUtils.isEmpty(tickers)) {
-            return;
-        }
+    public void fetchAndSave(ExchangeName exchangeName) {
+        Set<Ticker> tickers = clientService.fetchTickers(exchangeName);
         tickerContainer.addTickers(exchangeName, tickers);
     }
 
@@ -72,6 +53,7 @@ public class TickerServiceImpl implements TickerService {
     public Optional<Ticker> findValidEquivalentTickerFromSet(Ticker originalTicker, Set<Ticker> tickerSet) {
         checkNotNull(originalTicker, "Ticker that has to be compared cannot be null!");
         if (originalTicker.isPriceInvalid()) {
+            log.error("Invalid price found in {}!", originalTicker.toString());
             return Optional.empty();
         }
         return tickerSet.stream()
@@ -80,16 +62,15 @@ public class TickerServiceImpl implements TickerService {
     }
 
     @Override
-    public boolean checkStale(Ticker ticker1, Ticker ticker2) {
+    public boolean checkStale(Ticker ticker1, Ticker ticker2, Duration staleIntervalDuration) {
         checkNotNull(ticker1, "Ticker1 that has to be checked as stale cannot be null!");
         checkNotNull(ticker2, "Ticker2 that has to be checked as stale cannot be null!");
 
-        return checkTickerStale(ticker1) && checkTickerStale(ticker2);
+        return checkTickerStale(ticker1, staleIntervalDuration) && checkTickerStale(ticker2, staleIntervalDuration);
     }
 
-    private boolean checkTickerStale(Ticker ticker) {
-        if (!ticker.isStale() && DateUtils.durationMillis(ticker.getDateTime()) >= parameters.getStaleIntervalDuration()
-                .toMillis()) {
+    private boolean checkTickerStale(Ticker ticker, Duration staleIntervalDuration) {
+        if (!ticker.isStale() && DateUtils.durationMillis(ticker.getDateTime()) >= staleIntervalDuration.toMillis()) {
             ticker.setStale(true);
         }
         return ticker.isStale();

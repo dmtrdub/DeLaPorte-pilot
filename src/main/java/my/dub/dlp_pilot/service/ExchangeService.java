@@ -9,7 +9,7 @@ import my.dub.dlp_pilot.model.ExchangeName;
 public interface ExchangeService {
     long countAll();
 
-    Set<Exchange> loadAll();
+    Set<Exchange> findAll();
 
     Optional<Exchange> findById(Long id);
 

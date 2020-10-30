@@ -61,7 +61,8 @@ public class FileResultServiceImpl implements FileResultService {
 
     @Override
     public void write() {
-        Set<Trade> completedTrades = tradeService.getCompletedTradesNotWrittenToFile();
+        Set<Trade> completedTrades =
+                tradeService.getCompletedTradesNotWrittenToFile(testRunService.getCurrentTestRun());
         if (CollectionUtils.isEmpty(completedTrades)) {
             if (testRunService.checkTestRunEnd()) {
                 checkState(tradeService.isAllTradesClosed(), "Cannot exit test run if some trades are still opened!");
@@ -83,8 +84,7 @@ public class FileResultServiceImpl implements FileResultService {
     private void initFile() {
         TestRun currentTestRun = testRunService.getCurrentTestRun();
         String fileName = "test-run#" + currentTestRun.getId() + "_" + DateUtils
-                .formatDateTimeShort(currentTestRun.getStartTime()) + "_" + DateUtils
-                .formatDateTimeShort(currentTestRun.getEndTime()) + ".csv";
+                .formatDateTimeShort(currentTestRun.getStartTime()) + ".csv";
         String resultDir = parameters.getPathToResultDir();
         Files.createDirectories(Path.of(resultDir));
         Path fullFilePath = Path.of(resultDir, fileName);

@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.Constants;
+import my.dub.dlp_pilot.model.TimeFrame;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.InitializingBean;
@@ -32,8 +33,8 @@ public class ParametersHolder implements InitializingBean {
     private String staleInterval;
     @Value("${price_data_capture_period_duration}")
     private String dataCapturePeriod;
-    @Value("${price_data_capture_interval_duration}")
-    private String dataCaptureInterval;
+    @Value("${price_data_capture_timeFrame}")
+    private String dataCaptureTimeFrameParam;
 
     @Value("${trade_entry_profit_percentage}")
     private double entryProfitPercentageDouble;
@@ -60,8 +61,6 @@ public class ParametersHolder implements InitializingBean {
     @Value("${trade_suspense_after_detrimental_duration}")
     private String suspenseAfterDetrimentalTradeDurationParam;
 
-    @Value("${test_run_init_delay}")
-    private String initDelay;
     @Value("${test_run_duration}")
     private String testRunDurationParam;
     @Value("${test_run_result_csv_dir_path}")
@@ -72,17 +71,18 @@ public class ParametersHolder implements InitializingBean {
     private String exitCode;
     @Value("${test_run_exit_delay_duration}")
     private String exitDelay;
+    @Value("${test_run_delete_bars_on_exit}")
+    private boolean deleteBarsOnExit;
 
-    private Duration initDelayDuration;
     private Duration staleIntervalDuration;
     private Duration dataCapturePeriodDuration;
-    private Duration dataCaptureIntervalDuration;
     private Duration profitPercentageDecreaseAfterDuration;
     private Duration tradeTimeoutDuration;
     private Duration suspenseAfterDetrimentalTradeDuration;
     private Duration testRunDuration;
     private Duration exitDelayDuration;
 
+    private TimeFrame dataCaptureTimeFrame;
     private long profitPercentageDecreaseAfterDurationMillis;
     private BigDecimal entryProfitPercentage;
     private BigDecimal entryMinPercentageDiff;
@@ -135,7 +135,6 @@ public class ParametersHolder implements InitializingBean {
     }
 
     private void setDefaultValues() {
-        initDelayDuration = getDefaultDuration(initDelayDuration);
         profitPercentageDecreaseAfterDuration = getDefaultDuration(profitPercentageDecreaseAfterDuration);
         profitPercentageDecreaseAfterDurationMillis = profitPercentageDecreaseAfterDuration.toMillis();
         tradeTimeoutDuration = getDefaultDuration(tradeTimeoutDuration);
@@ -160,10 +159,9 @@ public class ParametersHolder implements InitializingBean {
     }
 
     private void parseDurationParams() {
-        initDelayDuration = parseDuration(initDelay);
         staleIntervalDuration = parseDuration(staleInterval);
         dataCapturePeriodDuration = parseDuration(dataCapturePeriod);
-        dataCaptureIntervalDuration = parseDuration(dataCaptureInterval);
+        dataCaptureTimeFrame = TimeFrame.parse(dataCaptureTimeFrameParam);
         profitPercentageDecreaseAfterDuration = parseDuration(profitPercentageDecreaseAfter);
         tradeTimeoutDuration = parseDuration(tradeTimeout);
         suspenseAfterDetrimentalTradeDuration = parseDuration(suspenseAfterDetrimentalTradeDurationParam);
@@ -178,8 +176,13 @@ public class ParametersHolder implements InitializingBean {
         if (isInvalidRequiredDurationParam(dataCapturePeriodDuration)) {
             throw new IllegalArgumentException("Price data capture period should be > 0!");
         }
-        if (isInvalidRequiredDurationParam(dataCaptureIntervalDuration)) {
-            throw new IllegalArgumentException("Price data capture interval should be > 0!");
+        if (dataCaptureTimeFrame == null) {
+            throw new IllegalArgumentException(
+                    String.format("Price data capture TimeFrame cannot be parsed! Valid values are: %s",
+                                  Arrays.stream(TimeFrame.values()).map(Enum::name).collect(Collectors.joining(", "))));
+        }
+        if (dataCapturePeriodDuration.compareTo(dataCaptureTimeFrame.getDuration()) < 0) {
+            throw new IllegalArgumentException("Price data capture period should be > Price data capture TimeFrame!");
         }
         if (entryProfitPercentageDouble < 0.0d) {
             throw new IllegalArgumentException("Trade entry profit percentage cannot be < 0!");
@@ -230,7 +233,7 @@ public class ParametersHolder implements InitializingBean {
 
         log.info("Price data stale interval:  {}", formatDuration(staleIntervalDuration));
         log.info("Price data capture period:  {}", formatDuration(dataCapturePeriodDuration));
-        log.info("Price data capture interval:  {}", formatDuration(dataCaptureIntervalDuration));
+        log.info("Price data capture timeFrame:  {}", dataCaptureTimeFrame);
         log.info("----------------------------------------");
         log.info("Trade entry amounts (USD):  {}",
                  entryAmounts.stream().map(String::valueOf).collect(Collectors.joining(", ")));
@@ -257,12 +260,12 @@ public class ParametersHolder implements InitializingBean {
                 ? DISABLED_MESSAGE
                 : formatDuration(suspenseAfterDetrimentalTradeDuration));
         log.info("----------------------------------------");
-        log.info("Test Run initial delay period:  {}", formatDuration(initDelayDuration));
         log.info("Test Run result file (.csv) path:  {}", pathToResultDir);
         log.info("Test Run force exit code:  {}", exitCode);
         log.info("Test Run force exit file path:  {}", forcedExitFilePath);
         log.info("Test Run delay on exit period:  {}", formatDuration(exitDelayDuration));
-        log.info("Test run Duration:  {}\n", formatDuration(testRunDuration));
+        log.info("Test Run delete bars on exit: {}", deleteBarsOnExit);
+        log.info("Test Run Duration:  {}\n", formatDuration(testRunDuration));
     }
 
     private boolean isInvalidRequiredDurationParam(Duration param) {

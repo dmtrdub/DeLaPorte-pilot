@@ -20,13 +20,16 @@ public class Ticker extends PriceData {
 
     private BigDecimal priceAsk;
 
-    // close price recorded for stale check (not required field)
+    // if empty - replaced by priceBid
     private BigDecimal closePrice;
+
+    private BigDecimal askQuantity;
+
+    private BigDecimal bidQuantity;
 
     @EqualsAndHashCode.Exclude
     private boolean stale;
 
-    //TODO: possibly remove previous price
     @EqualsAndHashCode.Exclude
     private BigDecimal previousPriceAsk;
 
@@ -43,6 +46,10 @@ public class Ticker extends PriceData {
             return priceAsk;
         }
         return BigDecimal.ZERO;
+    }
+
+    public BigDecimal getTotalQuantity() {
+        return askQuantity.add(bidQuantity);
     }
 
     public BigDecimal getSpread() {

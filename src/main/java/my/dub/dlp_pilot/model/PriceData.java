@@ -1,9 +1,14 @@
 package my.dub.dlp_pilot.model;
 
+import javax.persistence.Column;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
+import javax.persistence.MappedSuperclass;
 import lombok.Data;
 import my.dub.dlp_pilot.Constants;
 
 @Data
+@MappedSuperclass
 public abstract class PriceData {
 
     public PriceData() {
@@ -13,11 +18,23 @@ public abstract class PriceData {
         this.exchangeName = exchangeName;
     }
 
-    private ExchangeName exchangeName;
+    public PriceData(ExchangeName exchangeName, String base, String target) {
+        this.exchangeName = exchangeName;
+        this.base = base;
+        this.target = target;
+    }
 
-    private String base;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "exchange_name", unique = true, nullable = false, length = 200)
+    protected ExchangeName exchangeName;
 
-    private String target;
+    // parsed
+    @Column(nullable = false, length = 16)
+    protected String base;
+
+    // parsed
+    @Column(nullable = false, length = 16)
+    protected String target;
 
     public String getPair() {
         return base + Constants.DEFAULT_PAIR_DELIMITER + target;

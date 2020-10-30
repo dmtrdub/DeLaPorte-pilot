@@ -1,9 +1,9 @@
 package my.dub.dlp_pilot.model;
 
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
+import static my.dub.dlp_pilot.Constants.PRICE_SCALE;
 
+import java.io.Serializable;
+import java.math.BigDecimal;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.EnumType;
@@ -15,10 +15,9 @@ import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 import javax.validation.constraints.Digits;
-import java.io.Serializable;
-import java.math.BigDecimal;
-
-import static my.dub.dlp_pilot.Constants.PRICE_SCALE;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
@@ -49,7 +48,9 @@ public class Position implements Serializable {
     private Exchange exchange;
 
     public String toShortString() {
-        String closePrices = closePrice != null ? ", closePrice=" + closePrice : "";
-        return "Position{openPrice=" + openPrice + closePrices + ", exchange=" + exchange.getFullName() + '}';
+        String closePriceStr =
+                closePrice != null ? ", closePrice=" + closePrice.stripTrailingZeros().toPlainString() : "";
+        return "Position{openPrice=" + openPrice.stripTrailingZeros().toPlainString() + closePriceStr + ", exchange="
+                + exchange.getFullName() + '}';
     }
 }

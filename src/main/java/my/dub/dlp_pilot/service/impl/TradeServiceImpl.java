@@ -1,5 +1,6 @@
 package my.dub.dlp_pilot.service.impl;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static my.dub.dlp_pilot.util.Calculations.average;
 import static my.dub.dlp_pilot.util.Calculations.income;
@@ -24,7 +25,7 @@ import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.Position;
 import my.dub.dlp_pilot.model.PositionSide;
-import my.dub.dlp_pilot.model.PriceDifference;
+import my.dub.dlp_pilot.model.TestRun;
 import my.dub.dlp_pilot.model.Ticker;
 import my.dub.dlp_pilot.model.Trade;
 import my.dub.dlp_pilot.model.TradeDynamicResultData;
@@ -32,13 +33,13 @@ import my.dub.dlp_pilot.model.TradeResultType;
 import my.dub.dlp_pilot.repository.TradeRepository;
 import my.dub.dlp_pilot.repository.container.TradeContainer;
 import my.dub.dlp_pilot.service.ExchangeService;
-import my.dub.dlp_pilot.service.TestRunService;
 import my.dub.dlp_pilot.service.TickerService;
 import my.dub.dlp_pilot.service.TradeService;
 import my.dub.dlp_pilot.util.DateUtils;
 import org.hibernate.exception.LockAcquisitionException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.util.Pair;
+import org.springframework.lang.NonNull;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,21 +54,20 @@ public class TradeServiceImpl implements TradeService {
     private final TickerService tickerService;
     private final ExchangeService exchangeService;
     private final ParametersHolder parameters;
-    private final TestRunService testRunService;
 
     @Autowired
     public TradeServiceImpl(TradeRepository repository, TradeContainer tradeContainer, TickerService tickerService,
-            ExchangeService exchangeService, ParametersHolder parameters, TestRunService testRunService) {
+            ExchangeService exchangeService, ParametersHolder parameters) {
         this.repository = repository;
         this.tradeContainer = tradeContainer;
         this.tickerService = tickerService;
         this.exchangeService = exchangeService;
         this.parameters = parameters;
-        this.testRunService = testRunService;
     }
 
     @Override
-    public void checkTradeOpen(PriceDifference priceDifference, Ticker tickerShort, Ticker tickerLong) {
+    public void checkTradeOpen(Ticker tickerShort, Ticker tickerLong, BigDecimal averagePriceDifference,
+            TestRun testRun) {
         checkState(tickerShort.getPriceBid().compareTo(tickerLong.getPriceAsk()) > 0,
                    "BID price of SHORT ticker should be greater than ASK price of LONG ticker!");
 
@@ -81,26 +81,25 @@ public class TradeServiceImpl implements TradeService {
                 || currentPercentageDiff.compareTo(parameters.getEntryMaxPercentageDiff()) > 0) {
             return;
         }
-        if (isOpenDetrimental(tickerShort, tickerLong) || !isOpenProfitable(priceDifference, tickerShort, tickerLong)) {
+        BigDecimal currentPriceDifference = tickerShort.getPriceBid().subtract(tickerLong.getPriceAsk());
+        if (isOpenDetrimental(tickerShort, tickerLong) || !isOpenProfitable(tickerShort, tickerLong,
+                                                                            averagePriceDifference,
+                                                                            currentPriceDifference)) {
             return;
         }
 
-        Trade trade = createTrade(tickerShort, tickerLong, currentPercentageDiff);
+        Trade trade = createTrade(tickerShort, tickerLong, currentPercentageDiff, testRun);
         tradeContainer.addTrade(trade);
         log.info("New {} created and added to container. Current price difference: {}; average price difference: {}",
-                 trade.toShortString(), priceDifference.getCurrentValue().stripTrailingZeros().toPlainString(),
-                 priceDifference.getAvgValue().stripTrailingZeros().toPlainString());
+                 trade.toShortString(), currentPriceDifference.stripTrailingZeros().toPlainString(),
+                 averagePriceDifference.stripTrailingZeros().toPlainString());
     }
 
     @Override
     @Transactional
     @Retryable(LockAcquisitionException.class)
     public void handleTrades(ExchangeName exchangeName) {
-        if (testRunService.checkInitialDataCapture()) {
-            return;
-        }
         Set<Trade> tradesInProgress = tradeContainer.getTrades(exchangeName);
-        boolean isTestRunEnd = testRunService.checkTestRunEnd();
         tradesInProgress.forEach(trade -> {
             Position positionShort = trade.getPositionShort();
             Position positionLong = trade.getPositionLong();
@@ -112,26 +111,22 @@ public class TradeServiceImpl implements TradeService {
                     tickerService.getTicker(positionLong.getExchange().getName(), trade.getBase(), trade.getTarget())
                             .orElseThrow(() -> new MissingEntityException(Ticker.class.getSimpleName(),
                                                                           positionLong.toString()));
-            if (isTestRunEnd) {
-                handleClose(trade, tickerShort, tickerLong, TradeResultType.TEST_RUN_END);
+            Duration tradeTimeoutDuration = parameters.getTradeTimeoutDuration();
+            if (!tradeTimeoutDuration.isZero() && DateUtils.durationMillis(trade.getStartTime()) > tradeTimeoutDuration
+                    .toMillis()) {
+                handleClose(trade, tickerShort, tickerLong, TradeResultType.TIMED_OUT);
             } else {
-                Duration tradeTimeoutDuration = parameters.getTradeTimeoutDuration();
-                if (!tradeTimeoutDuration.isZero()
-                        && DateUtils.durationMillis(trade.getStartTime()) > tradeTimeoutDuration.toMillis()) {
-                    handleClose(trade, tickerShort, tickerLong, TradeResultType.TIMED_OUT);
-                } else {
-                    Pair<BigDecimal, BigDecimal> pnlSides =
-                            calculatePnlForSides(positionShort.getOpenPrice(), tickerShort.getPriceAsk(),
-                                                 positionLong.getOpenPrice(), tickerLong.getPriceBid());
-                    BigDecimal pnlShort = pnlSides.getFirst();
-                    BigDecimal pnlLong = pnlSides.getSecond();
-                    BigDecimal income = calculateCurrentIncome(pnlShort, tickerShort.getExchangeName(), pnlLong,
-                                                               tickerLong.getExchangeName());
-                    if (isExistingSuccessful(income, trade.getStartTime())) {
-                        handleClose(trade, tickerShort, tickerLong, TradeResultType.SUCCESSFUL);
-                    } else if (isExistingDetrimental(income) && !isDetrimentalSyncCondition(pnlShort, pnlLong)) {
-                        handleClose(trade, tickerShort, tickerLong, TradeResultType.DETRIMENTAL);
-                    }
+                Pair<BigDecimal, BigDecimal> pnlSides =
+                        calculatePnlForSides(positionShort.getOpenPrice(), tickerShort.getPriceAsk(),
+                                             positionLong.getOpenPrice(), tickerLong.getPriceBid());
+                BigDecimal pnlShort = pnlSides.getFirst();
+                BigDecimal pnlLong = pnlSides.getSecond();
+                BigDecimal income = calculateCurrentIncome(pnlShort, tickerShort.getExchangeName(), pnlLong,
+                                                           tickerLong.getExchangeName());
+                if (isExistingSuccessful(income, trade.getStartTime())) {
+                    handleClose(trade, tickerShort, tickerLong, TradeResultType.SUCCESSFUL);
+                } else if (isExistingDetrimental(income) && !isDetrimentalSyncCondition(pnlShort, pnlLong)) {
+                    handleClose(trade, tickerShort, tickerLong, TradeResultType.DETRIMENTAL);
                 }
             }
         });
@@ -139,9 +134,32 @@ public class TradeServiceImpl implements TradeService {
 
     @Override
     @Transactional
-    public Set<Trade> getCompletedTradesNotWrittenToFile() {
-        return repository.findByWrittenToFileFalseAndTestRunIdEqualsOrderByEndTimeAsc(
-                testRunService.getCurrentTestRun().getId());
+    @Retryable(LockAcquisitionException.class)
+    public void closeTrades(@NonNull ExchangeName exchangeName, @NonNull TradeResultType tradeResultType) {
+        checkNotNull(exchangeName, "Cannot close trades if exchangeName is null!");
+        checkNotNull(tradeResultType, "Cannot close trades if tradeResultType is null!");
+
+        tradeContainer.getTrades(exchangeName).forEach(trade -> {
+            Position positionShort = trade.getPositionShort();
+            Position positionLong = trade.getPositionLong();
+            Ticker tickerShort =
+                    tickerService.getTicker(positionShort.getExchange().getName(), trade.getBase(), trade.getTarget())
+                            .orElseThrow(() -> new MissingEntityException(Ticker.class.getSimpleName(),
+                                                                          positionShort.toString()));
+            Ticker tickerLong =
+                    tickerService.getTicker(positionLong.getExchange().getName(), trade.getBase(), trade.getTarget())
+                            .orElseThrow(() -> new MissingEntityException(Ticker.class.getSimpleName(),
+                                                                          positionLong.toString()));
+            handleClose(trade, tickerShort, tickerLong, tradeResultType);
+        });
+    }
+
+    @Override
+    @Transactional
+    public Set<Trade> getCompletedTradesNotWrittenToFile(@NonNull TestRun testRun) {
+        checkNotNull(testRun, "Cannot get completed trades if Test run is null!");
+
+        return repository.findByWrittenToFileFalseAndTestRunIdEqualsOrderByEndTimeAsc(testRun.getId());
     }
 
     @Override
@@ -159,7 +177,7 @@ public class TradeServiceImpl implements TradeService {
     }
 
     private boolean canEnterTrade(Ticker tickerShort, Ticker tickerLong) {
-        if (tickerService.checkStale(tickerShort, tickerLong)) {
+        if (tickerService.checkStale(tickerShort, tickerLong, parameters.getStaleIntervalDuration())) {
             return false;
         }
         String base = tickerShort.getBase();
@@ -245,13 +263,14 @@ public class TradeServiceImpl implements TradeService {
                 <= 0;
     }
 
-    private boolean isOpenProfitable(PriceDifference priceDifference, Ticker tickerShort, Ticker tickerLong) {
+    private boolean isOpenProfitable(Ticker tickerShort, Ticker tickerLong, BigDecimal averagePriceDifference,
+            BigDecimal currentPriceDifference) {
         BigDecimal avgOpenPrice = average(List.of(tickerShort.getPriceOnOpen(PositionSide.SHORT),
                                                   tickerLong.getPriceOnOpen(PositionSide.LONG)));
         BigDecimal amountUsd = parameters.getMinEntryAmount();
         BigDecimal expensesShort = exchangeService.getTotalExpenses(tickerShort.getExchangeName(), amountUsd);
         BigDecimal expensesLong = exchangeService.getTotalExpenses(tickerLong.getExchangeName(), amountUsd);
-        BigDecimal expectedProfitPriceDiff = priceDifference.getCurrentValue().subtract(priceDifference.getAvgValue());
+        BigDecimal expectedProfitPriceDiff = currentPriceDifference.subtract(averagePriceDifference);
         BigDecimal income =
                 income(pnl(expectedProfitPriceDiff, avgOpenPrice, amountUsd), BigDecimal.ZERO, expensesShort,
                        expensesLong);
@@ -311,7 +330,7 @@ public class TradeServiceImpl implements TradeService {
         trade.setResultData(resultData);
     }
 
-    private Trade createTrade(Ticker tickerShort, Ticker tickerLong, BigDecimal percentageDiff) {
+    private Trade createTrade(Ticker tickerShort, Ticker tickerLong, BigDecimal percentageDiff, TestRun testRun) {
         Trade trade = new Trade();
         // tickerShort and tickerLong have equal base and target
         trade.setBase(tickerShort.getBase());
@@ -324,7 +343,7 @@ public class TradeServiceImpl implements TradeService {
         Exchange exchangeShort = shortPos.getExchange();
         Exchange exchangeLong = longPos.getExchange();
         trade.setFixedExpensesUsd(exchangeShort.getFixedFeesUsd().add(exchangeLong.getFixedFeesUsd()));
-        trade.setTestRun(testRunService.getCurrentTestRun());
+        trade.setTestRun(testRun);
         trade.setWrittenToFile(false);
         trade.setStartTime(DateUtils.currentDateTimeUTC());
         return trade;

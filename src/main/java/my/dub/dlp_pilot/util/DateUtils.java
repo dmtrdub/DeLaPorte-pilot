@@ -3,6 +3,7 @@ package my.dub.dlp_pilot.util;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -18,11 +19,11 @@ public final class DateUtils {
     private static final String FORMAT_PATTERN = "dd.MM.yyyy-HH:mm:ss";
     private static final String FORMAT_PATTERN_SHORT = "ddMMyy-HHmm";
 
-    public static ZonedDateTime getDateTimeFromEpochMilli(long epoch) {
+    public static ZonedDateTime dateTimeFromEpochMilli(long epoch) {
         return ZonedDateTime.ofInstant(Instant.ofEpochMilli(epoch), DEFAULT_ZONE_OFFSET);
     }
 
-    public static ZonedDateTime getDateTimeFromEpochSecond(long epoch) {
+    public static ZonedDateTime dateTimeFromEpochSecond(long epoch) {
         return ZonedDateTime.ofInstant(Instant.ofEpochSecond(epoch), DEFAULT_ZONE_OFFSET);
     }
 
@@ -79,17 +80,43 @@ public final class DateUtils {
         return String.format("%d.%3d", duration.toSeconds(), duration.toMillisPart()).replaceAll("\\s+", "");
     }
 
+    // ISO-8601 standard
     public static Duration parseDuration(@NonNull String input) {
         if (StringUtils.isEmpty(input) || "0".equals(input)) {
             return Duration.ZERO;
         }
-        if (!input.startsWith("PT")) {
-            input = "PT" + input;
+        input = input.toUpperCase();
+        StringBuilder inputBuilder = new StringBuilder(input);
+        if (input.contains("D")) {
+            if (!input.endsWith("D")) {
+                inputBuilder.insert(input.indexOf("D"), 'T');
+            }
+        } else {
+            inputBuilder.insert(0, 'T');
         }
-        return Duration.parse(input);
+        if (!input.startsWith("P")) {
+            inputBuilder.insert(0, 'P');
+        }
+        return Duration.parse(inputBuilder);
     }
 
     public static String formatDuration(@NonNull Duration duration) {
         return duration.toString().substring(2).replaceAll("(\\d[HMS])(?!$)", "$1 ").toLowerCase();
+    }
+
+    public static ZonedDateTime parseDefaultZoneDateTime(@NonNull String dateTime) {
+        return ZonedDateTime.ofInstant(Instant.parse(dateTime), DEFAULT_ZONE_OFFSET);
+    }
+
+    public static ZonedDateTime toZonedDateTime(@NonNull LocalDateTime localDateTime) {
+        return localDateTime.atZone(ZoneId.systemDefault()).withZoneSameInstant(DEFAULT_ZONE_OFFSET);
+    }
+
+    public static String toIsoInstantString(@NonNull ZonedDateTime dateTime) {
+        return dateTime.format(DateTimeFormatter.ISO_INSTANT);
+    }
+
+    public static Instant toInstant(@NonNull LocalDateTime localDateTime) {
+        return localDateTime.atZone(ZoneId.systemDefault()).toInstant();
     }
 }

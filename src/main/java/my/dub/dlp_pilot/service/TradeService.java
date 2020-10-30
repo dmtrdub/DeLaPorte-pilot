@@ -1,19 +1,24 @@
 package my.dub.dlp_pilot.service;
 
+import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.Set;
 import my.dub.dlp_pilot.model.ExchangeName;
-import my.dub.dlp_pilot.model.PriceDifference;
+import my.dub.dlp_pilot.model.TestRun;
 import my.dub.dlp_pilot.model.Ticker;
 import my.dub.dlp_pilot.model.Trade;
+import my.dub.dlp_pilot.model.TradeResultType;
+import org.springframework.lang.NonNull;
 
 public interface TradeService {
 
-    void checkTradeOpen(PriceDifference priceDifference, Ticker tickerShort, Ticker tickerLong);
+    void checkTradeOpen(Ticker tickerShort, Ticker tickerLong, BigDecimal averagePriceDifference, TestRun testRun);
 
     void handleTrades(ExchangeName exchangeName);
 
-    Set<Trade> getCompletedTradesNotWrittenToFile();
+    void closeTrades(@NonNull ExchangeName exchangeName, @NonNull TradeResultType tradeResultType);
+
+    Set<Trade> getCompletedTradesNotWrittenToFile(TestRun testRun);
 
     void updateTradesWrittenToFile(Collection<Trade> trades);
 
