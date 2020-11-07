@@ -1,4 +1,4 @@
-package my.dub.dlp_pilot.model;
+package my.dub.dlp_pilot.model.dto;
 
 import javax.persistence.Column;
 import javax.persistence.EnumType;
@@ -6,6 +6,7 @@ import javax.persistence.Enumerated;
 import javax.persistence.MappedSuperclass;
 import lombok.Data;
 import my.dub.dlp_pilot.Constants;
+import my.dub.dlp_pilot.model.ExchangeName;
 
 @Data
 @MappedSuperclass

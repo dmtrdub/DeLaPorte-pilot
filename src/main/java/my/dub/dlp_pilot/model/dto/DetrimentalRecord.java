@@ -1,8 +1,9 @@
-package my.dub.dlp_pilot.model;
+package my.dub.dlp_pilot.model.dto;
 
 import java.time.ZonedDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import my.dub.dlp_pilot.model.ExchangeName;
 
 @Data
 @AllArgsConstructor

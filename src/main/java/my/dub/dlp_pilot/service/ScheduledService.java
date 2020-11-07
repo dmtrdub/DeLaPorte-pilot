@@ -38,7 +38,7 @@ public class ScheduledService implements InitializingBean {
     private final Map<ExchangeName, LocalDateTime> loadStartDateTimes = new ConcurrentHashMap<>();
     private final ThreadPoolTaskScheduler loadTaskScheduler = new ThreadPoolTaskScheduler();
 
-    private CountDownLatch countDownLatch;
+    private CountDownLatch preloadCountDownLatch;
 
     @Autowired
     public ScheduledService(ExchangeService exchangeService, TradeService tradeService, TestRunService testRunService,
@@ -66,7 +66,7 @@ public class ScheduledService implements InitializingBean {
     }
 
     private void startPreload() {
-        log.info("Starting Preload!");
+        log.info("#### STARTING PRELOAD! ####");
         Set<Exchange> exchanges = exchangeService.findAll();
         int exchangesCount = exchanges.size();
         loadTaskScheduler.setPoolSize(exchangesCount);
@@ -78,7 +78,7 @@ public class ScheduledService implements InitializingBean {
             System.exit(-1);
         });
         loadTaskScheduler.initialize();
-        countDownLatch = new CountDownLatch(exchangesCount);
+        preloadCountDownLatch = new CountDownLatch(exchangesCount);
         exchanges.forEach(exchange -> {
             int opIntervalMillis = calculatePreloadFixedDelayInMillis(exchange);
             log.info("Preload Operation interval set to {} ms for {} exchange", opIntervalMillis,
@@ -88,8 +88,8 @@ public class ScheduledService implements InitializingBean {
             loadStartDateTimes.put(exchange.getName(), LocalDateTime.now());
         });
         try {
-            countDownLatch.await();
-            log.info("Preload completed!");
+            preloadCountDownLatch.await();
+            log.info("#### PRELOAD COMPLETE! ####");
         } catch (InterruptedException e) {
             log.error("Main thread has been interrupted before completing the preload!");
             log.warn("De La Porte is exiting prematurely!");
@@ -104,12 +104,11 @@ public class ScheduledService implements InitializingBean {
         return () -> {
             boolean finished = testRunService.runPreload(exchange);
             if (finished) {
-                countDownLatch.countDown();
                 ExchangeName name = exchange.getName();
                 taskSchedulerLoadFutures.remove(name).cancel(true);
-                log.info("{} has finished preload task", name);
                 testRunService.onPreloadComplete(name);
                 setNextLoadTask(exchange);
+                preloadCountDownLatch.countDown();
             }
         };
     }
@@ -121,7 +120,7 @@ public class ScheduledService implements InitializingBean {
             boolean finished = testRunService.runRefreshLoad(exchangeName);
             if (finished) {
                 taskSchedulerLoadFutures.remove(exchangeName).cancel(true);
-                testRunService.onRefreshLoadComplete(exchangeName);
+                testRunService.onRefreshLoadComplete(exchangeName, preloadCountDownLatch.getCount() == 0);
                 setNextLoadTask(exchange);
             }
         };
@@ -141,7 +140,7 @@ public class ScheduledService implements InitializingBean {
     private void startTest() {
         testRunService.prepareRunTest();
         fileResultService.init();
-        log.info("Starting Test Run!");
+        log.info("#### STARTING TRADES TEST! ####");
         Set<Exchange> exchanges = exchangeService.findAll();
         int exchangesCount = exchanges.size();
         ThreadPoolTaskScheduler taskScheduler = new ThreadPoolTaskScheduler();
@@ -151,7 +150,7 @@ public class ScheduledService implements InitializingBean {
             if (t instanceof TestRunEndException) {
                 if (tradeService.isAllTradesClosed()) {
                     testRunService.onExit();
-                    log.info("De La Porte is exiting...");
+                    log.info("#### TEST RUN FINISHED! ####");
                     shutdownNow(taskScheduler);
                     shutdownNow(loadTaskScheduler);
                 }

@@ -5,9 +5,9 @@ import java.util.Collection;
 import java.util.Set;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.TestRun;
-import my.dub.dlp_pilot.model.Ticker;
 import my.dub.dlp_pilot.model.Trade;
 import my.dub.dlp_pilot.model.TradeResultType;
+import my.dub.dlp_pilot.model.dto.Ticker;
 import org.springframework.lang.NonNull;
 
 public interface TradeService {

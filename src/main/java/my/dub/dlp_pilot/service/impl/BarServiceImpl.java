@@ -6,9 +6,10 @@ import java.util.Collection;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.model.Bar;
-import my.dub.dlp_pilot.model.BarAverage;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.TestRun;
+import my.dub.dlp_pilot.model.dto.BarAverage;
+import my.dub.dlp_pilot.model.dto.LastBar;
 import my.dub.dlp_pilot.repository.BarRepository;
 import my.dub.dlp_pilot.service.BarService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -65,6 +66,14 @@ public class BarServiceImpl implements BarService {
         checkNotNull(exchangeName, "Cannot load BarAverages if exchangeName is null!");
 
         return repository.getBarAverages(exchangeName, testRun.getId());
+    }
+
+    @Override
+    public List<LastBar> loadExchangeLastBars(@NonNull TestRun testRun, @NonNull ExchangeName exchangeName) {
+        checkNotNull(testRun, "Cannot load LastBars if TestRun is null!");
+        checkNotNull(exchangeName, "Cannot load LastBars if exchangeName is null!");
+
+        return repository.getLastBars(exchangeName, testRun.getId());
     }
 
 }

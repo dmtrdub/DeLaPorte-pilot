@@ -7,7 +7,7 @@ import java.util.Optional;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.model.ExchangeName;
-import my.dub.dlp_pilot.model.Ticker;
+import my.dub.dlp_pilot.model.dto.Ticker;
 import my.dub.dlp_pilot.repository.container.TickerContainer;
 import my.dub.dlp_pilot.service.TickerService;
 import my.dub.dlp_pilot.service.client.ClientService;

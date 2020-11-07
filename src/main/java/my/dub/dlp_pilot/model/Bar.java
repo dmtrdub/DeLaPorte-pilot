@@ -20,6 +20,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
+import my.dub.dlp_pilot.model.dto.PriceData;
 
 @Data
 @Entity
@@ -28,21 +29,6 @@ import lombok.ToString;
 @EqualsAndHashCode(callSuper = true)
 public class Bar extends PriceData implements Serializable {
     private static final long serialVersionUID = 50L;
-
-    public Bar(ExchangeName exchangeName, String base, String target, BigDecimal open, BigDecimal volume,
-            ZonedDateTime openTime, TestRun testRun) {
-        super(exchangeName, base, target);
-        this.open = this.close = this.high = this.low = open;
-        this.volume = volume;
-        this.openTime = openTime;
-        this.testRun = testRun;
-    }
-
-    public Bar(ExchangeName exchangeName, String base, String target, ZonedDateTime openTime, ZonedDateTime closeTime) {
-        super(exchangeName, base, target);
-        this.openTime = openTime;
-        this.closeTime = closeTime;
-    }
 
     public Bar(ExchangeName exchangeName, String base, String target) {
         super(exchangeName, base, target);
@@ -86,10 +72,5 @@ public class Bar extends PriceData implements Serializable {
     private TestRun testRun;
 
     private transient boolean closed;
-
-    public void setOpenCloseTime(ZonedDateTime openTime, TimeFrame timeFrame) {
-        this.openTime = openTime;
-        this.closeTime = openTime.plus(timeFrame.getDuration());
-    }
 }
 

@@ -1,9 +1,9 @@
 package my.dub.dlp_pilot.service;
 
 import java.util.List;
-import my.dub.dlp_pilot.model.BarAverage;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.TestRun;
+import my.dub.dlp_pilot.model.dto.BarAverage;
 import org.springframework.lang.NonNull;
 
 public interface PriceDifferenceService {

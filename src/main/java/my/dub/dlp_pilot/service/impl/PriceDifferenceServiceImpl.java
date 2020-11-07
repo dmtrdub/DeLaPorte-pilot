@@ -9,18 +9,20 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import my.dub.dlp_pilot.model.BarAverage;
 import my.dub.dlp_pilot.model.ExchangeName;
-import my.dub.dlp_pilot.model.PriceDifference;
 import my.dub.dlp_pilot.model.TestRun;
-import my.dub.dlp_pilot.model.Ticker;
+import my.dub.dlp_pilot.model.dto.BarAverage;
+import my.dub.dlp_pilot.model.dto.PriceDifference;
+import my.dub.dlp_pilot.model.dto.Ticker;
 import my.dub.dlp_pilot.service.PriceDifferenceService;
 import my.dub.dlp_pilot.service.TickerService;
 import my.dub.dlp_pilot.service.TradeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 @Slf4j
@@ -50,11 +52,9 @@ public class PriceDifferenceServiceImpl implements PriceDifferenceService {
                                                                                                 bA1.getExchangeName(),
                                                                                                 bA2.getExchangeName())
                         .isEmpty()) {
-                    PriceDifference priceDifference =
-                            new PriceDifference(bA1.getBase(), bA1.getTarget(), bA1.getExchangeName(),
-                                                bA2.getExchangeName());
-                    priceDifference.setAverage(bA1.getAveragePrice().subtract(bA2.getAveragePrice()));
-                    priceDifferences.add(priceDifference);
+                    priceDifferences.add(new PriceDifference(bA1.getBase(), bA1.getTarget(), bA1.getExchangeName(),
+                                                             bA1.getAveragePrice(), bA2.getExchangeName(),
+                                                             bA2.getAveragePrice()));
                 }
             }
         }
@@ -62,27 +62,20 @@ public class PriceDifferenceServiceImpl implements PriceDifferenceService {
 
     @Override
     public void updatePriceDifferences(@NonNull List<BarAverage> barAverages) {
-        for (int i = 0; i < barAverages.size() - 1; i++) {
-            for (int j = i + 1; j < barAverages.size(); j++) {
-                BarAverage bA1 = barAverages.get(i);
-                BarAverage bA2 = barAverages.get(j);
-                if (bA1.getBase().equals(bA2.getBase()) && bA1.getTarget().equals(bA2.getTarget()) && !bA1
-                        .getExchangeName().equals(bA2.getExchangeName())) {
-                    String base = bA1.getBase();
-                    String target = bA1.getTarget();
-                    ExchangeName exchangeName = bA1.getExchangeName();
-                    ExchangeName exchangeName2 = bA2.getExchangeName();
-                    PriceDifference priceDifference =
-                            findPriceDifference(base, target, exchangeName, exchangeName2).orElse(null);
-                    if (priceDifference == null) {
-                        log.error("Unable to find existing Price Difference by base: {}, target: {}, exchangeName: {}, "
-                                          + "exchangeName2: {}", base, target, exchangeName, exchangeName2);
-                        continue;
-                    }
-                    priceDifference.setAverage(bA1.getAveragePrice().subtract(bA2.getAveragePrice()));
-                }
+        barAverages.forEach(barAverage -> {
+            List<PriceDifference> priceDiffs =
+                    findPriceDifferences(barAverage.getBase(), barAverage.getTarget(), barAverage.getExchangeName());
+            if (CollectionUtils.isEmpty(priceDiffs)) {
+                return;
             }
-        }
+            priceDiffs.forEach(priceDifference -> {
+                if (priceDifference.getExchangeName().equals(barAverage.getExchangeName())) {
+                    priceDifference.setExchange1Average(barAverage.getAveragePrice());
+                } else {
+                    priceDifference.setExchange2Average(barAverage.getAveragePrice());
+                }
+            });
+        });
     }
 
     @Override
@@ -147,6 +140,13 @@ public class PriceDifferenceServiceImpl implements PriceDifferenceService {
 
         return priceDifferences.stream()
                 .filter(priceDiff -> isSimilarMatch(priceDiff, base, target, exchange1, exchange2)).findFirst();
+    }
+
+    private List<PriceDifference> findPriceDifferences(String base, String target, ExchangeName exchange) {
+        return priceDifferences.stream()
+                .filter(priceDiff -> priceDiff.getBase().equals(base) && priceDiff.getTarget().equals(target) && (
+                        priceDiff.getExchangeName().equals(exchange) || priceDiff.getExchangeName2().equals(exchange)))
+                .collect(Collectors.toList());
     }
 
     private boolean isSimilarMatch(PriceDifference existingPD, String base, String target, ExchangeName exchange1,

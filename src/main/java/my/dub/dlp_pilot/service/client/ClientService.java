@@ -6,9 +6,9 @@ import java.util.List;
 import java.util.Set;
 import my.dub.dlp_pilot.model.Bar;
 import my.dub.dlp_pilot.model.ExchangeName;
-import my.dub.dlp_pilot.model.PriceData;
-import my.dub.dlp_pilot.model.Ticker;
 import my.dub.dlp_pilot.model.TimeFrame;
+import my.dub.dlp_pilot.model.dto.LastBar;
+import my.dub.dlp_pilot.model.dto.Ticker;
 import org.springframework.lang.NonNull;
 
 public interface ClientService {
@@ -17,12 +17,13 @@ public interface ClientService {
 
     int getSymbolPairsCount(@NonNull ExchangeName exchangeName);
 
-    void correctSymbolPairsAfterPreload(@NonNull Collection<? extends PriceData> priceData);
+    void removeSymbolPair(@NonNull ExchangeName exchangeName, int index);
 
     Set<Ticker> fetchTickers(@NonNull ExchangeName exchangeName);
 
     List<Bar> fetchBars(@NonNull ExchangeName exchangeName, @NonNull TimeFrame timeFrame,
             @NonNull ZonedDateTime startTime, int symbolPairIndex, ZonedDateTime endTime);
 
-    Bar fetchSingleBar(@NonNull ExchangeName exchangeName, @NonNull TimeFrame timeFrame, int symbolPairIndex);
+    List<Bar> fetchBars(@NonNull ExchangeName exchangeName, @NonNull TimeFrame timeFrame, int symbolPairIndex,
+            @NonNull Collection<LastBar> lastBars);
 }

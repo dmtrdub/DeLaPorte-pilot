@@ -1,9 +1,11 @@
-package my.dub.dlp_pilot.model;
+package my.dub.dlp_pilot.model.dto;
 
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import my.dub.dlp_pilot.model.ExchangeName;
+import my.dub.dlp_pilot.model.PositionSide;
 import my.dub.dlp_pilot.util.Calculations;
 import my.dub.dlp_pilot.util.DateUtils;
 

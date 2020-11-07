@@ -4,7 +4,7 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.Set;
 import my.dub.dlp_pilot.model.ExchangeName;
-import my.dub.dlp_pilot.model.Ticker;
+import my.dub.dlp_pilot.model.dto.Ticker;
 
 public interface TickerService {
 

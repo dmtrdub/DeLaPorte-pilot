@@ -10,25 +10,27 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
-import my.dub.dlp_pilot.exception.client.BarFetchCompletionException;
 import my.dub.dlp_pilot.exception.client.UnexpectedEndpointResponseException;
 import my.dub.dlp_pilot.model.Bar;
 import my.dub.dlp_pilot.model.ExchangeName;
-import my.dub.dlp_pilot.model.SymbolPair;
-import my.dub.dlp_pilot.model.Ticker;
 import my.dub.dlp_pilot.model.TimeFrame;
+import my.dub.dlp_pilot.model.dto.SymbolPair;
+import my.dub.dlp_pilot.model.dto.Ticker;
 import my.dub.dlp_pilot.service.ExchangeClientService;
 import my.dub.dlp_pilot.service.ExchangeService;
 import my.dub.dlp_pilot.service.client.AbstractExchangeClientService;
 import my.dub.dlp_pilot.util.DateUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -122,21 +124,39 @@ public class BinanceExchangeClientService extends AbstractExchangeClientService 
     @Override
     public List<Bar> fetchBars(SymbolPair symbolPair, TimeFrame timeFrame, ZonedDateTime startTime,
             ZonedDateTime endTime) throws IOException {
-        Map<String, String> queryParams =
-                Map.of("startTime", String.valueOf(startTime.toInstant().toEpochMilli()), "limit",
-                       String.valueOf(exchange.getMaxBarsPerRequest()), "interval",
-                       timeFrame.getExchangeValue(exchangeName), SYMBOL, symbolPair.getName());
+        return fetchBars(symbolPair, timeFrame, startTime, endTime, exchange.getMaxBarsPerRequest());
+    }
+
+    @Override
+    public List<Bar> fetchBars(SymbolPair symbolPair, TimeFrame timeFrame, long barsLimit) throws IOException {
+        return fetchBars(symbolPair, timeFrame, null, null, barsLimit);
+    }
+
+    private List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame, ZonedDateTime startTime,
+            ZonedDateTime endTime, long barsLimit) throws IOException {
+        Map<String, String> queryParams = new HashMap<>();
+        if (startTime != null) {
+            queryParams.put("startTime", String.valueOf(startTime.toInstant().toEpochMilli()));
+        }
+        if (barsLimit > 0) {
+            checkBarsLimit(barsLimit);
+            queryParams.put("limit", String.valueOf(barsLimit));
+        } else {
+            return Collections.emptyList();
+        }
+        queryParams.put("interval", timeFrame.getExchangeValue(exchangeName));
+        queryParams.put(SYMBOL, symbolPair.getName());
         JsonNode parentNode =
                 executeRequestParseResponse(exchange.getBaseEndpoint(), "klines", queryParams, exchangeFullName);
         checkResponseStatus(parentNode, NO_BARS_FOUND_IN_RESPONSE_MSG);
         List<Bar> bars = new ArrayList<>();
         for (JsonNode innerNode : parentNode) {
-            Bar bar = null;
+            Bar bar;
             try {
                 ZonedDateTime openTime = parseDateTime(innerNode.get(0)).orElseThrow();
                 ZonedDateTime closeTime = openTime.plus(timeFrame.getDuration());
-                if (openTime.isAfter(endTime)) {
-                    throw new BarFetchCompletionException();
+                if (endTime != null && openTime.isAfter(endTime)) {
+                    break;
                 }
                 if (closeTime.isAfter(DateUtils.currentDateTimeUTC())) {
                     continue;
@@ -146,33 +166,10 @@ public class BinanceExchangeClientService extends AbstractExchangeClientService 
                 bar.setCloseTime(closeTime);
             } catch (NoSuchElementException ignored) {
                 continue;
-            } catch (BarFetchCompletionException e) {
-                break;
             }
             bars.add(bar);
         }
         return bars;
-    }
-
-    @Override
-    public Bar fetchBar(SymbolPair symbolPair, TimeFrame timeFrame) throws IOException {
-        Map<String, String> queryParams =
-                Map.of("limit", "2", "interval", timeFrame.getExchangeValue(exchangeName), SYMBOL,
-                       symbolPair.getName());
-        JsonNode parentNode =
-                executeRequestParseResponse(exchange.getBaseEndpoint(), "klines", queryParams, exchangeFullName);
-        checkResponseStatus(parentNode, NO_BARS_FOUND_IN_RESPONSE_MSG);
-        if (parentNode.size() < 2) {
-            throw new UnexpectedEndpointResponseException(exchangeFullName, NO_BARS_FOUND_IN_RESPONSE_MSG);
-        }
-        JsonNode innerNode = parentNode.get(1);
-        try {
-            Bar bar = createBar(innerNode, symbolPair.getBase(), symbolPair.getTarget());
-            bar.setOpenCloseTime(parseDateTime(innerNode.get(0)).orElseThrow(), timeFrame);
-            return bar;
-        } catch (NoSuchElementException e) {
-            return null;
-        }
     }
 
     private Bar createBar(JsonNode innerNode, String base, String target) {

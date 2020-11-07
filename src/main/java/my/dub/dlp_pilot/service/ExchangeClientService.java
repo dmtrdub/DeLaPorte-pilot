@@ -5,9 +5,9 @@ import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Set;
 import my.dub.dlp_pilot.model.Bar;
-import my.dub.dlp_pilot.model.SymbolPair;
-import my.dub.dlp_pilot.model.Ticker;
 import my.dub.dlp_pilot.model.TimeFrame;
+import my.dub.dlp_pilot.model.dto.SymbolPair;
+import my.dub.dlp_pilot.model.dto.Ticker;
 
 public interface ExchangeClientService {
 
@@ -18,5 +18,5 @@ public interface ExchangeClientService {
     List<Bar> fetchBars(SymbolPair symbolPair, TimeFrame timeFrame, ZonedDateTime startTime, ZonedDateTime endTime)
             throws IOException;
 
-    Bar fetchBar(SymbolPair symbolPair, TimeFrame timeFrame) throws IOException;
+    List<Bar> fetchBars(SymbolPair symbolPair, TimeFrame timeFrame, long barsLimit) throws IOException;
 }

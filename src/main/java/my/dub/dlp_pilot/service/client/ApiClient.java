@@ -20,7 +20,7 @@ import my.dub.dlp_pilot.exception.client.UnexpectedEndpointResponseException;
 import my.dub.dlp_pilot.exception.client.UnexpectedResponseStatusCodeException;
 import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.ExchangeName;
-import my.dub.dlp_pilot.model.Ticker;
+import my.dub.dlp_pilot.model.dto.Ticker;
 import my.dub.dlp_pilot.service.ExchangeService;
 import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.stereotype.Component;

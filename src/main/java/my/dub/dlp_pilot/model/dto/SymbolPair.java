@@ -1,7 +1,8 @@
-package my.dub.dlp_pilot.model;
+package my.dub.dlp_pilot.model.dto;
 
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import my.dub.dlp_pilot.model.ExchangeName;
 
 @Data
 @EqualsAndHashCode(callSuper = true)

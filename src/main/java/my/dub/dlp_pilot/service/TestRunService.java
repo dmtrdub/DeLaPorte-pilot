@@ -14,7 +14,7 @@ public interface TestRunService {
 
     boolean runRefreshLoad(ExchangeName exchange);
 
-    void onRefreshLoadComplete(ExchangeName exchangeName);
+    void onRefreshLoadComplete(ExchangeName exchangeName, boolean isPreloadComplete);
 
     void runTest(ExchangeName exchangeName);
 

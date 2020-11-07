@@ -11,8 +11,8 @@ import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.Constants;
 import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.ExchangeName;
-import my.dub.dlp_pilot.model.PriceData;
-import my.dub.dlp_pilot.model.Ticker;
+import my.dub.dlp_pilot.model.dto.PriceData;
+import my.dub.dlp_pilot.model.dto.Ticker;
 import my.dub.dlp_pilot.service.ExchangeService;
 import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.beans.factory.InitializingBean;
@@ -135,4 +135,12 @@ public abstract class AbstractExchangeClientService implements InitializingBean 
         return rawSymbol;
     }
 
+    protected long checkBarsLimit(long barsLimit) {
+        Integer maxBarsPerRequest = exchange.getMaxBarsPerRequest();
+        if (barsLimit > maxBarsPerRequest) {
+            log.warn("Bars limit ({}) exceeds allowed size ({}). Setting to max value.", barsLimit, maxBarsPerRequest);
+            barsLimit = maxBarsPerRequest;
+        }
+        return barsLimit;
+    }
 }

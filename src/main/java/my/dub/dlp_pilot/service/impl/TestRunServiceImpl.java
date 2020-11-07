@@ -13,14 +13,16 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.configuration.ParametersHolder;
 import my.dub.dlp_pilot.model.Bar;
-import my.dub.dlp_pilot.model.BarAverage;
 import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.TestRun;
 import my.dub.dlp_pilot.model.TradeResultType;
+import my.dub.dlp_pilot.model.dto.BarAverage;
+import my.dub.dlp_pilot.model.dto.LastBar;
 import my.dub.dlp_pilot.repository.TestRunRepository;
 import my.dub.dlp_pilot.service.BarService;
 import my.dub.dlp_pilot.service.ExchangeService;
@@ -33,6 +35,7 @@ import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 @Slf4j
@@ -58,8 +61,9 @@ public class TestRunServiceImpl implements TestRunService {
     private final AtomicBoolean tradeStop = new AtomicBoolean();
     private final AtomicBoolean testRunEnd = new AtomicBoolean();
 
-    private final Map<ExchangeName, AtomicInteger> loadedPairsMap = new ConcurrentHashMap<>();
-    private final Map<ExchangeName, ZonedDateTime> loadedPairsEndDateTimeMap = new ConcurrentHashMap<>();
+    private final Map<ExchangeName, AtomicInteger> loadPairsIndexMap = new ConcurrentHashMap<>();
+    private final Map<ExchangeName, ZonedDateTime> preloadPairsDateTimeMap = new ConcurrentHashMap<>();
+    private final Map<ExchangeName, List<LastBar>> refreshLoadLastBars = new ConcurrentHashMap<>();
 
     @Autowired
     public TestRunServiceImpl(TestRunRepository repository, ParametersHolder parameters,
@@ -79,32 +83,33 @@ public class TestRunServiceImpl implements TestRunService {
     public void init() {
         createAndSave();
         Set<Exchange> exchanges = exchangeService.findAll();
-        exchanges.forEach(exchange -> loadedPairsMap.put(exchange.getName(), new AtomicInteger()));
-        clientService.loadAllSymbolPairs(loadedPairsMap.keySet());
+        exchanges.forEach(exchange -> loadPairsIndexMap.put(exchange.getName(), new AtomicInteger()));
+        clientService.loadAllSymbolPairs(loadPairsIndexMap.keySet());
     }
 
     @Override
     public boolean runPreload(Exchange exchange) {
         ExchangeName name = exchange.getName();
         boolean isDescPreload = Boolean.FALSE.equals(exchange.getAscendingPreload());
-        ZonedDateTime startTime = Optional.ofNullable(loadedPairsEndDateTimeMap.get(name)).orElse(DateUtils
-                                                                                                          .toZonedDateTime(
-                                                                                                                  isDescPreload
-                                                                                                                          ? currentTestRun
-                                                                                                                          .getStartTime()
-                                                                                                                          : currentTestRun
-                                                                                                                                  .getPreloadStartTime()));
+        LocalDateTime fallbackStartTime =
+                isDescPreload ? currentTestRun.getStartTime() : currentTestRun.getPreloadStartTime();
+        ZonedDateTime startTime = Optional.ofNullable(preloadPairsDateTimeMap.get(name))
+                .orElse(DateUtils.toZonedDateTime(fallbackStartTime));
         ZonedDateTime endTime = DateUtils
                 .toZonedDateTime(isDescPreload ? currentTestRun.getPreloadStartTime() : currentTestRun.getStartTime());
-        AtomicInteger atomicSymbolPairIndex = loadedPairsMap.get(name);
+        AtomicInteger atomicSymbolPairIndex = loadPairsIndexMap.get(name);
         List<Bar> bars = clientService
                 .fetchBars(name, parameters.getDataCaptureTimeFrame(), startTime, atomicSymbolPairIndex.get(), endTime);
+        if (bars.isEmpty()) {
+            clientService.removeSymbolPair(name, atomicSymbolPairIndex.get());
+            preloadPairsDateTimeMap.remove(name);
+            return atomicSymbolPairIndex.get() >= clientService.getSymbolPairsCount(name);
+        }
         // check to proceed to next symbol pair
         if ((isDescPreload && bars.stream().anyMatch(bar -> !bar.getOpenTime().isAfter(endTime))) || (!isDescPreload
-                && bars.stream().anyMatch(bar -> !bar.getCloseTime().isBefore(endTime))) || (bars.isEmpty()
-                && atomicSymbolPairIndex.get() < clientService.getSymbolPairsCount(name))) {
+                && bars.stream().anyMatch(bar -> !bar.getCloseTime().isBefore(endTime)))) {
             atomicSymbolPairIndex.incrementAndGet();
-            loadedPairsEndDateTimeMap.remove(name);
+            preloadPairsDateTimeMap.remove(name);
         } else {
             ZonedDateTime preloadIterationEndDateTime;
             if (isDescPreload) {
@@ -114,7 +119,11 @@ public class TestRunServiceImpl implements TestRunService {
                 preloadIterationEndDateTime =
                         bars.stream().map(Bar::getCloseTime).max(ChronoZonedDateTime::compareTo).orElse(endTime);
             }
-            loadedPairsEndDateTimeMap.put(name, preloadIterationEndDateTime);
+            if (DateUtils.isDurationLonger(isDescPreload ? endTime : preloadIterationEndDateTime,
+                                           isDescPreload ? preloadIterationEndDateTime : endTime,
+                                           parameters.getDataCaptureTimeFrame().getDuration())) {
+                preloadPairsDateTimeMap.put(name, preloadIterationEndDateTime);
+            }
         }
         barService.save(bars, currentTestRun);
         return atomicSymbolPairIndex.get() >= clientService.getSymbolPairsCount(name);
@@ -122,26 +131,40 @@ public class TestRunServiceImpl implements TestRunService {
 
     @Override
     public void onPreloadComplete(ExchangeName exchangeName) {
-        loadedPairsMap.get(exchangeName).set(0);
+        loadPairsIndexMap.get(exchangeName).set(0);
+        refreshLoadLastBars.putIfAbsent(exchangeName, barService.loadExchangeLastBars(currentTestRun, exchangeName));
+        log.info("{} has finished its preload task", exchangeName);
     }
 
     @Override
     public boolean runRefreshLoad(ExchangeName exchange) {
-        AtomicInteger atomicSymbolPairIndex = loadedPairsMap.get(exchange);
-        Bar bar = clientService
-                .fetchSingleBar(exchange, parameters.getDataCaptureTimeFrame(), atomicSymbolPairIndex.get());
+        AtomicInteger atomicSymbolPairIndex = loadPairsIndexMap.get(exchange);
+
+        List<Bar> bars = clientService
+                .fetchBars(exchange, parameters.getDataCaptureTimeFrame(), atomicSymbolPairIndex.get(),
+                           refreshLoadLastBars.get(exchange));
         atomicSymbolPairIndex.incrementAndGet();
-        if (bar != null) {
-            barService.save(List.of(bar), currentTestRun);
+        if (!CollectionUtils.isEmpty(bars)) {
+            barService.save(bars, currentTestRun);
         }
         return atomicSymbolPairIndex.get() >= clientService.getSymbolPairsCount(exchange);
     }
 
     @Override
-    public void onRefreshLoadComplete(ExchangeName exchangeName) {
-        List<BarAverage> barAverages = barService.loadBarAverages(currentTestRun, exchangeName);
-        priceDifferenceService.updatePriceDifferences(barAverages);
-        loadedPairsMap.get(exchangeName).set(0);
+    public void onRefreshLoadComplete(ExchangeName exchangeName, boolean isPreloadComplete) {
+        if (isPreloadComplete) {
+            List<BarAverage> barAverages = barService.loadBarAverages(currentTestRun, exchangeName);
+            priceDifferenceService.updatePriceDifferences(barAverages);
+            List<LastBar> lastBars = barAverages.stream()
+                    .map(barAverage -> new LastBar(barAverage.getExchangeName(), barAverage.getBase(),
+                                                   barAverage.getTarget(), barAverage.getCloseTime()))
+                    .collect(Collectors.toList());
+            refreshLoadLastBars.put(exchangeName, lastBars);
+        } else {
+            refreshLoadLastBars.put(exchangeName, barService.loadExchangeLastBars(currentTestRun, exchangeName));
+        }
+        loadPairsIndexMap.get(exchangeName).set(0);
+        log.info("Refresh load finished for {} exchange", exchangeName.getFullName());
     }
 
     @Override
@@ -162,9 +185,8 @@ public class TestRunServiceImpl implements TestRunService {
     public void prepareRunTest() {
         List<BarAverage> barAverages = barService.loadAllBarAverages(currentTestRun);
         priceDifferenceService.createPriceDifferences(barAverages);
-        clientService.correctSymbolPairsAfterPreload(barAverages);
         updateTradeStartEndTime();
-        loadedPairsEndDateTimeMap.clear();
+        preloadPairsDateTimeMap.clear();
     }
 
     @Override
@@ -194,7 +216,7 @@ public class TestRunServiceImpl implements TestRunService {
         testRunEndDateTime = tradeStopDateTime.plus(parameters.getExitDelayDuration());
         currentTestRun.setEndTime(testRunEndDateTime);
         currentTestRun = repository.save(currentTestRun);
-        log.info("Trade starting at: {}", DateUtils.formatDateTime(tickerStaleCheckEndDateTime));
+        log.info("Trades part starting at: {}", DateUtils.formatDateTime(tickerStaleCheckEndDateTime));
         log.info("Test Run ending at: {}", DateUtils.formatDateTime(testRunEndDateTime));
     }
 

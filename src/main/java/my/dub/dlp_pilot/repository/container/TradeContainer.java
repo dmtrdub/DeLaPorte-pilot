@@ -6,10 +6,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
-import my.dub.dlp_pilot.model.DetrimentalRecord;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.Position;
 import my.dub.dlp_pilot.model.Trade;
+import my.dub.dlp_pilot.model.dto.DetrimentalRecord;
 import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Component;
@@ -21,7 +21,7 @@ public class TradeContainer {
     private final Set<DetrimentalRecord> detrimentalRecords = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     // check if similar trade exists here, as well as before creating trade
-    public void addTrade(Trade trade) {
+    public synchronized void addTrade(Trade trade) {
         if (trade == null || isSimilarPresent(trade)) {
             return;
         }
