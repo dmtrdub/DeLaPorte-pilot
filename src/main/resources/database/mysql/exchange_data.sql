@@ -2,9 +2,9 @@ insert into local.exchange (name, deposit_fee_usd, withdraw_fee_usd, taker_fee_p
                             trust_score, base_endpoint, bars_per_request, api_request_rate_min, api_request_rate_min_preload, asc_preload)
 values ('BIGONE', 0, 0.0005, 0.1, 7, 'https://big.one/api/v3/', 500, 100, 2700, 0),
        ('BINANCE', 0, 0.0005, 0.1, 10, 'https://api.binance.com/api/v3/', 1000, 100, 1100, 1),
+       ('BITFINEX', 0, 0, 0.2, 10, 'https://api-pub.bitfinex.com/v2/', 10000, 30, 60, 1),
 
        ('BITBAY', 0, 0.0002, 0.1, 7, 'https://api.bitbay.net/rest/', 55),
-       ('BITFINEX', 0, 0, 0.2, 10, 'https://api-pub.bitfinex.com/v2/', 30),
        ('BITMART', 0, 0.00005, 0.2, 6, 'https://openapi.bitmart.com/v2/', 60),
        ('BITMAX', 0, 0.0005, 0.1, 8, 'https://bitmax.io/api/pro/v1/', 100),
        ('BITTREX', 0, 0.0005, 0.2, 9, 'https://api.bittrex.com/v3/', 60),

@@ -20,6 +20,7 @@ import my.dub.dlp_pilot.model.Bar;
 import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.TestRun;
+import my.dub.dlp_pilot.model.TimeFrame;
 import my.dub.dlp_pilot.model.TradeResultType;
 import my.dub.dlp_pilot.model.dto.BarAverage;
 import my.dub.dlp_pilot.model.dto.LastBar;
@@ -91,15 +92,16 @@ public class TestRunServiceImpl implements TestRunService {
     public boolean runPreload(Exchange exchange) {
         ExchangeName name = exchange.getName();
         boolean isDescPreload = Boolean.FALSE.equals(exchange.getAscendingPreload());
+        TimeFrame dataCaptureTimeFrame = parameters.getDataCaptureTimeFrame();
         LocalDateTime fallbackStartTime =
-                isDescPreload ? currentTestRun.getStartTime() : currentTestRun.getPreloadStartTime();
+                isDescPreload ? currentTestRun.getStartTime() : currentTestRun.getPreloadStartTime().minus(dataCaptureTimeFrame.getDuration());
         ZonedDateTime startTime = Optional.ofNullable(preloadPairsDateTimeMap.get(name))
                 .orElse(DateUtils.toZonedDateTime(fallbackStartTime));
         ZonedDateTime endTime = DateUtils
                 .toZonedDateTime(isDescPreload ? currentTestRun.getPreloadStartTime() : currentTestRun.getStartTime());
         AtomicInteger atomicSymbolPairIndex = loadPairsIndexMap.get(name);
         List<Bar> bars = clientService
-                .fetchBars(name, parameters.getDataCaptureTimeFrame(), startTime, atomicSymbolPairIndex.get(), endTime);
+                .fetchBars(name, dataCaptureTimeFrame, startTime, atomicSymbolPairIndex.get(), endTime);
         if (bars.isEmpty()) {
             clientService.removeSymbolPair(name, atomicSymbolPairIndex.get());
             preloadPairsDateTimeMap.remove(name);
@@ -121,8 +123,11 @@ public class TestRunServiceImpl implements TestRunService {
             }
             if (DateUtils.isDurationLonger(isDescPreload ? endTime : preloadIterationEndDateTime,
                                            isDescPreload ? preloadIterationEndDateTime : endTime,
-                                           parameters.getDataCaptureTimeFrame().getDuration())) {
+                                           dataCaptureTimeFrame.getDuration())) {
                 preloadPairsDateTimeMap.put(name, preloadIterationEndDateTime);
+            } else {
+                atomicSymbolPairIndex.incrementAndGet();
+                preloadPairsDateTimeMap.remove(name);
             }
         }
         barService.save(bars, currentTestRun);

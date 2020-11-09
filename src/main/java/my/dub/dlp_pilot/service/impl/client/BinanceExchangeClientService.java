@@ -91,7 +91,7 @@ public class BinanceExchangeClientService extends AbstractExchangeClientService 
      * Binance REST API - Order Book</a>
      */
     @Override
-    public Set<Ticker> fetchAllTickers(List<SymbolPair> symbolPairs) throws IOException {
+    public Set<Ticker> fetchAllTickers(@NonNull List<SymbolPair> symbolPairs) throws IOException {
         JsonNode parentNode =
                 executeRequestParseResponse(exchange.getBaseEndpoint(), "ticker/bookTicker", exchangeFullName);
         checkResponseStatus(parentNode, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
@@ -122,13 +122,13 @@ public class BinanceExchangeClientService extends AbstractExchangeClientService 
      * Binance REST API - Kline/Candlestick data</a>
      */
     @Override
-    public List<Bar> fetchBars(SymbolPair symbolPair, TimeFrame timeFrame, ZonedDateTime startTime,
-            ZonedDateTime endTime) throws IOException {
+    public List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame, @NonNull ZonedDateTime startTime,
+            @NonNull ZonedDateTime endTime) throws IOException {
         return fetchBars(symbolPair, timeFrame, startTime, endTime, exchange.getMaxBarsPerRequest());
     }
 
     @Override
-    public List<Bar> fetchBars(SymbolPair symbolPair, TimeFrame timeFrame, long barsLimit) throws IOException {
+    public List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame, long barsLimit) throws IOException {
         return fetchBars(symbolPair, timeFrame, null, null, barsLimit);
     }
 

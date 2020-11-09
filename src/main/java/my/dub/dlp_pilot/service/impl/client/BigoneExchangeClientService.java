@@ -70,7 +70,7 @@ public class BigoneExchangeClientService extends AbstractExchangeClientService i
      * @see <a href="https://open.big.one/docs/spot_tickers.html#ticker">BigONE REST API - Tickers</a>
      */
     @Override
-    public Set<Ticker> fetchAllTickers(List<SymbolPair> symbolPairs) throws IOException {
+    public Set<Ticker> fetchAllTickers(@NonNull List<SymbolPair> symbolPairs) throws IOException {
         JsonNode parentNode =
                 executeRequestParseResponse(exchange.getBaseEndpoint(), "asset_pairs/tickers", exchangeFullName);
         checkResponseStatus(parentNode);
@@ -78,11 +78,13 @@ public class BigoneExchangeClientService extends AbstractExchangeClientService i
         Set<Ticker> tickers = new HashSet<>();
         for (JsonNode innerNode : dataNode) {
             Ticker ticker = new Ticker(ExchangeName.BIGONE);
-            boolean parsePairResult = setSymbols(innerNode.get("asset_pair_name").asText(), DELIMITER, ticker);
-            if (!parsePairResult || symbolPairs.stream().noneMatch(ticker::isSimilar)) {
-                continue;
-            }
+            String symbolPairName = innerNode.get("asset_pair_name").asText();
             try {
+                SymbolPair symbolPair =
+                        symbolPairs.stream().filter(sP -> sP.getName().equals(symbolPairName)).findFirst()
+                                .orElseThrow();
+                ticker.setBase(symbolPair.getBase());
+                ticker.setTarget(symbolPair.getTarget());
                 ticker.setClosePrice(parsePrice(innerNode.get("close")).orElseThrow());
                 JsonNode askNode = innerNode.get("ask");
                 if (askNode == null) {
@@ -112,13 +114,14 @@ public class BigoneExchangeClientService extends AbstractExchangeClientService i
      * Candles of an asset pair</a>
      */
     @Override
-    public List<Bar> fetchBars(SymbolPair symbolPair, TimeFrame timeFrame, ZonedDateTime startTime,
-            ZonedDateTime endTime) throws IOException {
+    public List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame,
+            @NonNull ZonedDateTime startTime, @NonNull ZonedDateTime endTime) throws IOException {
         return fetchBars(symbolPair, timeFrame, startTime, endTime, exchange.getMaxBarsPerRequest());
     }
 
     @Override
-    public List<Bar> fetchBars(SymbolPair symbolPair, TimeFrame timeFrame, long barsLimit) throws IOException {
+    public List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame, long barsLimit)
+            throws IOException {
         return fetchBars(symbolPair, timeFrame, null, null, barsLimit);
     }
 

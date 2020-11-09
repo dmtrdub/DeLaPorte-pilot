@@ -11,7 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.Constants;
 import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.ExchangeName;
-import my.dub.dlp_pilot.model.dto.PriceData;
+import my.dub.dlp_pilot.model.dto.SymbolPair;
 import my.dub.dlp_pilot.model.dto.Ticker;
 import my.dub.dlp_pilot.service.ExchangeService;
 import my.dub.dlp_pilot.util.DateUtils;
@@ -105,15 +105,15 @@ public abstract class AbstractExchangeClientService implements InitializingBean 
         }
     }
 
-    protected boolean setSymbols(String input, String splitRegex, PriceData priceData) {
+    protected boolean setSymbols(String input, String splitRegex, SymbolPair symbolPair) {
         String[] symbols;
         try {
             symbols = input.split(splitRegex, 2);
-            priceData.setBase(parseSymbol(symbols[0].toUpperCase()));
-            priceData.setTarget(parseSymbol(symbols[1].toUpperCase()));
+            symbolPair.setBase(parseSymbol(symbols[0].toUpperCase()));
+            symbolPair.setTarget(parseSymbol(symbols[1].toUpperCase()));
         } catch (ArrayIndexOutOfBoundsException e) {
             log.trace("Incorrect pair input ({}) for {} exchange! Expecting to parse with split regex: {}", input,
-                      priceData.getExchangeName().getFullName(), splitRegex);
+                      symbolPair.getExchangeName().getFullName(), splitRegex);
             return false;
         }
         return true;
