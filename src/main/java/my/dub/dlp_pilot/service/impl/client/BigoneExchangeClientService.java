@@ -143,9 +143,6 @@ public class BigoneExchangeClientService extends AbstractExchangeClientService i
                                                           queryParams, exchangeFullName);
         checkResponseStatus(parentNode);
         JsonNode dataNode = getDataNode(parentNode, NO_BARS_FOUND_IN_RESPONSE_MSG);
-        if (dataNode.size() < barsLimit) {
-            throw new UnexpectedEndpointResponseException(exchangeFullName, NO_BARS_FOUND_IN_RESPONSE_MSG);
-        }
         List<Bar> bars = new ArrayList<>();
         for (JsonNode innerNode : dataNode) {
             Bar bar;
@@ -188,6 +185,11 @@ public class BigoneExchangeClientService extends AbstractExchangeClientService i
     }
 
     private void checkResponseStatus(JsonNode parentNode) {
+        checkResponseStatus(parentNode, "");
+    }
+
+    @Override
+    protected void checkResponseStatus(JsonNode parentNode, String errorMessage) {
         JsonNode statusNode = parentNode.get("code");
         String status = statusNode.asText();
         if (!Objects.equals(status, "0")) {

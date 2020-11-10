@@ -90,14 +90,8 @@ public class ApiClient {
                 case BITBAY:
                     result = fetchBitBayTickers(exchange);
                     break;
-                case BITFINEX:
-                    result = fetchBitfinexTickers(exchange);
-                    break;
                 case BITMART:
                     result = fetchBitmartTickers(exchange);
-                    break;
-                case BITMAX:
-                    result = fetchBitmaxTickers(exchange);
                     break;
                 case BITTREX:
                     result = fetchBittrexTickers(exchange);
@@ -210,52 +204,6 @@ public class ApiClient {
     /**
      * @param exchange
      *
-     * @see <a href="https://docs.bitfinex.com/reference#rest-public-tickers">Bitfinex REST API - Tickers</a>
-     */
-    private Set<Ticker> fetchBitfinexTickers(Exchange exchange) throws IOException {
-        String exchangeName = exchange.getFullName();
-        String resp = executeRequest(exchange.getBaseEndpoint(), "tickers?symbols=ALL", exchangeName);
-
-        ObjectMapper objectMapper = new ObjectMapper();
-        JsonNode parentNode = objectMapper.readTree(resp);
-        if (parentNode.isEmpty()) {
-            throw new UnexpectedEndpointResponseException(exchangeName, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
-        }
-        JsonNode first = parentNode.get(0);
-        if (first != null && ERROR.equalsIgnoreCase(first.asText())) {
-            throw new UnexpectedEndpointResponseException(exchangeName, parentNode.get(2).asText(),
-                                                          parentNode.get(3).asText());
-        }
-        Set<Ticker> tickers = new HashSet<>();
-        for (JsonNode innerNode : parentNode) {
-            if (innerNode == null || innerNode.size() < 4) {
-                log.trace("Inner node does not contain full ticker data in response for exchange {}!", exchangeName);
-                continue;
-            }
-            String pair = innerNode.get(0).asText();
-            String prefix = "t";
-            if (!pair.startsWith(prefix)) {
-                continue;
-            }
-            Ticker ticker = new Ticker(ExchangeName.BITFINEX);
-            String target = Constants.BITFINEX_TARGET_SYMBOLS.stream().filter(pair::endsWith).findFirst().orElse(null);
-            if (target == null) {
-                continue;
-            }
-            String base = pair.replace(prefix, "").replace(":", "").replace(target, "");
-            ticker.setBase(base);
-            ticker.setTarget(target);
-            ticker.setPriceBid(new BigDecimal(innerNode.get(1).asText()));
-            ticker.setPriceAsk(new BigDecimal(innerNode.get(3).asText()));
-            ticker.setClosePrice(new BigDecimal(innerNode.get(7).asText()));
-            tickers.add(ticker);
-        }
-        return tickers;
-    }
-
-    /**
-     * @param exchange
-     *
      * @see <a href="https://developer.bitmart.com/v2/en/?http#spot-api-public-endpoints-ticker">Bitmart REST API -
      * Ticker</a>
      */
@@ -283,55 +231,6 @@ public class ApiClient {
             ticker.setClosePrice(new BigDecimal(innerNode.get("current_price").asText()));
             ticker.setPriceAsk(new BigDecimal(innerNode.get("ask_1").asText()));
             ticker.setPriceBid(new BigDecimal(innerNode.get("bid_1").asText()));
-            tickers.add(ticker);
-        }
-        return tickers;
-    }
-
-    /**
-     * @param exchange
-     *
-     * @see <a href="https://bitmax-exchange.github.io/bitmax-pro-api/#ticker">BitMax REST API - Ticker</a>
-     */
-    private Set<Ticker> fetchBitmaxTickers(Exchange exchange) throws IOException {
-        String exchangeName = exchange.getFullName();
-        String resp = executeRequest(exchange.getBaseEndpoint(), TICKER, exchangeName);
-        ObjectMapper objectMapper = new ObjectMapper();
-        JsonNode parentNode = objectMapper.readTree(resp);
-
-        int code = parentNode.get(CODE).asInt();
-        if (code != 0) {
-            String message = parentNode.get(MESSAGE).asText();
-            throw new UnexpectedEndpointResponseException(exchangeName, String.valueOf(code), message);
-        }
-        JsonNode data = parentNode.get(DATA);
-        if (data == null || data.isEmpty()) {
-            throw new UnexpectedEndpointResponseException(exchangeName, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
-        }
-        Set<Ticker> tickers = new HashSet<>();
-        for (JsonNode innerNode : data) {
-            Ticker ticker = new Ticker(ExchangeName.BITMAX);
-            boolean parsePairResult = setSymbols(innerNode.get(SYMBOL).asText(), "/", ticker);
-            if (!parsePairResult) {
-                continue;
-            }
-            BigDecimal closePrice = parsePrice(innerNode.get(CLOSE), exchangeName);
-            if (closePrice == null) {
-                continue;
-            }
-            ticker.setClosePrice(closePrice);
-            JsonNode askNode = innerNode.get("ask");
-            if (askNode == null || askNode.isEmpty()) {
-                logInvalidPriceData(exchangeName, ticker.getPair(), PRICE_TYPE_ASK);
-                continue;
-            }
-            ticker.setPriceAsk(new BigDecimal(askNode.get(0).asText()));
-            JsonNode bidNode = innerNode.get("bid");
-            if (bidNode == null || bidNode.isEmpty()) {
-                logInvalidPriceData(exchangeName, ticker.getPair(), PRICE_TYPE_BID);
-                continue;
-            }
-            ticker.setPriceBid(new BigDecimal(bidNode.get(0).asText()));
             tickers.add(ticker);
         }
         return tickers;

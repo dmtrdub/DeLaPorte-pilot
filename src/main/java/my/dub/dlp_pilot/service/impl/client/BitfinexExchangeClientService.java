@@ -117,6 +117,9 @@ public class BitfinexExchangeClientService extends AbstractExchangeClientService
         return tickers;
     }
 
+    /**
+     * @see <a href="https://docs.bitfinex.com/reference#rest-public-candles">Bitfinex REST API - Candles</a>
+     */
     @Override
     public List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame, @NonNull ZonedDateTime startTime,
             @NonNull ZonedDateTime endTime) throws IOException {
@@ -175,7 +178,8 @@ public class BitfinexExchangeClientService extends AbstractExchangeClientService
         return bars;
     }
 
-    private void checkResponseStatus(JsonNode parentNode, String errorMessage) {
+    @Override
+    protected void checkResponseStatus(JsonNode parentNode, String errorMessage) {
         if (parentNode == null || parentNode.isEmpty()) {
             throw new UnexpectedEndpointResponseException(exchangeFullName, errorMessage);
         }

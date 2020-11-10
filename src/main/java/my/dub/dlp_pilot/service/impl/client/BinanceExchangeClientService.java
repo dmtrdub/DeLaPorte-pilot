@@ -182,7 +182,8 @@ public class BinanceExchangeClientService extends AbstractExchangeClientService 
         return bar;
     }
 
-    private void checkResponseStatus(JsonNode parentNode, String errorMessage) {
+    @Override
+    protected void checkResponseStatus(JsonNode parentNode, String errorMessage) {
         JsonNode statusNode = parentNode.get("code");
         if (statusNode != null) {
             String message = statusNode.get("msg").asText();

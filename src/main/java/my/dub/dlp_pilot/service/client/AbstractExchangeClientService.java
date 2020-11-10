@@ -143,4 +143,6 @@ public abstract class AbstractExchangeClientService implements InitializingBean 
         }
         return barsLimit;
     }
+
+    protected abstract void checkResponseStatus(JsonNode parentNode, String errorMessage);
 }
