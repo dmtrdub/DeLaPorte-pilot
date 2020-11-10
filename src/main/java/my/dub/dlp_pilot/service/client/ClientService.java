@@ -26,4 +26,6 @@ public interface ClientService {
 
     List<Bar> fetchBars(@NonNull ExchangeName exchangeName, @NonNull TimeFrame timeFrame, int symbolPairIndex,
             @NonNull Collection<LastBar> lastBars);
+
+    void updateSymbolPairs();
 }

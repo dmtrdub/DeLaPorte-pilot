@@ -11,6 +11,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.Constants;
 import my.dub.dlp_pilot.exception.TestRunEndException;
@@ -30,6 +31,7 @@ import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
 @Slf4j
 @Service
@@ -51,7 +53,15 @@ public class ClientServiceImpl implements ClientService {
     public void loadAllSymbolPairs(@NonNull Collection<ExchangeName> exchangeNames) {
         checkNotNull(exchangeNames, "Cannot load all SymbolPairs if exchangeNames collection is null!");
 
-        exchangeNames.forEach(this::loadSymbolPairs);
+        List<SymbolPair> allSymbolPairs = exchangeNames.stream().map(this::loadSymbolPairs).flatMap(Collection::stream)
+                .collect(Collectors.toList());
+        log.info("Loaded {} symbol pairs", allSymbolPairs.size());
+        Set<SymbolPair> relevantSymbolPairs = findRelevantSymbolPairs(allSymbolPairs);
+        if (CollectionUtils.isEmpty(relevantSymbolPairs)) {
+            throw new TestRunEndException("No relevant symbol pairs were found for Preload! Exiting...");
+        }
+        log.info("Filtered {} relevant symbol pairs for preload", relevantSymbolPairs.size());
+        symbolPairContainer.addAll(relevantSymbolPairs);
     }
 
     @Override
@@ -103,8 +113,9 @@ public class ClientServiceImpl implements ClientService {
             fetchedBars = exchangeClientService.fetchBars(symbolPair, timeFrame, startTime, endTime);
             log.trace("Successfully fetched {} bars from {} exchange", fetchedBars.size(), exchangeName.getFullName());
         } catch (UnexpectedEndpointResponseException | UnexpectedResponseStatusCodeException e) {
-            log.warn("{} Symbol pair {} will be excluded from preload and future trading!", e.getMessage(),
-                     symbolPair.getPair());
+            log.warn("{} Symbol pair {} {} will be excluded from preload and future trading!", e.getMessage(),
+                     symbolPair.getPair(), symbolPair.getPair().equalsIgnoreCase(symbolPair.getName()) ? ""
+                             : "(" + symbolPair.getName() + ")");
         } catch (IOException e) {
             log.error("Unable to fetch bars on {} exchange! Details: {}", exchangeName, e.toString());
             throw new TestRunEndException(e);
@@ -146,12 +157,12 @@ public class ClientServiceImpl implements ClientService {
         return fetchedBars;
     }
 
-    private void loadSymbolPairs(ExchangeName exchangeName) {
+    private List<SymbolPair> loadSymbolPairs(ExchangeName exchangeName) {
         try {
             List<SymbolPair> symbolPairs = getExchangeClientService(exchangeName).fetchSymbolPairs();
             log.trace("Successfully fetched {} symbol pairs from {} exchange", symbolPairs.size(),
                       exchangeName.getFullName());
-            symbolPairContainer.add(symbolPairs);
+            return symbolPairs;
         } catch (IOException e) {
             log.error("Unable to fetch additional symbol data for Exchange: {}! Caused by: {}",
                       exchangeName.getFullName(), e.getMessage());
@@ -160,7 +171,37 @@ public class ClientServiceImpl implements ClientService {
             log.error(e.getMessage());
             throw new TestRunEndException(e);
         }
+    }
 
+    @Override
+    public void updateSymbolPairs() {
+        List<SymbolPair> allSymbolPairs = symbolPairContainer.getAll();
+        Set<SymbolPair> relevantSymbolPairs = findRelevantSymbolPairs(allSymbolPairs);
+        if (CollectionUtils.isEmpty(relevantSymbolPairs)) {
+            throw new TestRunEndException("No relevant symbol pairs were found for Test Run! Exiting...");
+        }
+        symbolPairContainer.removeAll();
+        symbolPairContainer.addAll(relevantSymbolPairs);
+        log.info("Filtered {} relevant symbol pairs for Test Run", relevantSymbolPairs.size());
+    }
+
+    private Set<SymbolPair> findRelevantSymbolPairs(List<SymbolPair> symbolPairs) {
+        Set<SymbolPair> relevantSP = new HashSet<>();
+        for (int i = 0; i < symbolPairs.size() - 1; i++) {
+            for (int j = i + 1; j < symbolPairs.size(); j++) {
+                SymbolPair sP1 = symbolPairs.get(i);
+                SymbolPair sP2 = symbolPairs.get(j);
+                if (relevantSP.contains(sP2)) {
+                    continue;
+                }
+                if (!sP1.getExchangeName().equals(sP2.getExchangeName()) && sP1.getBase().equals(sP2.getBase()) && sP1
+                        .getTarget().equals(sP2.getTarget())) {
+                    relevantSP.add(sP1);
+                    relevantSP.add(sP2);
+                }
+            }
+        }
+        return relevantSP;
     }
 
     private ExchangeClientService getExchangeClientService(ExchangeName exchangeName) {

@@ -3,11 +3,14 @@ package my.dub.dlp_pilot.repository.container;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import my.dub.dlp_pilot.model.ExchangeName;
+import my.dub.dlp_pilot.model.dto.PriceData;
 import my.dub.dlp_pilot.model.dto.SymbolPair;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
@@ -18,20 +21,23 @@ public class SymbolPairContainer {
 
     private final Map<ExchangeName, List<SymbolPair>> symbolPairsMap = new ConcurrentHashMap<>();
 
-    public void add(@NonNull List<SymbolPair> symbolPairs) {
-        checkNotNull(symbolPairs, "Cannot add null item list to container!");
-        SymbolPair symbolPairFirst = symbolPairs.get(0);
-        checkArgument(symbolPairs.stream().allMatch(
-                symbolPair -> symbolPair.getExchangeName().equals(symbolPairFirst.getExchangeName())),
-                      "SymbolPairs cannot have different ExchangeNames when adding to container!");
-
-        symbolPairsMap.put(symbolPairFirst.getExchangeName(), symbolPairs);
+    public void addAll(@NonNull Collection<SymbolPair> symbolPairs) {
+        checkNotNull(symbolPairs, "Cannot add null item to container!");
+        Map<ExchangeName, List<SymbolPair>> collectedSP =
+                symbolPairs.stream().collect(Collectors.groupingBy(PriceData::getExchangeName));
+        symbolPairsMap.putAll(collectedSP);
     }
 
     public List<SymbolPair> getAll(@NonNull ExchangeName exchangeName) {
         checkNotNull(exchangeName, "Cannot get list if ExchangeName is null!");
 
         return symbolPairsMap.get(exchangeName);
+    }
+
+    public List<SymbolPair> getAll() {
+        return symbolPairsMap.entrySet().stream()
+                .flatMap(exchangeNameListEntry -> exchangeNameListEntry.getValue().stream())
+                .collect(Collectors.toList());
     }
 
     public SymbolPair get(@NonNull ExchangeName exchangeName, int index) {
@@ -54,5 +60,9 @@ public class SymbolPairContainer {
         checkArgument(index >= 0, "Cannot remove item if index < 0!");
 
         Optional.ofNullable(symbolPairsMap.get(exchangeName)).ifPresent(symbolPairs -> symbolPairs.remove(index));
+    }
+
+    public void removeAll() {
+        symbolPairsMap.clear();
     }
 }

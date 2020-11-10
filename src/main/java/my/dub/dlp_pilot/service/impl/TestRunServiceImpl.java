@@ -93,15 +93,16 @@ public class TestRunServiceImpl implements TestRunService {
         ExchangeName name = exchange.getName();
         boolean isDescPreload = Boolean.FALSE.equals(exchange.getAscendingPreload());
         TimeFrame dataCaptureTimeFrame = parameters.getDataCaptureTimeFrame();
-        LocalDateTime fallbackStartTime =
-                isDescPreload ? currentTestRun.getStartTime() : currentTestRun.getPreloadStartTime().minus(dataCaptureTimeFrame.getDuration());
+        LocalDateTime fallbackStartTime = isDescPreload
+                ? currentTestRun.getStartTime()
+                : currentTestRun.getPreloadStartTime().minus(dataCaptureTimeFrame.getDuration());
         ZonedDateTime startTime = Optional.ofNullable(preloadPairsDateTimeMap.get(name))
                 .orElse(DateUtils.toZonedDateTime(fallbackStartTime));
         ZonedDateTime endTime = DateUtils
                 .toZonedDateTime(isDescPreload ? currentTestRun.getPreloadStartTime() : currentTestRun.getStartTime());
         AtomicInteger atomicSymbolPairIndex = loadPairsIndexMap.get(name);
-        List<Bar> bars = clientService
-                .fetchBars(name, dataCaptureTimeFrame, startTime, atomicSymbolPairIndex.get(), endTime);
+        List<Bar> bars =
+                clientService.fetchBars(name, dataCaptureTimeFrame, startTime, atomicSymbolPairIndex.get(), endTime);
         if (bars.isEmpty()) {
             clientService.removeSymbolPair(name, atomicSymbolPairIndex.get());
             preloadPairsDateTimeMap.remove(name);
@@ -192,6 +193,7 @@ public class TestRunServiceImpl implements TestRunService {
         priceDifferenceService.createPriceDifferences(barAverages);
         updateTradeStartEndTime();
         preloadPairsDateTimeMap.clear();
+        clientService.updateSymbolPairs();
     }
 
     @Override

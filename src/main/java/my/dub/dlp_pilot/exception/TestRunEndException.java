@@ -9,4 +9,8 @@ public class TestRunEndException extends RuntimeException {
     public TestRunEndException() {
         super("Test Run finished");
     }
+
+    public TestRunEndException(String message) {
+        super(message);
+    }
 }
