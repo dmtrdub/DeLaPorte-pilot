@@ -47,8 +47,6 @@ public final class Constants {
 
     public static final String DEFAULT_PAIR_DELIMITER = "/";
 
-    public static final List<String> BITFINEX_TARGET_SYMBOLS = List.of("BTC", "ETH", "USD", "EUR", "JPY", "GBP", "EOS");
-
     public static final String NO_TICKERS_FOUND_IN_RESPONSE_MSG = "No tickers found in response!";
     public static final String NO_BARS_FOUND_IN_RESPONSE_MSG = "No bars found in response!";
     public static final String NO_SYMBOL_DATA_FOUND_IN_RESPONSE_MSG = "No symbol data found in response!";

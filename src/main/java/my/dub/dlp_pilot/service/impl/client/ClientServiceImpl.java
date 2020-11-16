@@ -150,7 +150,7 @@ public class ClientServiceImpl implements ClientService {
             fetchedBars = exchangeClientService.fetchBars(symbolPair, timeFrame, ++barsToLoad);
             log.trace("Successfully fetched {} bars from {} exchange", fetchedBars.size(), exchangeName.getFullName());
         } catch (UnexpectedEndpointResponseException | UnexpectedResponseStatusCodeException e) {
-            log.warn(e.getMessage());
+            log.warn("{} Symbol pair: {} ", e.getMessage(), symbolPair.getPair());
         } catch (IOException e) {
             log.error("Unable to fetch bars on {} exchange! Details: {}", exchangeName, e.toString());
         }

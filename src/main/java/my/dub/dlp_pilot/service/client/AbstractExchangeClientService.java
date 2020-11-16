@@ -12,7 +12,6 @@ import my.dub.dlp_pilot.Constants;
 import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.dto.SymbolPair;
-import my.dub.dlp_pilot.model.dto.Ticker;
 import my.dub.dlp_pilot.service.ExchangeService;
 import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.beans.factory.InitializingBean;
@@ -82,7 +81,7 @@ public abstract class AbstractExchangeClientService implements InitializingBean 
 
         try {
             if (dateTimeNode.isInt() || dateTimeNode.isLong()) {
-                return Optional.of(DateUtils.dateTimeFromEpochMilli(dateTimeNode.asLong()));
+                return parseDateTime(dateTimeNode, ChronoUnit.MILLIS);
             }
             return Optional.of(DateUtils.parseDefaultZoneDateTime(dateTimeStr));
         } catch (DateTimeParseException e) {
@@ -92,17 +91,24 @@ public abstract class AbstractExchangeClientService implements InitializingBean 
         }
     }
 
-    protected void setTickerDateTime(JsonNode innerNode, Ticker ticker, String fieldName, ChronoUnit epochChronoUnit) {
+    protected Optional<ZonedDateTime> parseDateTime(JsonNode dateTimeNode, ChronoUnit epochChronoUnit) {
+        if (dateTimeNode == null) {
+            log.trace("Null or empty dateTime node found in response from {} exchange. Skipping...", exchangeFullName);
+            return Optional.empty();
+        }
         ZonedDateTime dateTime;
-        long epoch = innerNode.get(fieldName).asLong();
-        if (ChronoUnit.SECONDS.equals(epochChronoUnit)) {
-            dateTime = DateUtils.dateTimeFromEpochSecond(epoch);
-        } else {
-            dateTime = DateUtils.dateTimeFromEpochMilli(epoch);
+        long epoch = dateTimeNode.asLong();
+        try {
+            if (ChronoUnit.SECONDS.equals(epochChronoUnit)) {
+                dateTime = DateUtils.dateTimeFromEpochSecond(epoch);
+            } else {
+                dateTime = DateUtils.dateTimeFromEpochMilli(epoch);
+            }
+        } catch (DateTimeParseException e) {
+            log.trace("Wrong dateTime found in response ({}) from {} exchange. Skipping...", epoch, exchangeFullName);
+            return Optional.empty();
         }
-        if (dateTime.isBefore(DateUtils.currentDateTimeUTC())) {
-            ticker.setDateTime(dateTime);
-        }
+        return Optional.of(dateTime);
     }
 
     protected boolean setSymbols(String input, String splitRegex, SymbolPair symbolPair) {

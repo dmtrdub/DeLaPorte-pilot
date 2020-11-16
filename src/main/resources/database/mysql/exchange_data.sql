@@ -4,13 +4,13 @@ values ('BIGONE', 0, 0.0005, 0.1, 7, 'https://big.one/api/v3/', 500, 100, 2700, 
        ('BINANCE', 0, 0.0005, 0.1, 10, 'https://api.binance.com/api/v3/', 1000, 100, 1100, 1),
        ('BITFINEX', 0, 0, 0.2, 10, 'https://api-pub.bitfinex.com/v2/', 10000, 30, 60, 1),
        ('BITMAX', 0, 0.0005, 0.1, 8, 'https://bitmax.io/api/pro/v1/', 500, 100, 580, 1),
+       ('GATE', 0, 0.0005, 0.2, 9, 'https://api.gateio.ws/api/v4/', 1000 , 100, 10000, 1),
 
        /*to be added*/
        ('BITBAY', 0, 0.0002, 0.1, 7, 'https://api.bitbay.net/rest/', 55),
        ('BITMART', 0, 0.00005, 0.2, 6, 'https://openapi.bitmart.com/v2/', 60),
        ('BITTREX', 0, 0.0005, 0.2, 9, 'https://api.bittrex.com/v3/', 60),
-       ('EXMO', 0, 0.0005, 0.4, 8, 'https://api.exmo.com/v1.1/', 100),
-       ('GATE', 0, 0.0005, 0.2, 9, 'https://data.gateio.la/api2/1/', 100),
+
        ('HUOBI', 0, 0.4, 0.2, 10, 'https://api.huobi.pro/', 100),
 
        ('kraken', 'Kraken', 0, 0.0001, 0.26, 135, 10),

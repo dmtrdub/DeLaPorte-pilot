@@ -99,9 +99,6 @@ public class ApiClient {
                 case EXMO:
                     result = fetchExmoTickers(exchange);
                     break;
-                case GATE:
-                    result = fetchGateTickers(exchange);
-                    break;
                 case HUOBI:
                     result = fetchHuobiTickers(exchange);
                     break;
@@ -301,51 +298,6 @@ public class ApiClient {
             ticker.setPriceAsk(new BigDecimal(innerNode.get("sell_price").asText()));
             ticker.setPriceBid(new BigDecimal(innerNode.get("buy_price").asText()));
             setTickerDateTime(innerNode, ticker, "updated", ChronoUnit.SECONDS);
-            tickers.add(ticker);
-        });
-        return tickers;
-    }
-
-    /**
-     * @param exchange
-     *
-     * @see <a href="https://www.gate.io/en/api2#tickers">GATE.IO REST API - Tickers</a>
-     */
-    private Set<Ticker> fetchGateTickers(Exchange exchange) throws IOException {
-        String exchangeName = exchange.getFullName();
-        String resp = executeRequest(exchange.getBaseEndpoint(), "tickers", exchangeName);
-        JsonNode parentNode = new ObjectMapper().readTree(resp);
-        if (parentNode == null || parentNode.isEmpty()) {
-            throw new UnexpectedEndpointResponseException(exchangeName, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
-        }
-        JsonNode errorCodeNode = parentNode.get(CODE);
-        if (errorCodeNode != null) {
-            throw new UnexpectedEndpointResponseException(exchangeName, errorCodeNode.asText(),
-                                                          parentNode.get(MESSAGE).asText());
-        }
-        Set<Ticker> tickers = new HashSet<>();
-        parentNode.fields().forEachRemaining(entry -> {
-            Ticker ticker = new Ticker(ExchangeName.GATE);
-            boolean parsePairResult = setSymbols(entry.getKey(), "_", ticker);
-            if (!parsePairResult) {
-                return;
-            }
-            JsonNode innerNode = entry.getValue();
-            BigDecimal close = parsePrice(innerNode.get("last"), exchangeName);
-            if (close == null) {
-                return;
-            }
-            ticker.setClosePrice(close);
-            BigDecimal ask = parsePrice(innerNode.get("lowestAsk"), exchangeName);
-            if (ask == null) {
-                return;
-            }
-            ticker.setPriceAsk(ask);
-            BigDecimal bid = parsePrice(innerNode.get("highestBid"), exchangeName);
-            if (bid == null) {
-                return;
-            }
-            ticker.setPriceBid(bid);
             tickers.add(ticker);
         });
         return tickers;
