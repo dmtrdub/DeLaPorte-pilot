@@ -11,7 +11,6 @@ import java.io.IOException;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -99,7 +98,9 @@ public class GateExchangeClientService extends AbstractExchangeClientService imp
     @Override
     public List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame,
             @NonNull ZonedDateTime startTime, @NonNull ZonedDateTime endTime) throws IOException {
-        return fetchBars(symbolPair, timeFrame, startTime, endTime, exchange.getMaxBarsPerRequest());
+        ZonedDateTime limitedEndTime = startTime
+                .plus((exchange.getMaxBarsPerRequest() - 1) * timeFrame.getDuration().toMillis(), ChronoUnit.MILLIS);
+        return fetchBars(symbolPair, timeFrame, startTime, limitedEndTime, -1);
     }
 
     @Override
@@ -126,11 +127,12 @@ public class GateExchangeClientService extends AbstractExchangeClientService imp
         if (startTime != null) {
             queryParams.put("from", String.valueOf(startTime.toEpochSecond()));
         }
+        if (endTime != null) {
+            queryParams.put("to", String.valueOf(endTime.toEpochSecond()));
+        }
         if (barsLimit > 0) {
             checkBarsLimit(barsLimit);
             queryParams.put("limit", String.valueOf(barsLimit));
-        } else {
-            return Collections.emptyList();
         }
         queryParams.put("interval", timeFrame.getExchangeValue(exchangeName));
         queryParams.put("currency_pair", symbolPair.getName());
