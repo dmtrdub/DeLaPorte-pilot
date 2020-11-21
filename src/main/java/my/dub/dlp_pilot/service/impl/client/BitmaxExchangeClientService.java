@@ -147,7 +147,7 @@ public class BitmaxExchangeClientService extends AbstractExchangeClientService i
             queryParams.put("from", String.valueOf(startTime.toInstant().toEpochMilli()));
         }
         if (barsLimit > 0) {
-            checkBarsLimit(barsLimit);
+            barsLimit = checkBarsLimit(barsLimit);
             queryParams.put("n", String.valueOf(barsLimit));
         } else {
             return Collections.emptyList();

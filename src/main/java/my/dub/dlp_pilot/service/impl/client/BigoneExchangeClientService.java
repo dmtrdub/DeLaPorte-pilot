@@ -132,7 +132,7 @@ public class BigoneExchangeClientService extends AbstractExchangeClientService i
             queryParams.put("time", DateUtils.toIsoInstantString(startTime));
         }
         if (barsLimit > 0) {
-            checkBarsLimit(barsLimit);
+            barsLimit = checkBarsLimit(barsLimit);
             queryParams.put("limit", String.valueOf(barsLimit));
         } else {
             return Collections.emptyList();

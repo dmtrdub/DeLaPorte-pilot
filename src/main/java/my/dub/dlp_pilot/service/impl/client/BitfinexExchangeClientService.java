@@ -138,7 +138,7 @@ public class BitfinexExchangeClientService extends AbstractExchangeClientService
             queryParams.put("start", String.valueOf(startTime.toInstant().toEpochMilli()));
         }
         if (barsLimit > 0) {
-            checkBarsLimit(barsLimit);
+            barsLimit = checkBarsLimit(barsLimit);
             queryParams.put("limit", String.valueOf(barsLimit));
         } else {
             return Collections.emptyList();

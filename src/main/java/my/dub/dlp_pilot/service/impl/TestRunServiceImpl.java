@@ -34,6 +34,7 @@ import my.dub.dlp_pilot.service.TradeService;
 import my.dub.dlp_pilot.service.client.ClientService;
 import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -159,6 +160,7 @@ public class TestRunServiceImpl implements TestRunService {
     @Override
     public void onRefreshLoadComplete(ExchangeName exchangeName, boolean isPreloadComplete) {
         if (isPreloadComplete) {
+            //TODO: fix incorrect time
             List<BarAverage> barAverages = barService.loadBarAverages(currentTestRun, exchangeName);
             priceDifferenceService.updatePriceDifferences(barAverages);
             List<LastBar> lastBars = barAverages.stream()
@@ -203,6 +205,12 @@ public class TestRunServiceImpl implements TestRunService {
         }
     }
 
+    @Override
+    public void updateResultFile(@NonNull String filePath) {
+        currentTestRun.setPathToResultFile(filePath);
+        currentTestRun = repository.save(currentTestRun);
+    }
+
     private void createAndSave() {
         TestRun testRun = new TestRun();
         String configuration = parameters.getConfiguration()
@@ -230,6 +238,14 @@ public class TestRunServiceImpl implements TestRunService {
     @Override
     public TestRun getCurrentTestRun() {
         return currentTestRun;
+    }
+
+    @Override
+    public boolean checkTradeStopped() {
+        if (!tradeStop.get()) {
+            tradeStop.set(!LocalDateTime.now().isBefore(tradeStopDateTime));
+        }
+        return tradeStop.get();
     }
 
     @Override
@@ -267,7 +283,7 @@ public class TestRunServiceImpl implements TestRunService {
                 Files.delete(exitFile.toPath());
             }
         } catch (IOException e) {
-            log.error("Error when reading exit file {}! Details: {}", exitFile, e.getMessage());
+            log.error("Error when working with exit file {}! Details: {}", exitFile, e.getMessage());
         }
     }
 
@@ -276,12 +292,5 @@ public class TestRunServiceImpl implements TestRunService {
             tickerStaleCheckEnd.set(!LocalDateTime.now().isBefore(tickerStaleCheckEndDateTime));
         }
         return tickerStaleCheckEnd.get();
-    }
-
-    private boolean checkTradeStopped() {
-        if (!tradeStop.get()) {
-            tradeStop.set(!LocalDateTime.now().isBefore(tradeStopDateTime));
-        }
-        return tradeStop.get();
     }
 }

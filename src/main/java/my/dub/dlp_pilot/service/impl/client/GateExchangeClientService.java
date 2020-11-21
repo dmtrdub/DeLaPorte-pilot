@@ -131,7 +131,7 @@ public class GateExchangeClientService extends AbstractExchangeClientService imp
             queryParams.put("to", String.valueOf(endTime.toEpochSecond()));
         }
         if (barsLimit > 0) {
-            checkBarsLimit(barsLimit);
+            barsLimit = checkBarsLimit(barsLimit);
             queryParams.put("limit", String.valueOf(barsLimit));
         }
         queryParams.put("interval", timeFrame.getExchangeValue(exchangeName));

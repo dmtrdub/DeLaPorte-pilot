@@ -121,6 +121,9 @@ public class ScheduledService implements InitializingBean {
             if (finished) {
                 taskSchedulerLoadFutures.remove(exchangeName).cancel(true);
                 testRunService.onRefreshLoadComplete(exchangeName, preloadCountDownLatch.getCount() == 0);
+                if(testRunService.checkTradeStopped() || testRunService.checkTestRunEnd()) {
+                    return;
+                }
                 setNextLoadTask(exchange);
             }
         };

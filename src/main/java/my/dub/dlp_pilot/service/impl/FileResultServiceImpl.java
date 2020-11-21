@@ -90,6 +90,7 @@ public class FileResultServiceImpl implements FileResultService {
         Path fullFilePath = Path.of(resultDir, fileName);
         filePath = Files.write(fullFilePath, List.of(header), StandardOpenOption.CREATE);
         log.info("Created test result file: {}", filePath);
+        testRunService.updateResultFile(filePath.toString());
     }
 
     private String getTradeResultString(Trade trade) {

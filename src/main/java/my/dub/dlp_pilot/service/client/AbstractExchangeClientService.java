@@ -144,7 +144,7 @@ public abstract class AbstractExchangeClientService implements InitializingBean 
     protected long checkBarsLimit(long barsLimit) {
         Integer maxBarsPerRequest = exchange.getMaxBarsPerRequest();
         if (barsLimit > maxBarsPerRequest) {
-            log.warn("Bars limit ({}) exceeds allowed size ({}). Setting to max value.", barsLimit, maxBarsPerRequest);
+            log.warn("Bars limit ({}) exceeds allowed size ({}) for {} exchange. Setting to max value.", barsLimit, maxBarsPerRequest, exchangeFullName);
             barsLimit = maxBarsPerRequest;
         }
         return barsLimit;
