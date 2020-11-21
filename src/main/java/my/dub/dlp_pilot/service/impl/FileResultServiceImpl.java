@@ -8,7 +8,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.time.ZonedDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -73,7 +73,8 @@ public class FileResultServiceImpl implements FileResultService {
         Set<String> linesToWrite = completedTrades.stream().map(this::getTradeResultString).collect(Collectors.toSet());
         try {
             Files.write(filePath, linesToWrite, StandardOpenOption.APPEND);
-            tradeService.updateTradesWrittenToFile(completedTrades);
+            completedTrades.forEach(trade -> trade.setWrittenToFile(true));
+            tradeService.saveOrUpdate(completedTrades);
             log.debug("Successfully written {} lines to test result file {}", linesToWrite.size(), filePath);
         } catch (IOException e) {
             log.error("Error when writing to test result file {}! Details: {}", filePath, e.getMessage());
@@ -99,8 +100,8 @@ public class FileResultServiceImpl implements FileResultService {
         String dynamicResult = trade.getResultData().stream().map(resultData -> String.join(",", decimalResults(
                 resultData.getPnlUsdShort(), resultData.getPnlUsdLong(), resultData.getTotalExpensesUsd(),
                 resultData.getIncomeUsd()))).collect(Collectors.joining(","));
-        ZonedDateTime startTime = trade.getStartTime();
-        ZonedDateTime endTime = trade.getEndTime();
+        Instant startTime = trade.getStartTime();
+        Instant endTime = trade.getEndTime();
         return String.join(",", trade.getBase(), trade.getTarget(), decimalResult(trade.getEntryPercentageDiff()),
                            dynamicResult, DateUtils.formatDateTime(startTime), DateUtils.formatDateTime(endTime),
                            DateUtils.durationSecondsDetailed(startTime, endTime), trade.getResultType().name(),

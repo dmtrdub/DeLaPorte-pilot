@@ -8,7 +8,7 @@ import static my.dub.dlp_pilot.util.ApiClientUtils.executeRequestParseResponse;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
-import java.time.ZonedDateTime;
+import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,7 +26,6 @@ import my.dub.dlp_pilot.model.dto.Ticker;
 import my.dub.dlp_pilot.service.ExchangeClientService;
 import my.dub.dlp_pilot.service.ExchangeService;
 import my.dub.dlp_pilot.service.client.AbstractExchangeClientService;
-import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
@@ -96,9 +95,9 @@ public class GateExchangeClientService extends AbstractExchangeClientService imp
      * candlesticks</a>
      */
     @Override
-    public List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame,
-            @NonNull ZonedDateTime startTime, @NonNull ZonedDateTime endTime) throws IOException {
-        ZonedDateTime limitedEndTime = startTime
+    public List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame, @NonNull Instant startTime,
+            @NonNull Instant endTime) throws IOException {
+        Instant limitedEndTime = startTime
                 .plus((exchange.getMaxBarsPerRequest() - 1) * timeFrame.getDuration().toMillis(), ChronoUnit.MILLIS);
         return fetchBars(symbolPair, timeFrame, startTime, limitedEndTime, -1);
     }
@@ -121,14 +120,14 @@ public class GateExchangeClientService extends AbstractExchangeClientService imp
         }
     }
 
-    private List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame, ZonedDateTime startTime,
-            ZonedDateTime endTime, long barsLimit) throws IOException {
+    private List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame, Instant startTime,
+            Instant endTime, long barsLimit) throws IOException {
         Map<String, String> queryParams = new HashMap<>();
         if (startTime != null) {
-            queryParams.put("from", String.valueOf(startTime.toEpochSecond()));
+            queryParams.put("from", String.valueOf(startTime.getEpochSecond()));
         }
         if (endTime != null) {
-            queryParams.put("to", String.valueOf(endTime.toEpochSecond()));
+            queryParams.put("to", String.valueOf(endTime.getEpochSecond()));
         }
         if (barsLimit > 0) {
             barsLimit = checkBarsLimit(barsLimit);
@@ -143,12 +142,12 @@ public class GateExchangeClientService extends AbstractExchangeClientService imp
         for (JsonNode innerNode : parentNode) {
             Bar bar;
             try {
-                ZonedDateTime openTime = parseDateTime(innerNode.get(0), ChronoUnit.SECONDS).orElseThrow();
-                ZonedDateTime closeTime = openTime.plus(timeFrame.getDuration());
+                Instant openTime = parseDateTimeFromSeconds(innerNode.get(0)).orElseThrow();
+                Instant closeTime = openTime.plus(timeFrame.getDuration());
                 if (endTime != null && openTime.isAfter(endTime)) {
                     break;
                 }
-                if (closeTime.isAfter(DateUtils.currentDateTimeUTC())) {
+                if (closeTime.isAfter(Instant.now())) {
                     continue;
                 }
                 bar = createBar(innerNode, symbolPair.getBase(), symbolPair.getTarget());

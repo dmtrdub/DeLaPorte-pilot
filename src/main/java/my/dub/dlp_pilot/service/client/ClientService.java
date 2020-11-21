@@ -1,6 +1,6 @@
 package my.dub.dlp_pilot.service.client;
 
-import java.time.ZonedDateTime;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -22,7 +22,7 @@ public interface ClientService {
     Set<Ticker> fetchTickers(@NonNull ExchangeName exchangeName);
 
     List<Bar> fetchBars(@NonNull ExchangeName exchangeName, @NonNull TimeFrame timeFrame,
-            @NonNull ZonedDateTime startTime, int symbolPairIndex, ZonedDateTime endTime);
+            @NonNull Instant startTime, int symbolPairIndex, Instant endTime);
 
     List<Bar> fetchBars(@NonNull ExchangeName exchangeName, @NonNull TimeFrame timeFrame, int symbolPairIndex,
             @NonNull Collection<LastBar> lastBars);

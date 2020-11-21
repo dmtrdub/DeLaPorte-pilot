@@ -6,7 +6,7 @@ import static my.dub.dlp_pilot.util.ApiClientUtils.executeRequestParseResponse;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
-import java.time.ZonedDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -26,7 +26,6 @@ import my.dub.dlp_pilot.model.dto.Ticker;
 import my.dub.dlp_pilot.service.ExchangeClientService;
 import my.dub.dlp_pilot.service.ExchangeService;
 import my.dub.dlp_pilot.service.client.AbstractExchangeClientService;
-import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
@@ -110,8 +109,8 @@ public class BitmaxExchangeClientService extends AbstractExchangeClientService i
      * Historical Bar Data</a>
      */
     @Override
-    public List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame,
-            @NonNull ZonedDateTime startTime, @NonNull ZonedDateTime endTime) throws IOException {
+    public List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame, @NonNull Instant startTime,
+            @NonNull Instant endTime) throws IOException {
         return fetchBars(symbolPair, timeFrame, startTime, endTime, exchange.getMaxBarsPerRequest());
     }
 
@@ -138,13 +137,13 @@ public class BitmaxExchangeClientService extends AbstractExchangeClientService i
         return dataNode;
     }
 
-    private List<Bar> fetchBars(SymbolPair symbolPair, TimeFrame timeFrame, ZonedDateTime startTime,
-            ZonedDateTime endTime, long barsLimit) throws IOException {
+    private List<Bar> fetchBars(SymbolPair symbolPair, TimeFrame timeFrame, Instant startTime, Instant endTime,
+            long barsLimit) throws IOException {
         Map<String, String> queryParams = new HashMap<>();
         queryParams.put(SYMBOL, symbolPair.getName());
         queryParams.put("interval", timeFrame.getExchangeValue(exchangeName));
         if (startTime != null) {
-            queryParams.put("from", String.valueOf(startTime.toInstant().toEpochMilli()));
+            queryParams.put("from", String.valueOf(startTime.toEpochMilli()));
         }
         if (barsLimit > 0) {
             barsLimit = checkBarsLimit(barsLimit);
@@ -165,12 +164,12 @@ public class BitmaxExchangeClientService extends AbstractExchangeClientService i
                     log.trace("Inner node does not contain bar data in response for exchange {}!", exchangeName);
                     continue;
                 }
-                ZonedDateTime openTime = parseDateTime(innerDataNode.get("ts")).orElseThrow();
-                ZonedDateTime closeTime = openTime.plus(timeFrame.getDuration());
+                Instant openTime = parseDateTimeFromMillis(innerDataNode.get("ts")).orElseThrow();
+                Instant closeTime = openTime.plus(timeFrame.getDuration());
                 if (endTime != null && openTime.isAfter(endTime)) {
                     break;
                 }
-                if (closeTime.isAfter(DateUtils.currentDateTimeUTC())) {
+                if (closeTime.isAfter(Instant.now())) {
                     continue;
                 }
                 bar = new Bar(exchangeName, symbolPair.getBase(), symbolPair.getTarget());

@@ -4,7 +4,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.io.IOException;
-import java.time.ZonedDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -100,7 +100,7 @@ public class ClientServiceImpl implements ClientService {
 
     @Override
     public List<Bar> fetchBars(@NonNull ExchangeName exchangeName, @NonNull TimeFrame timeFrame,
-            @NonNull ZonedDateTime startTime, int symbolPairIndex, @NonNull ZonedDateTime endTime) {
+            @NonNull Instant startTime, int symbolPairIndex, @NonNull Instant endTime) {
         checkNotNull(exchangeName, "Cannot fetch Bars if exchangeName is null!");
         checkNotNull(timeFrame, "Cannot fetch Bars if timeFrame is null!");
         checkNotNull(startTime, "Cannot fetch Bars if startTime is null!");
@@ -138,8 +138,7 @@ public class ClientServiceImpl implements ClientService {
                       symbolPair.getTarget());
             return fetchedBars;
         }
-        if (!DateUtils
-                .isDurationLonger(lastBar.getCloseTime(), DateUtils.currentDateTimeUTC(), timeFrame.getDuration())) {
+        if (!DateUtils.isCurrentDurationLonger(lastBar.getCloseTime(), timeFrame.getDuration())) {
             return fetchedBars;
         }
         long barsToLoad = DateUtils.durationMillis(lastBar.getCloseTime()) / timeFrame.getDuration().toMillis();

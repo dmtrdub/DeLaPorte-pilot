@@ -5,7 +5,7 @@ import static my.dub.dlp_pilot.Constants.VOLUME_SCALE;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
-import java.time.ZonedDateTime;
+import java.time.Instant;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.FetchType;
@@ -60,10 +60,10 @@ public class Bar extends PriceData implements Serializable {
     private BigDecimal volume;
 
     @Column(name = "time_open", columnDefinition = "default CURRENT_TIMESTAMP")
-    private ZonedDateTime openTime;
+    private Instant openTime;
 
     @Column(name = "time_close", columnDefinition = "default CURRENT_TIMESTAMP")
-    private ZonedDateTime closeTime;
+    private Instant closeTime;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "test_run_id", updatable = false, nullable = false)

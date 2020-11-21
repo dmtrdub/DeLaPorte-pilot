@@ -8,7 +8,7 @@ import static my.dub.dlp_pilot.util.ApiClientUtils.executeRequestParseResponse;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
-import java.time.ZonedDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -114,8 +114,8 @@ public class BigoneExchangeClientService extends AbstractExchangeClientService i
      * Candles of an asset pair</a>
      */
     @Override
-    public List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame,
-            @NonNull ZonedDateTime startTime, @NonNull ZonedDateTime endTime) throws IOException {
+    public List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame, @NonNull Instant startTime,
+            @NonNull Instant endTime) throws IOException {
         return fetchBars(symbolPair, timeFrame, startTime, endTime, exchange.getMaxBarsPerRequest());
     }
 
@@ -125,8 +125,8 @@ public class BigoneExchangeClientService extends AbstractExchangeClientService i
         return fetchBars(symbolPair, timeFrame, null, null, barsLimit);
     }
 
-    private List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame, ZonedDateTime startTime,
-            ZonedDateTime endTime, long barsLimit) throws IOException {
+    private List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame, Instant startTime,
+            Instant endTime, long barsLimit) throws IOException {
         Map<String, String> queryParams = new HashMap<>();
         if (startTime != null) {
             queryParams.put("time", DateUtils.toIsoInstantString(startTime));
@@ -147,12 +147,12 @@ public class BigoneExchangeClientService extends AbstractExchangeClientService i
         for (JsonNode innerNode : dataNode) {
             Bar bar;
             try {
-                ZonedDateTime openTime = parseDateTime(innerNode.get("time")).orElseThrow();
-                ZonedDateTime closeTime = openTime.plus(timeFrame.getDuration());
+                Instant openTime = parseDateTimeHR(innerNode.get("time")).orElseThrow();
+                Instant closeTime = openTime.plus(timeFrame.getDuration());
                 if (endTime != null && closeTime.isBefore(endTime)) {
                     break;
                 }
-                if (closeTime.isAfter(DateUtils.currentDateTimeUTC())) {
+                if (closeTime.isAfter(Instant.now())) {
                     continue;
                 }
                 bar = createBar(innerNode, symbolPair.getBase(), symbolPair.getTarget());

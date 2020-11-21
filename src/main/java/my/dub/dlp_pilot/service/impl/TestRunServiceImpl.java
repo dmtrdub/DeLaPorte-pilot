@@ -3,9 +3,9 @@ package my.dub.dlp_pilot.service.impl;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZonedDateTime;
-import java.time.chrono.ChronoZonedDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -64,7 +64,7 @@ public class TestRunServiceImpl implements TestRunService {
     private final AtomicBoolean testRunEnd = new AtomicBoolean();
 
     private final Map<ExchangeName, AtomicInteger> loadPairsIndexMap = new ConcurrentHashMap<>();
-    private final Map<ExchangeName, ZonedDateTime> preloadPairsDateTimeMap = new ConcurrentHashMap<>();
+    private final Map<ExchangeName, Instant> preloadPairsDateTimeMap = new ConcurrentHashMap<>();
     private final Map<ExchangeName, List<LastBar>> refreshLoadLastBars = new ConcurrentHashMap<>();
 
     @Autowired
@@ -97,10 +97,10 @@ public class TestRunServiceImpl implements TestRunService {
         LocalDateTime fallbackStartTime = isDescPreload
                 ? currentTestRun.getStartTime()
                 : currentTestRun.getPreloadStartTime().minus(dataCaptureTimeFrame.getDuration());
-        ZonedDateTime startTime = Optional.ofNullable(preloadPairsDateTimeMap.get(name))
-                .orElse(DateUtils.toZonedDateTime(fallbackStartTime));
-        ZonedDateTime endTime = DateUtils
-                .toZonedDateTime(isDescPreload ? currentTestRun.getPreloadStartTime() : currentTestRun.getStartTime());
+        Instant startTime =
+                Optional.ofNullable(preloadPairsDateTimeMap.get(name)).orElse(DateUtils.toInstant(fallbackStartTime));
+        Instant endTime = DateUtils
+                .toInstant(isDescPreload ? currentTestRun.getPreloadStartTime() : currentTestRun.getStartTime());
         AtomicInteger atomicSymbolPairIndex = loadPairsIndexMap.get(name);
         List<Bar> bars =
                 clientService.fetchBars(name, dataCaptureTimeFrame, startTime, atomicSymbolPairIndex.get(), endTime);
@@ -115,13 +115,13 @@ public class TestRunServiceImpl implements TestRunService {
             atomicSymbolPairIndex.incrementAndGet();
             preloadPairsDateTimeMap.remove(name);
         } else {
-            ZonedDateTime preloadIterationEndDateTime;
+            Instant preloadIterationEndDateTime;
             if (isDescPreload) {
                 preloadIterationEndDateTime =
-                        bars.stream().map(Bar::getOpenTime).min(ChronoZonedDateTime::compareTo).orElse(startTime);
+                        bars.stream().map(Bar::getOpenTime).min(Comparator.naturalOrder()).orElse(startTime);
             } else {
                 preloadIterationEndDateTime =
-                        bars.stream().map(Bar::getCloseTime).max(ChronoZonedDateTime::compareTo).orElse(endTime);
+                        bars.stream().map(Bar::getCloseTime).max(Comparator.naturalOrder()).orElse(endTime);
             }
             if (DateUtils.isDurationLonger(isDescPreload ? endTime : preloadIterationEndDateTime,
                                            isDescPreload ? preloadIterationEndDateTime : endTime,
@@ -160,19 +160,18 @@ public class TestRunServiceImpl implements TestRunService {
     @Override
     public void onRefreshLoadComplete(ExchangeName exchangeName, boolean isPreloadComplete) {
         if (isPreloadComplete) {
-            //TODO: fix incorrect time
             List<BarAverage> barAverages = barService.loadBarAverages(currentTestRun, exchangeName);
             priceDifferenceService.updatePriceDifferences(barAverages);
             List<LastBar> lastBars = barAverages.stream()
                     .map(barAverage -> new LastBar(barAverage.getExchangeName(), barAverage.getBase(),
-                                                   barAverage.getTarget(), barAverage.getCloseTime()))
+                                                   barAverage.getTarget(), barAverage.getLastCloseTime()))
                     .collect(Collectors.toList());
             refreshLoadLastBars.put(exchangeName, lastBars);
         } else {
             refreshLoadLastBars.put(exchangeName, barService.loadExchangeLastBars(currentTestRun, exchangeName));
         }
         loadPairsIndexMap.get(exchangeName).set(0);
-        log.info("Refresh load finished for {} exchange", exchangeName.getFullName());
+        log.debug("Refresh load finished for {} exchange", exchangeName.getFullName());
     }
 
     @Override
@@ -276,6 +275,7 @@ public class TestRunServiceImpl implements TestRunService {
                 tradeStopDateTime = LocalDateTime.now();
                 testRunEndDateTime = tradeStopDateTime.plus(parameters.getExitDelayDuration());
                 currentTestRun.setEndTime(testRunEndDateTime);
+                currentTestRun.setForcedExit(true);
                 repository.save(currentTestRun);
                 log.info("Found force exit file {} containing valid exit code! Stopping trades now. "
                                  + "Test Run will end at {}", exitFile.getName(),

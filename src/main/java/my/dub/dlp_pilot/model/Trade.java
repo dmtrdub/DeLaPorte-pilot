@@ -6,7 +6,7 @@ import static my.dub.dlp_pilot.Constants.PRICE_SCALE;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
-import java.time.ZonedDateTime;
+import java.time.Instant;
 import java.util.List;
 import javax.persistence.CascadeType;
 import javax.persistence.Column;
@@ -52,10 +52,11 @@ public class Trade implements Serializable {
     private BigDecimal fixedExpensesUsd;
 
     @Column(name = "time_start", columnDefinition = "default CURRENT_TIMESTAMP")
-    private ZonedDateTime startTime;
+    @EqualsAndHashCode.Exclude // some similar trades can be created with minimum start time difference
+    private Instant startTime;
 
     @Column(name = "time_end", columnDefinition = "default CURRENT_TIMESTAMP")
-    private ZonedDateTime endTime;
+    private Instant endTime;
 
     @Column(name = "entry_percentage_diff", nullable = false, precision = 8, scale = PERCENTAGE_SCALE)
     @Digits(integer = 5, fraction = PERCENTAGE_SCALE)
@@ -97,13 +98,15 @@ public class Trade implements Serializable {
     }
 
     public String toShortString() {
-        String first =
-                "Trade{pair=" + getPair() + ", fixedExpensesUsd=" + fixedExpensesUsd + ", startTime=" + DateUtils.formatDateTime(startTime) +
-                        ", entryPercentageDiff=" + entryPercentageDiff;
+        String firstSubStr =
+                String.format("Trade{pair=%s, fixedExpensesUsd=%s, startTime=%s, entryPercentageDiff=%s", getPair(),
+                              fixedExpensesUsd, DateUtils.formatDateTime(startTime), entryPercentageDiff);
+        StringBuilder builder = new StringBuilder(firstSubStr);
         if (!TradeResultType.IN_PROGRESS.equals(resultType)) {
-            first = first + ", endTime=" + DateUtils.formatDateTime(endTime) + ", resultType=" + resultType;
+            builder.append(String.format(", endTime=%s, resultType=%s", DateUtils.formatDateTime(endTime), resultType));
         }
-        return first + ", positionShort=" + positionShort.toShortString() + ", positionLong=" +
-                positionLong.toShortString() + '}';
+        builder.append(String.format(", positionShort=%s, positionLong=%s}", positionShort.toShortString(),
+                                     positionLong.toShortString()));
+        return builder.toString();
     }
 }

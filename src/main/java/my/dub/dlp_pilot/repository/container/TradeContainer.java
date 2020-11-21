@@ -1,6 +1,6 @@
 package my.dub.dlp_pilot.repository.container;
 
-import java.time.ZonedDateTime;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
@@ -10,7 +10,6 @@ import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.Position;
 import my.dub.dlp_pilot.model.Trade;
 import my.dub.dlp_pilot.model.dto.DetrimentalRecord;
-import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Component;
 
@@ -21,11 +20,11 @@ public class TradeContainer {
     private final Set<DetrimentalRecord> detrimentalRecords = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     // check if similar trade exists here, as well as before creating trade
-    public synchronized void addTrade(Trade trade) {
+    public synchronized boolean addTrade(Trade trade) {
         if (trade == null || isSimilarPresent(trade)) {
-            return;
+            return false;
         }
-        trades.put(trade.hashCode(), trade);
+        return trades.putIfAbsent(trade.hashCode(), trade) == null;
     }
 
     public Set<Trade> getTrades(ExchangeName exchangeName) {
@@ -83,7 +82,7 @@ public class TradeContainer {
     }
 
     public void addDetrimentalRecord(ExchangeName exchangeShort, ExchangeName exchangeLong, String base, String target,
-            ZonedDateTime dateTimeClosed) {
+            Instant dateTimeClosed) {
         if (checkHasDetrimentalRecord(exchangeShort, exchangeLong, base, target)) {
             return;
         }
@@ -101,7 +100,7 @@ public class TradeContainer {
         if (existingRecord == null) {
             return false;
         }
-        if (DateUtils.currentDateTimeUTC().isAfter(existingRecord.getInvalidationDateTime())) {
+        if (Instant.now().isAfter(existingRecord.getInvalidationDateTime())) {
             detrimentalRecords.remove(existingRecord);
             return false;
         }

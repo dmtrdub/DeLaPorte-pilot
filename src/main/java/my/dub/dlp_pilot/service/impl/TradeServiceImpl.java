@@ -13,7 +13,7 @@ import static my.dub.dlp_pilot.util.Calculations.pnl;
 
 import java.math.BigDecimal;
 import java.time.Duration;
-import java.time.ZonedDateTime;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -89,10 +89,13 @@ public class TradeServiceImpl implements TradeService {
         }
 
         Trade trade = createTrade(tickerShort, tickerLong, currentPercentageDiff, testRun);
-        tradeContainer.addTrade(trade);
-        log.info("New {} created and added to container. Current price difference: {}; average price difference: {}",
-                 trade.toShortString(), currentPriceDifference.stripTrailingZeros().toPlainString(),
-                 averagePriceDifference.stripTrailingZeros().toPlainString());
+        boolean tradeCreated = tradeContainer.addTrade(trade);
+        if (tradeCreated) {
+            log.info(
+                    "New {} created and added to container. Current price difference: {}; average price difference: {}",
+                    trade.toShortString(), currentPriceDifference.stripTrailingZeros().toPlainString(),
+                    averagePriceDifference.stripTrailingZeros().toPlainString());
+        }
     }
 
     @Override
@@ -164,11 +167,11 @@ public class TradeServiceImpl implements TradeService {
 
     @Override
     @Transactional
-    public void updateTradesWrittenToFile(Collection<Trade> trades) {
+    public void saveOrUpdate(Collection<Trade> trades) {
         if (CollectionUtils.isEmpty(trades)) {
             return;
         }
-        repository.updateTradesSetWrittenToFileTrue(trades.stream().map(Trade::getId).collect(Collectors.toSet()));
+        repository.saveAll(trades);
     }
 
     @Override
@@ -239,7 +242,7 @@ public class TradeServiceImpl implements TradeService {
         }
     }
 
-    private boolean isExistingSuccessful(BigDecimal income, ZonedDateTime tradeStartTime) {
+    private boolean isExistingSuccessful(BigDecimal income, Instant tradeStartTime) {
         BigDecimal amountUsd = parameters.getMinEntryAmount();
         BigDecimal exitPercentage = parameters.getProfitPercentageOnExitSum(DateUtils.durationSeconds(tradeStartTime));
         BigDecimal profitValue = originalValueFromPercent(amountUsd, exitPercentage);
@@ -303,8 +306,7 @@ public class TradeServiceImpl implements TradeService {
     private void recordDetrimental(Trade trade) {
         ExchangeName exchangeShort = trade.getPositionShort().getExchange().getName();
         ExchangeName exchangeLong = trade.getPositionLong().getExchange().getName();
-        ZonedDateTime invalidationDateTime =
-                trade.getEndTime().plus(parameters.getSuspenseAfterDetrimentalTradeDuration());
+        Instant invalidationDateTime = trade.getEndTime().plus(parameters.getSuspenseAfterDetrimentalTradeDuration());
         String base = trade.getBase();
         String target = trade.getTarget();
         tradeContainer.addDetrimentalRecord(exchangeShort, exchangeLong, base, target, invalidationDateTime);
@@ -322,7 +324,7 @@ public class TradeServiceImpl implements TradeService {
         Position positionLong = trade.getPositionLong();
         positionLong.setClosePrice(priceLong);
 
-        trade.setEndTime(DateUtils.currentDateTimeUTC());
+        trade.setEndTime(Instant.now());
         trade.setResultType(resultType);
         List<TradeDynamicResultData> resultData = parameters.getEntryAmounts().stream()
                 .map(amount -> createDynamicResultData(trade, positionShort, positionLong, amount))
@@ -345,7 +347,7 @@ public class TradeServiceImpl implements TradeService {
         trade.setFixedExpensesUsd(exchangeShort.getFixedFeesUsd().add(exchangeLong.getFixedFeesUsd()));
         trade.setTestRun(testRun);
         trade.setWrittenToFile(false);
-        trade.setStartTime(DateUtils.currentDateTimeUTC());
+        trade.setStartTime(Instant.now());
         return trade;
     }
 

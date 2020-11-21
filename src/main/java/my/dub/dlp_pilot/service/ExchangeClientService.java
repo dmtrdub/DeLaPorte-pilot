@@ -1,7 +1,7 @@
 package my.dub.dlp_pilot.service;
 
 import java.io.IOException;
-import java.time.ZonedDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import my.dub.dlp_pilot.model.Bar;
@@ -16,8 +16,8 @@ public interface ExchangeClientService {
 
     Set<Ticker> fetchAllTickers(@NonNull List<SymbolPair> symbolPairs) throws IOException;
 
-    List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame, @NonNull ZonedDateTime startTime,
-            @NonNull ZonedDateTime endTime) throws IOException;
+    List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame, @NonNull Instant startTime,
+            @NonNull Instant endTime) throws IOException;
 
     List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame, long barsLimit)
             throws IOException;

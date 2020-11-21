@@ -86,6 +86,7 @@ public class AppConfig {
         properties.put("hibernate.order_inserts", true);
         properties.put("hibernate.order_updates", true);
         properties.put("hibernate.hbm2ddl.delimiter", ";");
+        properties.put("hibernate.jdbc.time_zone", environment.getRequiredProperty("hibernate.jdbc.time_zone"));
         return properties;
     }
 }

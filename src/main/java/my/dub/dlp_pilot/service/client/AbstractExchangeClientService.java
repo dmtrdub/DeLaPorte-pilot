@@ -3,7 +3,7 @@ package my.dub.dlp_pilot.service.client;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.ZonedDateTime;
+import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
@@ -13,7 +13,6 @@ import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.dto.SymbolPair;
 import my.dub.dlp_pilot.service.ExchangeService;
-import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.beans.factory.InitializingBean;
 
 @Slf4j
@@ -72,18 +71,14 @@ public abstract class AbstractExchangeClientService implements InitializingBean 
         }
     }
 
-    protected Optional<ZonedDateTime> parseDateTime(JsonNode dateTimeNode) {
+    protected Optional<Instant> parseDateTimeHR(JsonNode dateTimeNode) {
         if (dateTimeNode == null) {
             log.trace("Null or empty dateTime node found in response from {} exchange. Skipping...", exchangeFullName);
             return Optional.empty();
         }
         String dateTimeStr = dateTimeNode.asText();
-
         try {
-            if (dateTimeNode.isInt() || dateTimeNode.isLong()) {
-                return parseDateTime(dateTimeNode, ChronoUnit.MILLIS);
-            }
-            return Optional.of(DateUtils.parseDefaultZoneDateTime(dateTimeStr));
+            return Optional.of(Instant.parse(dateTimeStr));
         } catch (DateTimeParseException e) {
             log.trace("Wrong dateTime found in response ({}) from {} exchange. Skipping...", dateTimeStr,
                       exchangeFullName);
@@ -91,18 +86,26 @@ public abstract class AbstractExchangeClientService implements InitializingBean 
         }
     }
 
-    protected Optional<ZonedDateTime> parseDateTime(JsonNode dateTimeNode, ChronoUnit epochChronoUnit) {
+    protected Optional<Instant> parseDateTimeFromMillis(JsonNode dateTimeNode) {
+        return parseDateTime(dateTimeNode, ChronoUnit.MILLIS);
+    }
+
+    protected Optional<Instant> parseDateTimeFromSeconds(JsonNode dateTimeNode) {
+        return parseDateTime(dateTimeNode, ChronoUnit.SECONDS);
+    }
+
+    protected Optional<Instant> parseDateTime(JsonNode dateTimeNode, ChronoUnit epochChronoUnit) {
         if (dateTimeNode == null) {
             log.trace("Null or empty dateTime node found in response from {} exchange. Skipping...", exchangeFullName);
             return Optional.empty();
         }
-        ZonedDateTime dateTime;
+        Instant dateTime;
         long epoch = dateTimeNode.asLong();
         try {
             if (ChronoUnit.SECONDS.equals(epochChronoUnit)) {
-                dateTime = DateUtils.dateTimeFromEpochSecond(epoch);
+                dateTime = Instant.ofEpochSecond(epoch);
             } else {
-                dateTime = DateUtils.dateTimeFromEpochMilli(epoch);
+                dateTime = Instant.ofEpochMilli(epoch);
             }
         } catch (DateTimeParseException e) {
             log.trace("Wrong dateTime found in response ({}) from {} exchange. Skipping...", epoch, exchangeFullName);
@@ -144,7 +147,8 @@ public abstract class AbstractExchangeClientService implements InitializingBean 
     protected long checkBarsLimit(long barsLimit) {
         Integer maxBarsPerRequest = exchange.getMaxBarsPerRequest();
         if (barsLimit > maxBarsPerRequest) {
-            log.warn("Bars limit ({}) exceeds allowed size ({}) for {} exchange. Setting to max value.", barsLimit, maxBarsPerRequest, exchangeFullName);
+            log.warn("Bars limit ({}) exceeds allowed size ({}) for {} exchange. Setting to max value.", barsLimit,
+                     maxBarsPerRequest, exchangeFullName);
             barsLimit = maxBarsPerRequest;
         }
         return barsLimit;

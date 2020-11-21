@@ -4,7 +4,7 @@ import static my.dub.dlp_pilot.util.ApiClientUtils.executeRequestParseResponse;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
-import java.time.ZonedDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -26,7 +26,6 @@ import my.dub.dlp_pilot.model.dto.Ticker;
 import my.dub.dlp_pilot.service.ExchangeClientService;
 import my.dub.dlp_pilot.service.ExchangeService;
 import my.dub.dlp_pilot.service.client.AbstractExchangeClientService;
-import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
@@ -102,8 +101,7 @@ public class BitfinexExchangeClientService extends AbstractExchangeClientService
             Ticker ticker = new Ticker(ExchangeName.BITFINEX);
             try {
                 SymbolPair symbolPair =
-                        symbolPairs.stream().filter(sP -> sP.getName().equals(pair)).findFirst()
-                                .orElseThrow();
+                        symbolPairs.stream().filter(sP -> sP.getName().equals(pair)).findFirst().orElseThrow();
                 ticker.setBase(symbolPair.getBase());
                 ticker.setTarget(symbolPair.getTarget());
                 ticker.setPriceBid(parsePrice(innerNode.get(1)).orElseThrow());
@@ -121,21 +119,22 @@ public class BitfinexExchangeClientService extends AbstractExchangeClientService
      * @see <a href="https://docs.bitfinex.com/reference#rest-public-candles">Bitfinex REST API - Candles</a>
      */
     @Override
-    public List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame, @NonNull ZonedDateTime startTime,
-            @NonNull ZonedDateTime endTime) throws IOException {
+    public List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame, @NonNull Instant startTime,
+            @NonNull Instant endTime) throws IOException {
         return fetchBars(symbolPair, timeFrame, startTime, endTime, exchange.getMaxBarsPerRequest());
     }
 
     @Override
-    public List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame, long barsLimit) throws IOException {
+    public List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame, long barsLimit)
+            throws IOException {
         return fetchBars(symbolPair, timeFrame, null, null, barsLimit);
     }
 
-    private List<Bar> fetchBars(SymbolPair symbolPair, TimeFrame timeFrame, ZonedDateTime startTime,
-            ZonedDateTime endTime, long barsLimit) throws IOException {
+    private List<Bar> fetchBars(SymbolPair symbolPair, TimeFrame timeFrame, Instant startTime, Instant endTime,
+            long barsLimit) throws IOException {
         Map<String, String> queryParams = new HashMap<>();
         if (startTime != null) {
-            queryParams.put("start", String.valueOf(startTime.toInstant().toEpochMilli()));
+            queryParams.put("start", String.valueOf(startTime.toEpochMilli()));
         }
         if (barsLimit > 0) {
             barsLimit = checkBarsLimit(barsLimit);
@@ -154,12 +153,12 @@ public class BitfinexExchangeClientService extends AbstractExchangeClientService
         for (JsonNode innerNode : parentNode) {
             Bar bar;
             try {
-                ZonedDateTime openTime = parseDateTime(innerNode.get(0)).orElseThrow();
-                ZonedDateTime closeTime = openTime.plus(timeFrame.getDuration());
+                Instant openTime = parseDateTimeFromMillis(innerNode.get(0)).orElseThrow();
+                Instant closeTime = openTime.plus(timeFrame.getDuration());
                 if (endTime != null && openTime.isAfter(endTime)) {
                     break;
                 }
-                if (closeTime.isAfter(DateUtils.currentDateTimeUTC())) {
+                if (closeTime.isAfter(Instant.now())) {
                     continue;
                 }
                 bar = new Bar(exchangeName, symbolPair.getBase(), symbolPair.getTarget());

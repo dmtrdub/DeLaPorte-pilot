@@ -1,6 +1,6 @@
 package my.dub.dlp_pilot.model.dto;
 
-import java.time.ZonedDateTime;
+import java.time.Instant;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import my.dub.dlp_pilot.model.ExchangeName;
@@ -17,5 +17,5 @@ public class DetrimentalRecord {
 
     private String target;
 
-    private ZonedDateTime invalidationDateTime;
+    private Instant invalidationDateTime;
 }

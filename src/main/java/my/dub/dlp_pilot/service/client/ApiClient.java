@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -22,7 +21,6 @@ import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.dto.Ticker;
 import my.dub.dlp_pilot.service.ExchangeService;
-import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
@@ -387,16 +385,7 @@ public class ApiClient {
     }
 
     private void setTickerDateTime(JsonNode innerNode, Ticker ticker, String fieldName, ChronoUnit epochChronoUnit) {
-        ZonedDateTime dateTime;
-        long epoch = innerNode.get(fieldName).asLong();
-        if (ChronoUnit.SECONDS.equals(epochChronoUnit)) {
-            dateTime = DateUtils.dateTimeFromEpochSecond(epoch);
-        } else {
-            dateTime = DateUtils.dateTimeFromEpochMilli(epoch);
-        }
-        if (dateTime.isBefore(DateUtils.currentDateTimeUTC())) {
-            ticker.setDateTime(dateTime);
-        }
+        // TODO: for removal
     }
 
     private BigDecimal parsePrice(JsonNode priceNode, String exchangeName) {

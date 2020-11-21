@@ -43,4 +43,7 @@ public class TestRun implements Serializable {
 
     @Column(name = "path_to_result_file", length = FILE_PATH_PARAM_LENGTH)
     private String pathToResultFile;
+
+    @Column(name = "forced_exit")
+    private Boolean forcedExit;
 }

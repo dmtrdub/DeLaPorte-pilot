@@ -1,4 +1,4 @@
-package my.dub.dlp_pilot.service;
+package my.dub.dlp_pilot;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -13,6 +13,9 @@ import my.dub.dlp_pilot.configuration.ParametersHolder;
 import my.dub.dlp_pilot.exception.TestRunEndException;
 import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.ExchangeName;
+import my.dub.dlp_pilot.service.ExchangeService;
+import my.dub.dlp_pilot.service.TestRunService;
+import my.dub.dlp_pilot.service.TradeService;
 import my.dub.dlp_pilot.service.impl.FileResultServiceImpl;
 import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.beans.factory.InitializingBean;

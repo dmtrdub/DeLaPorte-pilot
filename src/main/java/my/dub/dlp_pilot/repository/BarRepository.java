@@ -15,12 +15,12 @@ public interface BarRepository extends CrudRepository<Bar, Long> {
 
     Long deleteAllByTestRunIdEquals(Long testRunId);
 
-    @Query("select new my.dub.dlp_pilot.model.dto.BarAverage(b.exchangeName, b.base, b.target, b.closeTime, avg((b"
+    @Query("select new my.dub.dlp_pilot.model.dto.BarAverage(b.exchangeName, b.base, b.target, max(b.closeTime), avg((b"
                    + ".high + b.close + b.low)/3)) from Bar b where b.testRun.id=:testRunId group by b.exchangeName, "
                    + "b.base, b.target")
     List<BarAverage> getAllBarAverages(@Param("testRunId") Long testRunId);
 
-    @Query("select new my.dub.dlp_pilot.model.dto.BarAverage(b.exchangeName, b.base, b.target,  b.closeTime, avg((b"
+    @Query("select new my.dub.dlp_pilot.model.dto.BarAverage(b.exchangeName, b.base, b.target, max(b.closeTime), avg((b"
                    + ".high + b.close + b.low)/3)) from Bar b where (b.exchangeName = :exchangeName and b.testRun"
                    + ".id=:testRunId) group by b.exchangeName, b.base, b.target")
     List<BarAverage> getBarAverages(@Param("exchangeName") ExchangeName exchangeName,

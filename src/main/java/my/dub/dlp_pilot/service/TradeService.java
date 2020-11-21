@@ -20,7 +20,7 @@ public interface TradeService {
 
     Set<Trade> getCompletedTradesNotWrittenToFile(TestRun testRun);
 
-    void updateTradesWrittenToFile(Collection<Trade> trades);
+    void saveOrUpdate(Collection<Trade> trades);
 
     boolean isAllTradesClosed();
 }

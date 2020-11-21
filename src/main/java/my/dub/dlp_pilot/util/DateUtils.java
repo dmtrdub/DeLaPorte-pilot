@@ -4,8 +4,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.Temporal;
 import org.springframework.lang.NonNull;
@@ -15,30 +13,18 @@ public final class DateUtils {
     private DateUtils() {
     }
 
-    private static final ZoneOffset DEFAULT_ZONE_OFFSET = ZoneOffset.UTC;
+    private static final ZoneId ZONE_ID_UTC = ZoneId.of("UTC");
     private static final String FORMAT_PATTERN = "dd.MM.yyyy-HH:mm:ss";
     private static final String FORMAT_PATTERN_SHORT = "ddMMyy-HHmm";
-
-    public static ZonedDateTime dateTimeFromEpochMilli(long epoch) {
-        return ZonedDateTime.ofInstant(Instant.ofEpochMilli(epoch), DEFAULT_ZONE_OFFSET);
-    }
-
-    public static ZonedDateTime dateTimeFromEpochSecond(long epoch) {
-        return ZonedDateTime.ofInstant(Instant.ofEpochSecond(epoch), DEFAULT_ZONE_OFFSET);
-    }
-
-    public static ZonedDateTime currentDateTimeUTC() {
-        return ZonedDateTime.now(DEFAULT_ZONE_OFFSET);
-    }
-
-    public static String formatDateTime(ZonedDateTime dateTime) {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(FORMAT_PATTERN);
-        return dateTime.format(formatter);
-    }
 
     public static String formatDateTime(LocalDateTime dateTime) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern(FORMAT_PATTERN);
         return dateTime.format(formatter);
+    }
+
+    public static String formatDateTime(Instant dateTime) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(FORMAT_PATTERN).withZone(ZONE_ID_UTC);
+        return formatter.format(dateTime);
     }
 
     public static String formatDateTimeShort(LocalDateTime dateTime) {
@@ -51,25 +37,27 @@ public final class DateUtils {
         return duration.compareTo(toCompare) > 0;
     }
 
-    public static long durationMinutes(Temporal start) {
-        if (start == null) {
-            return 0;
-        }
-        return Duration.between(start, currentDateTimeUTC()).toMinutes();
+    public static boolean isCurrentDurationLonger(Temporal start, Duration toCompare) {
+        Duration duration = currentDuration(start);
+        return duration.compareTo(toCompare) > 0;
     }
 
     public static long durationSeconds(Temporal start) {
         if (start == null) {
             return 0;
         }
-        return Duration.between(start, currentDateTimeUTC()).toSeconds();
+        return currentDuration(start).toSeconds();
+    }
+
+    public static Duration currentDuration(Temporal start) {
+        return Duration.between(start, Instant.now());
     }
 
     public static long durationMillis(Temporal start) {
         if (start == null) {
             return 0;
         }
-        return Duration.between(start, currentDateTimeUTC()).toMillis();
+        return currentDuration(start).toMillis();
     }
 
     public static String durationSecondsDetailed(Temporal start, Temporal end) {
@@ -104,16 +92,8 @@ public final class DateUtils {
         return duration.toString().substring(2).replaceAll("(\\d[HMS])(?!$)", "$1 ").toLowerCase();
     }
 
-    public static ZonedDateTime parseDefaultZoneDateTime(@NonNull String dateTime) {
-        return ZonedDateTime.ofInstant(Instant.parse(dateTime), DEFAULT_ZONE_OFFSET);
-    }
-
-    public static ZonedDateTime toZonedDateTime(@NonNull LocalDateTime localDateTime) {
-        return localDateTime.atZone(ZoneId.systemDefault()).withZoneSameInstant(DEFAULT_ZONE_OFFSET);
-    }
-
-    public static String toIsoInstantString(@NonNull ZonedDateTime dateTime) {
-        return dateTime.format(DateTimeFormatter.ISO_INSTANT);
+    public static String toIsoInstantString(@NonNull Instant dateTime) {
+        return DateTimeFormatter.ISO_INSTANT.withZone(ZONE_ID_UTC).format(dateTime);
     }
 
     public static Instant toInstant(@NonNull LocalDateTime localDateTime) {
