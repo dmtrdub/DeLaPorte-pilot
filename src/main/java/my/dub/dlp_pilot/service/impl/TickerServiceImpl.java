@@ -53,7 +53,7 @@ public class TickerServiceImpl implements TickerService {
     public Optional<Ticker> findValidEquivalentTickerFromSet(Ticker originalTicker, Set<Ticker> tickerSet) {
         checkNotNull(originalTicker, "Ticker that has to be compared cannot be null!");
         if (originalTicker.isPriceInvalid()) {
-            log.error("Invalid price found in {}!", originalTicker.toString());
+            log.trace("Invalid price found in {}!", originalTicker.toShortString());
             return Optional.empty();
         }
         return tickerSet.stream()

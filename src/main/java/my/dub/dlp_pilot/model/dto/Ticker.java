@@ -61,4 +61,10 @@ public class Ticker extends PriceData {
         return priceAsk == null || priceBid == null || Calculations.isNotPositive(priceAsk) || Calculations
                 .isNotPositive(priceBid);
     }
+
+    public String toShortString() {
+        return "Ticker{base='" + base + '\'' + ", target='" + target + '\'' + "priceBid=" + priceBid + ", priceAsk="
+                + priceAsk + ", closePrice=" + closePrice + ", stale=" + stale + ", dateTime=" + dateTime
+                + ", exchangeName=" + exchangeName + '}';
+    }
 }
