@@ -86,4 +86,12 @@ public final class Calculations {
     public static List<String> decimalResults(BigDecimal... decimals) {
         return Arrays.stream(decimals).map(Calculations::decimalResult).collect(Collectors.toList());
     }
+
+    public static String originalDecimalResult(BigDecimal decimal) {
+        return decimal.stripTrailingZeros().toPlainString();
+    }
+
+    public static List<String> originalDecimalResults(BigDecimal... decimals) {
+        return Arrays.stream(decimals).map(Calculations::originalDecimalResult).collect(Collectors.toList());
+    }
 }

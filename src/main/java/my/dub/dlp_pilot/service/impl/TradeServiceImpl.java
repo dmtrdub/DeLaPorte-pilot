@@ -12,6 +12,7 @@ import static my.dub.dlp_pilot.util.Calculations.percentageDifferencePrice;
 import static my.dub.dlp_pilot.util.Calculations.pnl;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
@@ -19,6 +20,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import my.dub.dlp_pilot.Constants;
 import my.dub.dlp_pilot.configuration.ParametersHolder;
 import my.dub.dlp_pilot.exception.MissingEntityException;
 import my.dub.dlp_pilot.model.Exchange;
@@ -88,12 +90,15 @@ public class TradeServiceImpl implements TradeService {
             return;
         }
 
-        Trade trade = createTrade(tickerShort, tickerLong, currentPercentageDiff, testRun);
+        Trade trade = createTrade(tickerShort, tickerLong, currentPercentageDiff, testRun, currentPriceDifference,
+                                  averagePriceDifference);
         boolean tradeCreated = tradeContainer.addTrade(trade);
         if (tradeCreated) {
             log.info(
-                    "New {} created and added to container. Current price difference: {}; average price difference: {}",
-                    trade.toShortString(), currentPriceDifference.stripTrailingZeros().toPlainString(),
+                    "New #{} {} created and added to container. Current price difference: {}; average price "
+                            + "difference: {}",
+                    trade.hashCode(), trade.toShortString(),
+                    currentPriceDifference.stripTrailingZeros().toPlainString(),
                     averagePriceDifference.stripTrailingZeros().toPlainString());
         }
     }
@@ -232,10 +237,10 @@ public class TradeServiceImpl implements TradeService {
             repository.save(trade);
             boolean removed = tradeContainer.remove(prevHash);
             if (!removed) {
-                log.error("{} was not removed from container!", trade.toShortString());
+                log.error("#{} {} was not removed from container!", prevHash, trade.toShortString());
             }
 
-            log.info("{} closed. Reason: {}", trade.toShortString(), trade.getResultType());
+            log.info("#{} {} closed. Reason: {}", prevHash, trade.toShortString(), trade.getResultType());
             if (TradeResultType.DETRIMENTAL.equals(tradeResultType)) {
                 recordDetrimental(trade);
             }
@@ -326,18 +331,22 @@ public class TradeServiceImpl implements TradeService {
 
         trade.setEndTime(Instant.now());
         trade.setResultType(resultType);
+        trade.setClosePriceDiff(priceShort.subtract(priceLong).setScale(Constants.PRICE_SCALE, RoundingMode.HALF_UP));
         List<TradeDynamicResultData> resultData = parameters.getEntryAmounts().stream()
                 .map(amount -> createDynamicResultData(trade, positionShort, positionLong, amount))
                 .collect(Collectors.toList());
         trade.setResultData(resultData);
     }
 
-    private Trade createTrade(Ticker tickerShort, Ticker tickerLong, BigDecimal percentageDiff, TestRun testRun) {
+    private Trade createTrade(Ticker tickerShort, Ticker tickerLong, BigDecimal percentageDiff, TestRun testRun,
+            BigDecimal openPriceDiff, BigDecimal averagePriceDiff) {
         Trade trade = new Trade();
         // tickerShort and tickerLong have equal base and target
         trade.setBase(tickerShort.getBase());
         trade.setTarget(tickerShort.getTarget());
         trade.setEntryPercentageDiff(percentageDiff);
+        trade.setOpenPriceDiff(openPriceDiff.setScale(Constants.PRICE_SCALE, RoundingMode.HALF_UP));
+        trade.setAveragePriceDiff(averagePriceDiff.setScale(Constants.PRICE_SCALE, RoundingMode.HALF_UP));
         Position shortPos = createPosition(PositionSide.SHORT, tickerShort);
         Position longPos = createPosition(PositionSide.LONG, tickerLong);
         trade.setPositions(shortPos, longPos);

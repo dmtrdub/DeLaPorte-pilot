@@ -3,6 +3,7 @@ package my.dub.dlp_pilot.service.impl;
 import static com.google.common.base.Preconditions.checkState;
 import static my.dub.dlp_pilot.util.Calculations.decimalResult;
 import static my.dub.dlp_pilot.util.Calculations.decimalResults;
+import static my.dub.dlp_pilot.util.Calculations.originalDecimalResults;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -54,8 +55,9 @@ public class FileResultServiceImpl implements FileResultService {
         String dynamicHeaders = entryAmounts.stream().map(amount -> String
                 .join(dynamicDelimiter, "PnL_Short_" + amount, "PnL_Long_" + amount, "Expenses_" + amount,
                       "Income" + amount)).collect(Collectors.joining(dynamicDelimiter)) + "_" + USD;
-        header = String.join(",", "Base", "Target", "Entry_Percentage_Diff", dynamicHeaders, "Time_Start", "Time_End",
-                             "Duration_(sec)", "Result_Type", "Exchange_Short", "Exchange_Long");
+        header = String.join(",", "Base", "Target", "Entry_Percentage_Diff", "Open_Price_Diff", "Average_Price_Diff",
+                             "Close_Price_Diff", dynamicHeaders, "Time_Start", "Time_End", "Duration_(sec)",
+                             "Result_Type", "Exchange_Short", "Exchange_Long");
         initFile();
     }
 
@@ -103,7 +105,10 @@ public class FileResultServiceImpl implements FileResultService {
         Instant startTime = trade.getStartTime();
         Instant endTime = trade.getEndTime();
         return String.join(",", trade.getBase(), trade.getTarget(), decimalResult(trade.getEntryPercentageDiff()),
-                           dynamicResult, DateUtils.formatDateTime(startTime), DateUtils.formatDateTime(endTime),
+                           String.join(",",
+                                       originalDecimalResults(trade.getOpenPriceDiff(), trade.getAveragePriceDiff(),
+                                                              trade.getClosePriceDiff())), dynamicResult,
+                           DateUtils.formatDateTime(startTime), DateUtils.formatDateTime(endTime),
                            DateUtils.durationSecondsDetailed(startTime, endTime), trade.getResultType().name(),
                            positionShort.getExchange().getFullName(), positionLong.getExchange().getFullName());
     }

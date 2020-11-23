@@ -62,6 +62,18 @@ public class Trade implements Serializable {
     @Digits(integer = 5, fraction = PERCENTAGE_SCALE)
     private BigDecimal entryPercentageDiff;
 
+    @Column(name = "average_price_diff", nullable = false, precision = 25, scale = PRICE_SCALE)
+    @Digits(integer = 13, fraction = PRICE_SCALE)
+    private BigDecimal averagePriceDiff;
+
+    @Column(name = "open_price_diff", nullable = false, precision = 25, scale = PRICE_SCALE)
+    @Digits(integer = 13, fraction = PRICE_SCALE)
+    private BigDecimal openPriceDiff;
+
+    @Column(name = "close_price_diff", nullable = false, precision = 25, scale = PRICE_SCALE)
+    @Digits(integer = 13, fraction = PRICE_SCALE)
+    private BigDecimal closePriceDiff;
+
     @Enumerated(EnumType.ORDINAL)
     @Column(name = "result_type", nullable = false, columnDefinition = "default 0")
     private TradeResultType resultType;
