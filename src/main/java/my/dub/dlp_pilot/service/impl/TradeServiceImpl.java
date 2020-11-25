@@ -4,10 +4,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static my.dub.dlp_pilot.util.Calculations.average;
 import static my.dub.dlp_pilot.util.Calculations.income;
-import static my.dub.dlp_pilot.util.Calculations.isZero;
 import static my.dub.dlp_pilot.util.Calculations.originalValueFromPercent;
 import static my.dub.dlp_pilot.util.Calculations.originalValueFromPercentSum;
-import static my.dub.dlp_pilot.util.Calculations.percentageDifference;
 import static my.dub.dlp_pilot.util.Calculations.percentageDifferencePrice;
 import static my.dub.dlp_pilot.util.Calculations.pnl;
 
@@ -133,7 +131,7 @@ public class TradeServiceImpl implements TradeService {
                                                            tickerLong.getExchangeName());
                 if (isExistingSuccessful(income, trade.getStartTime())) {
                     handleClose(trade, tickerShort, tickerLong, TradeResultType.SUCCESSFUL);
-                } else if (isExistingDetrimental(income) && !isDetrimentalSyncCondition(pnlShort, pnlLong)) {
+                } else if (isExistingDetrimental(income)) {
                     handleClose(trade, tickerShort, tickerLong, TradeResultType.DETRIMENTAL);
                 }
             }
@@ -209,18 +207,6 @@ public class TradeServiceImpl implements TradeService {
             return tradesCount.getFirst() <= parallelTradesNumber && tradesCount.getSecond() <= parallelTradesNumber;
         }
         return true;
-    }
-
-    private boolean isDetrimentalSyncCondition(BigDecimal pnlShort, BigDecimal pnlLong) {
-        if (isZero(parameters.getPostponeDetrimentalExitPnlPercentageDiff())) {
-            return false;
-        }
-        BigDecimal absPnlShort = pnlShort.abs();
-        BigDecimal absPnlLong = pnlLong.abs();
-        return (absPnlShort.compareTo(absPnlLong) > 0 && percentageDifference(absPnlShort, absPnlLong)
-                .compareTo(parameters.getPostponeDetrimentalExitPnlPercentageDiff()) > 0) || (
-                absPnlLong.compareTo(absPnlShort) > 0 && percentageDifference(absPnlLong, absPnlShort)
-                        .compareTo(parameters.getPostponeDetrimentalExitPnlPercentageDiff()) > 0);
     }
 
     private synchronized void handleClose(Trade trade, Ticker tickerShort, Ticker tickerLong,
@@ -317,7 +303,7 @@ public class TradeServiceImpl implements TradeService {
         tradeContainer.addDetrimentalRecord(exchangeShort, exchangeLong, base, target, invalidationDateTime);
         log.debug("Added new detrimental record for {} (SHORT) and {} (LONG) exchanges, base: {}, target {}. "
                           + "Similar trades will be suspended until {}", exchangeShort, exchangeLong, base, target,
-                  invalidationDateTime);
+                  DateUtils.formatDateTime(invalidationDateTime));
     }
 
     private void closeTrade(Trade trade, TradeResultType resultType, Ticker tickerShort, Ticker tickerLong) {

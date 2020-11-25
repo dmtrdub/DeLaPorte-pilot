@@ -46,12 +46,10 @@ public class ParametersHolder implements InitializingBean {
     private double exitProfitPercentageDouble;
     @Value("${trade_decrease_expected_profit_percentage_after_duration}")
     private String profitPercentageDecreaseAfter;
-    @Value("${trade_postpone_detrimental_exit_pnl_percentage_diff}")
+    @Value("${trade_decrease_expected_profit_percentage_by}")
     private double profitPercentageDecreaseByDouble;
     @Value("${trade_entry_amounts_usd}")
     private String[] entryAmountsUsdParam;
-    @Value("${trade_exit_sync_pnl_percentage_diff}")
-    private double postponeDetrimentalExitPnlPercentageDiffDouble;
     @Value("${trade_timeout_duration}")
     private String tradeTimeout;
     @Value("${trade_detrimental_amount_percentage}")
@@ -89,7 +87,6 @@ public class ParametersHolder implements InitializingBean {
     private BigDecimal entryMaxPercentageDiff;
     private BigDecimal exitProfitPercentage;
     private BigDecimal profitPercentageDecreaseBy;
-    private BigDecimal postponeDetrimentalExitPnlPercentageDiff;
     private List<Double> entryAmounts;
     private BigDecimal detrimentAmountPercentage;
 
@@ -152,8 +149,6 @@ public class ParametersHolder implements InitializingBean {
         entryAmounts = Arrays.stream(entryAmountsUsdParam).mapToDouble(Double::parseDouble).boxed().distinct().sorted()
                 .collect(Collectors.toList());
         detrimentAmountPercentage = BigDecimal.valueOf(detrimentAmountPercentageDouble);
-        postponeDetrimentalExitPnlPercentageDiff = postponeDetrimentalExitPnlPercentageDiffDouble > 0 ? BigDecimal
-                .valueOf(postponeDetrimentalExitPnlPercentageDiffDouble) : BigDecimal.ZERO;
         parallelTradesNumber = parallelTradesNumber > 0 ? parallelTradesNumber : 0;
         testRunDuration = parseDuration(testRunDurationParam.toUpperCase());
     }
@@ -249,10 +244,6 @@ public class ParametersHolder implements InitializingBean {
                  profitPercentageDecreaseByDouble == 0 || profitPercentageDecreaseAfterDuration.isZero()
                          ? DISABLED_MESSAGE
                          : profitPercentageDecreaseByDouble);
-        log.info("Trade postpone detrimental close on percentage gap:  {}",
-                 postponeDetrimentalExitPnlPercentageDiffDouble == 0
-                         ? DISABLED_MESSAGE
-                         : postponeDetrimentalExitPnlPercentageDiffDouble);
         log.info("Trade timeout after period:  {}", formatDuration(tradeTimeoutDuration));
         log.info("Trade detrimental entry amount percentage:  {}", detrimentAmountPercentageDouble);
         log.info("Trade MAX parallel number:  {}", parallelTradesNumber == 0 ? DISABLED_MESSAGE : parallelTradesNumber);
