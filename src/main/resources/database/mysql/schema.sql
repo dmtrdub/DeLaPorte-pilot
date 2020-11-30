@@ -40,11 +40,16 @@ create unique index test_run_id_uindex
 
 create table if not exists position
 (
-    id          int auto_increment,
-    side        tinyint         not null,
-    open_price  decimal(25, 12) not null,
-    close_price decimal(25, 12) null,
-    exchange_id int             null,
+    id           int auto_increment,
+    side         tinyint         not null,
+    open_price   decimal(25, 12) not null,
+    close_price  decimal(25, 12) null,
+    min_pnl_usd  decimal(31, 12),
+    min_pnl_time datetime,
+    pnl_usd      decimal(31, 12) not null,
+    max_pnl_usd  decimal(31, 12),
+    max_pnl_time datetime,
+    exchange_id  int             null,
     primary key (id),
     constraint position_exchange_fk
         foreign key (exchange_id) references exchange (id)
@@ -70,6 +75,8 @@ create table if not exists trade
     result_type           tinyint       default 0                 not null,
     position_short_id     int                                     null,
     position_long_id      int                                     null,
+    expenses_usd          decimal(25, 12)                         not null,
+    income_usd            decimal(31, 12)                         not null,
     test_run_id           int                                     null,
     written_to_file       tinyint(1)    default 0                 not null,
     primary key (id),
@@ -85,24 +92,6 @@ create table if not exists trade
 );
 create unique index trade_id_uindex
     on trade (id);
-
-create table if not exists trade_dynamic_result_data
-(
-    id            int auto_increment,
-    amount_usd    decimal(26, 7)  not null,
-    expenses_usd  decimal(25, 12) not null,
-    pnl_usd_short decimal(31, 12) not null,
-    pnl_usd_long  decimal(31, 12) not null,
-    income_usd    decimal(31, 12) not null,
-    trade_id      int             not null,
-    primary key (id),
-    constraint trade_dynamic_result_data_trade_fk
-        foreign key (trade_id) references trade (id)
-            on update cascade on delete cascade
-);
-
-create unique index trade_dynamic_result_data_id_uindex
-    on trade_dynamic_result_data (id);
 
 create table if not exists bar
 (

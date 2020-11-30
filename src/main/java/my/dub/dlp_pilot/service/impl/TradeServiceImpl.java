@@ -4,8 +4,10 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static my.dub.dlp_pilot.util.Calculations.average;
 import static my.dub.dlp_pilot.util.Calculations.income;
+import static my.dub.dlp_pilot.util.Calculations.isZero;
 import static my.dub.dlp_pilot.util.Calculations.originalValueFromPercent;
 import static my.dub.dlp_pilot.util.Calculations.originalValueFromPercentSum;
+import static my.dub.dlp_pilot.util.Calculations.percentageDifference;
 import static my.dub.dlp_pilot.util.Calculations.percentageDifferencePrice;
 import static my.dub.dlp_pilot.util.Calculations.pnl;
 
@@ -16,7 +18,6 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.Constants;
 import my.dub.dlp_pilot.configuration.ParametersHolder;
@@ -27,7 +28,6 @@ import my.dub.dlp_pilot.model.Position;
 import my.dub.dlp_pilot.model.PositionSide;
 import my.dub.dlp_pilot.model.TestRun;
 import my.dub.dlp_pilot.model.Trade;
-import my.dub.dlp_pilot.model.TradeDynamicResultData;
 import my.dub.dlp_pilot.model.TradeResultType;
 import my.dub.dlp_pilot.model.dto.Ticker;
 import my.dub.dlp_pilot.repository.TradeRepository;
@@ -35,6 +35,7 @@ import my.dub.dlp_pilot.repository.container.TradeContainer;
 import my.dub.dlp_pilot.service.ExchangeService;
 import my.dub.dlp_pilot.service.TickerService;
 import my.dub.dlp_pilot.service.TradeService;
+import my.dub.dlp_pilot.util.Calculations;
 import my.dub.dlp_pilot.util.DateUtils;
 import org.hibernate.exception.LockAcquisitionException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -92,12 +93,12 @@ public class TradeServiceImpl implements TradeService {
                                   averagePriceDifference);
         boolean tradeCreated = tradeContainer.addTrade(trade);
         if (tradeCreated) {
-            log.info(
-                    "New #{} {} created and added to container. Current price difference: {}; average price "
-                            + "difference: {}",
-                    trade.hashCode(), trade.toShortString(),
-                    currentPriceDifference.stripTrailingZeros().toPlainString(),
-                    averagePriceDifference.stripTrailingZeros().toPlainString());
+            log.info("New #{} {} opened. Current price difference: {}; average price " + "difference: {}",
+                     trade.getLocalId(), trade.toShortString(),
+                     Calculations.originalDecimalResult(currentPriceDifference),
+                     Calculations.originalDecimalResult(averagePriceDifference));
+        } else {
+            log.error("Unable to locally save new #{} {}", trade.getLocalId(), trade.toShortString());
         }
     }
 
@@ -127,11 +128,13 @@ public class TradeServiceImpl implements TradeService {
                                              positionLong.getOpenPrice(), tickerLong.getPriceBid());
                 BigDecimal pnlShort = pnlSides.getFirst();
                 BigDecimal pnlLong = pnlSides.getSecond();
+                checkExtremumPnl(trade.getPositionShort(), pnlShort);
+                checkExtremumPnl(trade.getPositionLong(), pnlLong);
                 BigDecimal income = calculateCurrentIncome(pnlShort, tickerShort.getExchangeName(), pnlLong,
                                                            tickerLong.getExchangeName());
                 if (isExistingSuccessful(income, trade.getStartTime())) {
                     handleClose(trade, tickerShort, tickerLong, TradeResultType.SUCCESSFUL);
-                } else if (isExistingDetrimental(income)) {
+                } else if (isExistingDetrimental(income) && !isDetrimentalSyncCondition(pnlShort, pnlLong)) {
                     handleClose(trade, tickerShort, tickerLong, TradeResultType.DETRIMENTAL);
                 }
             }
@@ -209,24 +212,45 @@ public class TradeServiceImpl implements TradeService {
         return true;
     }
 
+    private void checkExtremumPnl(Position position, BigDecimal pnl) {
+        if (position.getMinPnlUsd() == null || pnl.compareTo(position.getMinPnlUsd()) < 0) {
+            position.setMinPnlUsd(pnl);
+            position.setMinPnlTime(Instant.now());
+        }
+        if (position.getMaxPnlTime() == null || pnl.compareTo(position.getMaxPnlUsd()) > 0) {
+            position.setMaxPnlUsd(pnl);
+            position.setMaxPnlTime(Instant.now());
+        }
+    }
+
+    private boolean isDetrimentalSyncCondition(BigDecimal pnlShort, BigDecimal pnlLong) {
+        if (isZero(parameters.getDetrimentalCloseOnMaxPnlDiffPercentage())) {
+            return false;
+        }
+        BigDecimal absPnlShort = pnlShort.abs();
+        BigDecimal absPnlLong = pnlLong.abs();
+        return (absPnlShort.compareTo(absPnlLong) > 0 && percentageDifference(absPnlShort, absPnlLong)
+                .compareTo(parameters.getDetrimentalCloseOnMaxPnlDiffPercentage()) > 0) || (
+                absPnlLong.compareTo(absPnlShort) > 0 && percentageDifference(absPnlLong, absPnlShort)
+                        .compareTo(parameters.getDetrimentalCloseOnMaxPnlDiffPercentage()) > 0);
+    }
+
     private synchronized void handleClose(Trade trade, Ticker tickerShort, Ticker tickerLong,
             TradeResultType tradeResultType) {
-        if (!tradeContainer.isSimilarPresent(trade) || repository
+        if (tradeContainer.isSimilarPresent(trade) && !repository
                 .checkSimilarExists(trade.getBase(), trade.getTarget(), trade.getStartTime(),
                                     tickerShort.getExchangeName(), tickerLong.getExchangeName(),
                                     trade.getPositionShort().getOpenPrice(), trade.getPositionLong().getOpenPrice(),
                                     tradeResultType)) {
-            log.trace("Attempting to close Trade that is already closed!. Details: {}", trade.toShortString());
-        } else {
-            int prevHash = trade.hashCode();
             closeTrade(trade, tradeResultType, tickerShort, tickerLong);
             repository.save(trade);
-            boolean removed = tradeContainer.remove(prevHash);
+            Long localId = trade.getLocalId();
+            boolean removed = tradeContainer.remove(localId);
             if (!removed) {
-                log.error("#{} {} was not removed from container!", prevHash, trade.toShortString());
+                log.error("#{} {} was not removed from container!", localId, trade.toShortString());
             }
 
-            log.info("#{} {} closed. Reason: {}", prevHash, trade.toShortString(), trade.getResultType());
+            log.info("#{} {} closed", localId, trade.toShortString());
             if (TradeResultType.DETRIMENTAL.equals(tradeResultType)) {
                 recordDetrimental(trade);
             }
@@ -234,7 +258,7 @@ public class TradeServiceImpl implements TradeService {
     }
 
     private boolean isExistingSuccessful(BigDecimal income, Instant tradeStartTime) {
-        BigDecimal amountUsd = parameters.getMinEntryAmount();
+        BigDecimal amountUsd = parameters.getEntryAmount();
         BigDecimal exitPercentage = parameters.getProfitPercentageOnExitSum(DateUtils.durationSeconds(tradeStartTime));
         BigDecimal profitValue = originalValueFromPercent(amountUsd, exitPercentage);
         return income.subtract(profitValue).compareTo(BigDecimal.ZERO) >= 0;
@@ -245,7 +269,7 @@ public class TradeServiceImpl implements TradeService {
     }
 
     private boolean isOpenDetrimental(Ticker tickerShort, Ticker tickerLong) {
-        BigDecimal amountUsd = parameters.getMinEntryAmount();
+        BigDecimal amountUsd = parameters.getEntryAmount();
         BigDecimal expensesShort = exchangeService.getTotalExpenses(tickerShort.getExchangeName(), amountUsd);
         BigDecimal expensesLong = exchangeService.getTotalExpenses(tickerLong.getExchangeName(), amountUsd);
         BigDecimal pnlShort =
@@ -261,7 +285,7 @@ public class TradeServiceImpl implements TradeService {
             BigDecimal currentPriceDifference) {
         BigDecimal avgOpenPrice = average(List.of(tickerShort.getPriceOnOpen(PositionSide.SHORT),
                                                   tickerLong.getPriceOnOpen(PositionSide.LONG)));
-        BigDecimal amountUsd = parameters.getMinEntryAmount();
+        BigDecimal amountUsd = parameters.getEntryAmount();
         BigDecimal expensesShort = exchangeService.getTotalExpenses(tickerShort.getExchangeName(), amountUsd);
         BigDecimal expensesLong = exchangeService.getTotalExpenses(tickerLong.getExchangeName(), amountUsd);
         BigDecimal expectedProfitPriceDiff = currentPriceDifference.subtract(averagePriceDifference);
@@ -274,13 +298,13 @@ public class TradeServiceImpl implements TradeService {
     }
 
     private boolean isDetrimental(BigDecimal detrimentalEntryPercentage, BigDecimal income) {
-        BigDecimal amountUsd = parameters.getMinEntryAmount();
+        BigDecimal amountUsd = parameters.getEntryAmount();
         return income.compareTo(originalValueFromPercent(amountUsd, detrimentalEntryPercentage).negate()) <= 0;
     }
 
     private Pair<BigDecimal, BigDecimal> calculatePnlForSides(BigDecimal positionShortOpenPrice,
             BigDecimal tickerShortPrice, BigDecimal positionLongOpenPrice, BigDecimal tickerLongPrice) {
-        BigDecimal amountUsd = parameters.getMinEntryAmount();
+        BigDecimal amountUsd = parameters.getEntryAmount();
         BigDecimal pnlShort = pnl(PositionSide.SHORT, positionShortOpenPrice, tickerShortPrice, amountUsd);
         BigDecimal pnlLong = pnl(PositionSide.LONG, positionLongOpenPrice, tickerLongPrice, amountUsd);
         return Pair.of(pnlShort, pnlLong);
@@ -288,7 +312,7 @@ public class TradeServiceImpl implements TradeService {
 
     private BigDecimal calculateCurrentIncome(BigDecimal pnlShort, ExchangeName exchangeShort, BigDecimal pnlLong,
             ExchangeName exchangeLong) {
-        BigDecimal amountUsd = parameters.getMinEntryAmount();
+        BigDecimal amountUsd = parameters.getEntryAmount();
         BigDecimal expensesShort = exchangeService.getTotalExpenses(exchangeShort, amountUsd);
         BigDecimal expensesLong = exchangeService.getTotalExpenses(exchangeLong, amountUsd);
         return income(pnlShort, pnlLong, expensesShort, expensesLong);
@@ -307,21 +331,26 @@ public class TradeServiceImpl implements TradeService {
     }
 
     private void closeTrade(Trade trade, TradeResultType resultType, Ticker tickerShort, Ticker tickerLong) {
+        BigDecimal amountUsd = parameters.getEntryAmount();
+
         BigDecimal priceShort = tickerShort.getPriceAsk();
         Position positionShort = trade.getPositionShort();
         positionShort.setClosePrice(priceShort);
+        positionShort.setPnlUsd(pnl(positionShort.getSide(), positionShort.getOpenPrice(), priceShort, amountUsd));
 
         BigDecimal priceLong = tickerLong.getPriceBid();
         Position positionLong = trade.getPositionLong();
         positionLong.setClosePrice(priceLong);
+        positionLong.setPnlUsd(pnl(positionLong.getSide(), positionLong.getOpenPrice(), priceLong, amountUsd));
 
+        BigDecimal variableExpenses =
+                originalValueFromPercentSum(amountUsd, positionShort.getExchange().getTakerFeePercentage(), amountUsd,
+                                            positionLong.getExchange().getTakerFeePercentage());
+        trade.setTotalExpensesUsd(trade.getFixedExpensesUsd().add(variableExpenses));
+        trade.setIncomeUsd(income(positionShort.getPnlUsd(), positionLong.getPnlUsd(), trade.getTotalExpensesUsd()));
         trade.setEndTime(Instant.now());
         trade.setResultType(resultType);
         trade.setClosePriceDiff(priceShort.subtract(priceLong).setScale(Constants.PRICE_SCALE, RoundingMode.HALF_UP));
-        List<TradeDynamicResultData> resultData = parameters.getEntryAmounts().stream()
-                .map(amount -> createDynamicResultData(trade, positionShort, positionLong, amount))
-                .collect(Collectors.toList());
-        trade.setResultData(resultData);
     }
 
     private Trade createTrade(Ticker tickerShort, Ticker tickerLong, BigDecimal percentageDiff, TestRun testRun,
@@ -355,24 +384,5 @@ public class TradeServiceImpl implements TradeService {
         Exchange exchange = exchangeService.findByName(exchangeName);
         position.setExchange(exchange);
         return position;
-    }
-
-    private TradeDynamicResultData createDynamicResultData(Trade trade, Position positionShort, Position positionLong,
-            Double amount) {
-        TradeDynamicResultData dynamicResultData = new TradeDynamicResultData();
-        BigDecimal amountUsd = BigDecimal.valueOf(amount);
-        dynamicResultData.setAmountUsd(amountUsd);
-        dynamicResultData.setPnlUsdShort(
-                pnl(positionShort.getSide(), positionShort.getOpenPrice(), positionShort.getClosePrice(), amountUsd));
-        dynamicResultData.setPnlUsdLong(
-                pnl(positionLong.getSide(), positionLong.getOpenPrice(), positionLong.getClosePrice(), amountUsd));
-        BigDecimal variableExpenses =
-                originalValueFromPercentSum(amountUsd, positionShort.getExchange().getTakerFeePercentage(), amountUsd,
-                                            positionLong.getExchange().getTakerFeePercentage());
-        dynamicResultData.setTotalExpensesUsd(trade.getFixedExpensesUsd().add(variableExpenses));
-        dynamicResultData.setIncomeUsd(income(dynamicResultData.getPnlUsdShort(), dynamicResultData.getPnlUsdLong(),
-                                              dynamicResultData.getTotalExpensesUsd()));
-        dynamicResultData.setTrade(trade);
-        return dynamicResultData;
     }
 }

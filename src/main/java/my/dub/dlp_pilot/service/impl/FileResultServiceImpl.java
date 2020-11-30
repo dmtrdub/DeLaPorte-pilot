@@ -2,14 +2,17 @@ package my.dub.dlp_pilot.service.impl;
 
 import static com.google.common.base.Preconditions.checkState;
 import static my.dub.dlp_pilot.util.Calculations.decimalResult;
-import static my.dub.dlp_pilot.util.Calculations.decimalResults;
-import static my.dub.dlp_pilot.util.Calculations.originalDecimalResults;
+import static my.dub.dlp_pilot.util.Calculations.originalDecimalResult;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -50,14 +53,15 @@ public class FileResultServiceImpl implements FileResultService {
 
     @Override
     public void init() {
-        List<Double> entryAmounts = parameters.getEntryAmounts();
-        String dynamicDelimiter = "_" + USD + ",";
-        String dynamicHeaders = entryAmounts.stream().map(amount -> String
-                .join(dynamicDelimiter, "PnL_Short_" + amount, "PnL_Long_" + amount, "Expenses_" + amount,
-                      "Income" + amount)).collect(Collectors.joining(dynamicDelimiter)) + "_" + USD;
+        double entryAmount = parameters.getEntryAmountUsdDouble();
+        String amountHeaderPrefix = String.format("_%s_%s", entryAmount, USD);
         header = String.join(",", "Base", "Target", "Entry_Percentage_Diff", "Open_Price_Diff", "Average_Price_Diff",
-                             "Close_Price_Diff", dynamicHeaders, "Time_Start", "Time_End", "Duration_(sec)",
-                             "Result_Type", "Exchange_Short", "Exchange_Long");
+                             "Close_Price_Diff", "PnL_Min_Short" + amountHeaderPrefix, "PnL_Short_Min_Time",
+                             "PnL_Short" + amountHeaderPrefix, "PnL_Max_Short" + amountHeaderPrefix,
+                             "PnL_Short_Max_Time", "PnL_Min_Long" + amountHeaderPrefix, "PnL_Long_Min_Time",
+                             "PnL_Long" + amountHeaderPrefix, "PnL_Max_Long" + amountHeaderPrefix, "PnL_Long_Max_Time",
+                             "Expenses_" + amountHeaderPrefix, "Income_" + amountHeaderPrefix, "Time_Start", "Time_End",
+                             "Duration_(sec)", "Result_Type", "Exchange_Short", "Exchange_Long");
         initFile();
     }
 
@@ -99,17 +103,38 @@ public class FileResultServiceImpl implements FileResultService {
     private String getTradeResultString(Trade trade) {
         Position positionShort = trade.getPositionShort();
         Position positionLong = trade.getPositionLong();
-        String dynamicResult = trade.getResultData().stream().map(resultData -> String.join(",", decimalResults(
-                resultData.getPnlUsdShort(), resultData.getPnlUsdLong(), resultData.getTotalExpensesUsd(),
-                resultData.getIncomeUsd()))).collect(Collectors.joining(","));
-        Instant startTime = trade.getStartTime();
-        Instant endTime = trade.getEndTime();
-        return String.join(",", trade.getBase(), trade.getTarget(), decimalResult(trade.getEntryPercentageDiff()),
-                           String.join(",",
-                                       originalDecimalResults(trade.getOpenPriceDiff(), trade.getAveragePriceDiff(),
-                                                              trade.getClosePriceDiff())), dynamicResult,
-                           DateUtils.formatDateTime(startTime), DateUtils.formatDateTime(endTime),
-                           DateUtils.durationSecondsDetailed(startTime, endTime), trade.getResultType().name(),
+
+        LocalDateTime startTime = DateUtils.toLocalDateTime(trade.getStartTime());
+        LocalDateTime endTime = DateUtils.toLocalDateTime(trade.getEndTime());
+        return joinResults(trade.getBase(), trade.getTarget(), trade.getEntryPercentageDiff(),
+                           originalDecimalResult(trade.getOpenPriceDiff()),
+                           originalDecimalResult(trade.getAveragePriceDiff()),
+                           originalDecimalResult(trade.getClosePriceDiff()), positionShort.getMinPnlUsd(),
+                           positionShort.getMinPnlTime(), positionShort.getPnlUsd(), positionShort.getMaxPnlUsd(),
+                           positionShort.getMaxPnlTime(), positionLong.getMinPnlUsd(), positionLong.getMinPnlTime(),
+                           positionLong.getPnlUsd(), positionLong.getMaxPnlUsd(), positionLong.getMaxPnlTime(),
+                           trade.getTotalExpensesUsd(), trade.getIncomeUsd(), startTime, endTime,
+                           DateUtils.durationSecondsDetailed(startTime, endTime), trade.getResultType(),
                            positionShort.getExchange().getFullName(), positionLong.getExchange().getFullName());
+    }
+
+    private String joinResults(Object... values) {
+        List<String> result = new ArrayList<>();
+        Arrays.stream(values).forEachOrdered(value -> {
+            if (value == null) {
+                result.add("");
+            } else if (value instanceof BigDecimal) {
+                result.add(decimalResult((BigDecimal) value));
+            } else if (value instanceof Instant) {
+                result.add(DateUtils.formatLocalDateTime((Instant) value));
+            } else if (value instanceof LocalDateTime) {
+                result.add(DateUtils.formatDateTime((LocalDateTime) value));
+            } else if (value instanceof Enum<?>) {
+                result.add(((Enum<?>) value).name());
+            } else {
+                result.add(value.toString());
+            }
+        });
+        return String.join(",", result);
     }
 }

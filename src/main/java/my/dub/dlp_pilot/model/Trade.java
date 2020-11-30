@@ -7,7 +7,6 @@ import static my.dub.dlp_pilot.Constants.PRICE_SCALE;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.List;
 import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -19,7 +18,6 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
-import javax.persistence.OneToMany;
 import javax.persistence.OneToOne;
 import javax.persistence.Table;
 import javax.validation.constraints.Digits;
@@ -52,7 +50,6 @@ public class Trade implements Serializable {
     private BigDecimal fixedExpensesUsd;
 
     @Column(name = "time_start", columnDefinition = "default CURRENT_TIMESTAMP")
-    @EqualsAndHashCode.Exclude // some similar trades can be created with minimum start time difference
     private Instant startTime;
 
     @Column(name = "time_end", columnDefinition = "default CURRENT_TIMESTAMP")
@@ -86,10 +83,13 @@ public class Trade implements Serializable {
     @JoinColumn(name = "position_long_id")
     private Position positionLong;
 
-    @OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL, mappedBy = "trade")
-    @EqualsAndHashCode.Exclude
-    @ToString.Exclude
-    private List<TradeDynamicResultData> resultData;
+    @Column(name = "expenses_usd", nullable = false, precision = 25, scale = PRICE_SCALE)
+    @Digits(integer = 13, fraction = PRICE_SCALE)
+    private BigDecimal totalExpensesUsd;
+
+    @Column(name = "income_usd", nullable = false, precision = 31, scale = PRICE_SCALE)
+    @Digits(integer = 19, fraction = PRICE_SCALE)
+    private BigDecimal incomeUsd;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "test_run_id", updatable = false, nullable = false)
@@ -99,6 +99,9 @@ public class Trade implements Serializable {
 
     @Column(name = "written_to_file", nullable = false, columnDefinition = "default 0")
     private Boolean writtenToFile;
+
+    // for local storage
+    private transient Long localId;
 
     public void setPositions(Position shortPosition, Position longPosition) {
         positionShort = shortPosition;
@@ -110,9 +113,8 @@ public class Trade implements Serializable {
     }
 
     public String toShortString() {
-        String firstSubStr =
-                String.format("Trade{pair=%s, fixedExpensesUsd=%s, startTime=%s, entryPercentageDiff=%s", getPair(),
-                              fixedExpensesUsd, DateUtils.formatDateTime(startTime), entryPercentageDiff);
+        String firstSubStr = String.format("Trade{pair=%s, startTime=%s, entryPercentageDiff=%s", getPair(),
+                                           DateUtils.formatDateTime(startTime), entryPercentageDiff);
         StringBuilder builder = new StringBuilder(firstSubStr);
         if (!TradeResultType.IN_PROGRESS.equals(resultType)) {
             builder.append(String.format(", endTime=%s, resultType=%s", DateUtils.formatDateTime(endTime), resultType));

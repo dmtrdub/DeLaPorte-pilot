@@ -4,6 +4,7 @@ import static my.dub.dlp_pilot.Constants.PRICE_SCALE;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.time.Instant;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.EnumType;
@@ -18,6 +19,7 @@ import javax.validation.constraints.Digits;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import my.dub.dlp_pilot.util.Calculations;
 
 @Data
 @NoArgsConstructor
@@ -43,14 +45,32 @@ public class Position implements Serializable {
     @Digits(integer = 13, fraction = PRICE_SCALE)
     private BigDecimal closePrice;
 
+    @Column(name = "min_pnl_usd", precision = 31, scale = PRICE_SCALE)
+    @Digits(integer = 19, fraction = PRICE_SCALE)
+    private BigDecimal minPnlUsd;
+
+    @Column(name = "min_pnl_time", columnDefinition = "default CURRENT_TIMESTAMP")
+    private Instant minPnlTime;
+
+    @Column(name = "pnl_usd", nullable = false, precision = 31, scale = PRICE_SCALE)
+    @Digits(integer = 19, fraction = PRICE_SCALE)
+    private BigDecimal pnlUsd;
+
+    @Column(name = "max_pnl_usd", precision = 31, scale = PRICE_SCALE)
+    @Digits(integer = 19, fraction = PRICE_SCALE)
+    private BigDecimal maxPnlUsd;
+
+    @Column(name = "max_pnl_time", columnDefinition = "default CURRENT_TIMESTAMP")
+    private Instant maxPnlTime;
+
     @ManyToOne(optional = false)
     @JoinColumn(name = "exchange_id")
     private Exchange exchange;
 
     public String toShortString() {
         String closePriceStr =
-                closePrice != null ? ", closePrice=" + closePrice.stripTrailingZeros().toPlainString() : "";
-        return "Position{openPrice=" + openPrice.stripTrailingZeros().toPlainString() + closePriceStr + ", exchange="
+                closePrice != null ? ", closePrice=" + Calculations.originalDecimalResult(closePrice) : "";
+        return "Position{openPrice=" + Calculations.originalDecimalResult(openPrice) + closePriceStr + ", exchange="
                 + exchange.getFullName() + '}';
     }
 }

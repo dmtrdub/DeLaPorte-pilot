@@ -87,13 +87,20 @@ public class ClientServiceImpl implements ClientService {
         try {
             tickers = exchangeClientService.fetchAllTickers(symbolPairContainer.getAll(exchangeName));
             log.trace("Successfully fetched {} tickers from {} exchange", tickers.size(), exchangeName.getFullName());
-            exchangeService.updateExchangeFault(exchangeName, false);
+            if (exchangeService.isExchangeFaulty(exchangeName)) {
+                log.info("Fault for {} exchange was resolved", exchangeName);
+                exchangeService.updateExchangeFault(exchangeName, false);
+            }
         } catch (UnexpectedEndpointResponseException | UnexpectedResponseStatusCodeException e) {
-            log.warn(e.getMessage());
-            exchangeService.updateExchangeFault(exchangeName, true);
+            if (!exchangeService.isExchangeFaulty(exchangeName)) {
+                log.warn(e.getMessage());
+                exchangeService.updateExchangeFault(exchangeName, true);
+            }
         } catch (IOException e) {
-            log.error("Unable to fetch tickers on {} exchange! Details: {}", exchangeName, e.toString());
-            exchangeService.updateExchangeFault(exchangeName, true);
+            if (!exchangeService.isExchangeFaulty(exchangeName)) {
+                log.error("Unable to fetch tickers on {} exchange! Details: {}", exchangeName, e.toString());
+                exchangeService.updateExchangeFault(exchangeName, true);
+            }
         }
         return tickers;
     }
@@ -114,7 +121,8 @@ public class ClientServiceImpl implements ClientService {
             log.trace("Successfully fetched {} bars from {} exchange", fetchedBars.size(), exchangeName.getFullName());
         } catch (UnexpectedEndpointResponseException | UnexpectedResponseStatusCodeException e) {
             log.warn("{} Symbol pair {} {} will be excluded from preload and future trading!", e.getMessage(),
-                     symbolPair.getPair(), symbolPair.getPair().equalsIgnoreCase(symbolPair.getName()) ? ""
+                     symbolPair.getPair(), symbolPair.getPair().equalsIgnoreCase(symbolPair.getName())
+                             ? ""
                              : "(" + symbolPair.getName() + ")");
         } catch (IOException e) {
             log.error("Unable to fetch bars on {} exchange! Details: {}", exchangeName, e.toString());

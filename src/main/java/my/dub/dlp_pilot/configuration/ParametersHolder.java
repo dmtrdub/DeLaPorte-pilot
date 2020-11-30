@@ -15,7 +15,6 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.Constants;
 import my.dub.dlp_pilot.model.TimeFrame;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Value;
@@ -48,8 +47,10 @@ public class ParametersHolder implements InitializingBean {
     private String profitPercentageDecreaseAfter;
     @Value("${trade_decrease_expected_profit_percentage_by}")
     private double profitPercentageDecreaseByDouble;
-    @Value("${trade_entry_amounts_usd}")
-    private String[] entryAmountsUsdParam;
+    @Value("${trade_entry_amount_usd}")
+    private double entryAmountUsdDouble;
+    @Value("${trade_detrimental_close_max_pnl_percentage_diff}")
+    private double detrimentalCloseOnMaxPnlDiffPercentageDouble;
     @Value("${trade_timeout_duration}")
     private String tradeTimeout;
     @Value("${trade_detrimental_amount_percentage}")
@@ -87,7 +88,8 @@ public class ParametersHolder implements InitializingBean {
     private BigDecimal entryMaxPercentageDiff;
     private BigDecimal exitProfitPercentage;
     private BigDecimal profitPercentageDecreaseBy;
-    private List<Double> entryAmounts;
+    private BigDecimal detrimentalCloseOnMaxPnlDiffPercentage;
+    private BigDecimal entryAmount;
     private BigDecimal detrimentAmountPercentage;
 
     @Override
@@ -127,10 +129,6 @@ public class ParametersHolder implements InitializingBean {
         return Optional.of(String.join(";", configProperties));
     }
 
-    public BigDecimal getMinEntryAmount() {
-        return BigDecimal.valueOf(entryAmounts.get(0));
-    }
-
     private void setDefaultValues() {
         profitPercentageDecreaseAfterDuration = getDefaultDuration(profitPercentageDecreaseAfterDuration);
         profitPercentageDecreaseAfterDurationMillis = profitPercentageDecreaseAfterDuration.toMillis();
@@ -146,9 +144,10 @@ public class ParametersHolder implements InitializingBean {
         exitProfitPercentage = BigDecimal.valueOf(exitProfitPercentageDouble);
         profitPercentageDecreaseByDouble = profitPercentageDecreaseByDouble > 0 ? profitPercentageDecreaseByDouble : 0;
         profitPercentageDecreaseBy = BigDecimal.valueOf(profitPercentageDecreaseByDouble);
-        entryAmounts = Arrays.stream(entryAmountsUsdParam).mapToDouble(Double::parseDouble).boxed().distinct().sorted()
-                .collect(Collectors.toList());
+        entryAmount = BigDecimal.valueOf(entryAmountUsdDouble);
         detrimentAmountPercentage = BigDecimal.valueOf(detrimentAmountPercentageDouble);
+        detrimentalCloseOnMaxPnlDiffPercentage = detrimentalCloseOnMaxPnlDiffPercentageDouble > 0 ? BigDecimal
+                .valueOf(detrimentalCloseOnMaxPnlDiffPercentageDouble) : BigDecimal.ZERO;
         parallelTradesNumber = parallelTradesNumber > 0 ? parallelTradesNumber : 0;
         testRunDuration = parseDuration(testRunDurationParam.toUpperCase());
     }
@@ -190,15 +189,7 @@ public class ParametersHolder implements InitializingBean {
             throw new IllegalArgumentException(
                     "Profit percentage decrease by cannot be >= entry + exit profit percentages!");
         }
-        if (ArrayUtils.isEmpty(entryAmountsUsdParam)) {
-            throw new IllegalArgumentException("Trade entry sums cannot be empty!");
-        }
-        if (String.join(",", entryAmountsUsdParam).length() > Constants.STRING_PARAM_LENGTH) {
-            throw new IllegalArgumentException(
-                    String.format("Trade entry sums cannot be longer than %d chars!", Constants.STRING_PARAM_LENGTH));
-        }
-        if (Arrays.stream(entryAmountsUsdParam).mapToDouble(Double::parseDouble).boxed()
-                .anyMatch(aDouble -> aDouble < 10)) {
+        if (entryAmountUsdDouble < 10) {
             throw new IllegalArgumentException("Trade entry sum cannot be < 10 USD");
         }
         if (detrimentAmountPercentageDouble <= 0) {
@@ -230,8 +221,7 @@ public class ParametersHolder implements InitializingBean {
         log.info("Price data capture period:  {}", formatDuration(dataCapturePeriodDuration));
         log.info("Price data capture timeFrame:  {}", dataCaptureTimeFrame);
         log.info("----------------------------------------");
-        log.info("Trade entry amounts (USD):  {}",
-                 entryAmounts.stream().map(String::valueOf).collect(Collectors.joining(", ")));
+        log.info("Trade entry amount (USD):  {}", entryAmount);
         log.info("Trade entry profit percentage:  {}", entryProfitPercentageDouble);
         log.info("Trade exit profit percentage:  {}", exitProfitPercentageDouble);
         log.info("Trade entry MIN percentage difference:  {}", entryMinPercentageDiffDouble);
@@ -244,6 +234,10 @@ public class ParametersHolder implements InitializingBean {
                  profitPercentageDecreaseByDouble == 0 || profitPercentageDecreaseAfterDuration.isZero()
                          ? DISABLED_MESSAGE
                          : profitPercentageDecreaseByDouble);
+        log.info("Trade postpone detrimental close on percentage gap:  {}",
+                 detrimentalCloseOnMaxPnlDiffPercentageDouble == 0
+                         ? DISABLED_MESSAGE
+                         : detrimentalCloseOnMaxPnlDiffPercentageDouble);
         log.info("Trade timeout after period:  {}", formatDuration(tradeTimeoutDuration));
         log.info("Trade detrimental entry amount percentage:  {}", detrimentAmountPercentageDouble);
         log.info("Trade MAX parallel number:  {}", parallelTradesNumber == 0 ? DISABLED_MESSAGE : parallelTradesNumber);

@@ -14,7 +14,7 @@ public final class DateUtils {
     }
 
     private static final ZoneId ZONE_ID_UTC = ZoneId.of("UTC");
-    private static final String FORMAT_PATTERN = "dd.MM.yyyy-HH:mm:ss";
+    private static final String FORMAT_PATTERN = "dd.MM.yyyy HH:mm:ss";
     private static final String FORMAT_PATTERN_SHORT = "ddMMyy-HHmm";
 
     public static String formatDateTime(LocalDateTime dateTime) {
@@ -98,5 +98,13 @@ public final class DateUtils {
 
     public static Instant toInstant(@NonNull LocalDateTime localDateTime) {
         return localDateTime.atZone(ZoneId.systemDefault()).toInstant();
+    }
+
+    public static LocalDateTime toLocalDateTime(@NonNull Instant instant) {
+        return LocalDateTime.ofInstant(instant, ZoneId.systemDefault());
+    }
+
+    public static String formatLocalDateTime(@NonNull Instant instant) {
+        return formatDateTime(toLocalDateTime(instant));
     }
 }

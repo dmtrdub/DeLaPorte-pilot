@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.Position;
@@ -16,15 +17,19 @@ import org.springframework.stereotype.Component;
 @Component
 public class TradeContainer {
     // use map to store hash of trade in created state, in order to ensure remove only after successful persist to db
-    private final Map<Integer, Trade> trades = new ConcurrentHashMap<>();
+    private final Map<Long, Trade> trades = new ConcurrentHashMap<>();
     private final Set<DetrimentalRecord> detrimentalRecords = Collections.newSetFromMap(new ConcurrentHashMap<>());
+
+    private static final AtomicLong LOCAL_ID_SEQUENCE = new AtomicLong();
 
     // check if similar trade exists here, as well as before creating trade
     public synchronized boolean addTrade(Trade trade) {
         if (trade == null || isSimilarPresent(trade)) {
             return false;
         }
-        return trades.putIfAbsent(trade.hashCode(), trade) == null;
+        long localId = LOCAL_ID_SEQUENCE.getAndIncrement();
+        trade.setLocalId(localId);
+        return trades.putIfAbsent(localId, trade) == null;
     }
 
     public Set<Trade> getTrades(ExchangeName exchangeName) {
@@ -73,8 +78,8 @@ public class TradeContainer {
         });
     }
 
-    public boolean remove(Integer hash) {
-        return trades.remove(hash) != null;
+    public boolean remove(Long localId) {
+        return trades.remove(localId) != null;
     }
 
     public boolean isEmpty() {
