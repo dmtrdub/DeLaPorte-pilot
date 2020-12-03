@@ -4,10 +4,11 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static my.dub.dlp_pilot.util.Calculations.average;
 import static my.dub.dlp_pilot.util.Calculations.income;
+import static my.dub.dlp_pilot.util.Calculations.isNotNegative;
 import static my.dub.dlp_pilot.util.Calculations.isZero;
 import static my.dub.dlp_pilot.util.Calculations.originalValueFromPercent;
 import static my.dub.dlp_pilot.util.Calculations.originalValueFromPercentSum;
-import static my.dub.dlp_pilot.util.Calculations.percentageDifference;
+import static my.dub.dlp_pilot.util.Calculations.percentageDifferenceAbs;
 import static my.dub.dlp_pilot.util.Calculations.percentageDifferencePrice;
 import static my.dub.dlp_pilot.util.Calculations.pnl;
 
@@ -21,7 +22,6 @@ import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import my.dub.dlp_pilot.Constants;
 import my.dub.dlp_pilot.configuration.ParametersHolder;
-import my.dub.dlp_pilot.exception.MissingEntityException;
 import my.dub.dlp_pilot.model.Exchange;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.Position;
@@ -110,14 +110,10 @@ public class TradeServiceImpl implements TradeService {
         tradesInProgress.forEach(trade -> {
             Position positionShort = trade.getPositionShort();
             Position positionLong = trade.getPositionLong();
-            Ticker tickerShort =
-                    tickerService.getTicker(positionShort.getExchange().getName(), trade.getBase(), trade.getTarget())
-                            .orElseThrow(() -> new MissingEntityException(Ticker.class.getSimpleName(),
-                                                                          positionShort.toString()));
-            Ticker tickerLong =
-                    tickerService.getTicker(positionLong.getExchange().getName(), trade.getBase(), trade.getTarget())
-                            .orElseThrow(() -> new MissingEntityException(Ticker.class.getSimpleName(),
-                                                                          positionLong.toString()));
+            Ticker tickerShort = tickerService
+                    .getTickerWithRetry(positionShort.getExchange().getName(), trade.getBase(), trade.getTarget());
+            Ticker tickerLong = tickerService
+                    .getTickerWithRetry(positionLong.getExchange().getName(), trade.getBase(), trade.getTarget());
             Duration tradeTimeoutDuration = parameters.getTradeTimeoutDuration();
             if (!tradeTimeoutDuration.isZero() && DateUtils.durationMillis(trade.getStartTime()) > tradeTimeoutDuration
                     .toMillis()) {
@@ -134,7 +130,7 @@ public class TradeServiceImpl implements TradeService {
                                                            tickerLong.getExchangeName());
                 if (isExistingSuccessful(income, trade.getStartTime())) {
                     handleClose(trade, tickerShort, tickerLong, TradeResultType.SUCCESSFUL);
-                } else if (isExistingDetrimental(income) && !isDetrimentalSyncCondition(pnlShort, pnlLong)) {
+                } else if (isExistingDetrimental(income) && !checkDetrimentalSyncCondition(trade, pnlShort, pnlLong)) {
                     handleClose(trade, tickerShort, tickerLong, TradeResultType.DETRIMENTAL);
                 }
             }
@@ -143,7 +139,6 @@ public class TradeServiceImpl implements TradeService {
 
     @Override
     @Transactional
-    @Retryable(LockAcquisitionException.class)
     public void closeTrades(@NonNull ExchangeName exchangeName, @NonNull TradeResultType tradeResultType) {
         checkNotNull(exchangeName, "Cannot close trades if exchangeName is null!");
         checkNotNull(tradeResultType, "Cannot close trades if tradeResultType is null!");
@@ -151,14 +146,10 @@ public class TradeServiceImpl implements TradeService {
         tradeContainer.getTrades(exchangeName).forEach(trade -> {
             Position positionShort = trade.getPositionShort();
             Position positionLong = trade.getPositionLong();
-            Ticker tickerShort =
-                    tickerService.getTicker(positionShort.getExchange().getName(), trade.getBase(), trade.getTarget())
-                            .orElseThrow(() -> new MissingEntityException(Ticker.class.getSimpleName(),
-                                                                          positionShort.toString()));
-            Ticker tickerLong =
-                    tickerService.getTicker(positionLong.getExchange().getName(), trade.getBase(), trade.getTarget())
-                            .orElseThrow(() -> new MissingEntityException(Ticker.class.getSimpleName(),
-                                                                          positionLong.toString()));
+            Ticker tickerShort = tickerService
+                    .getTickerWithRetry(positionShort.getExchange().getName(), trade.getBase(), trade.getTarget());
+            Ticker tickerLong = tickerService
+                    .getTickerWithRetry(positionLong.getExchange().getName(), trade.getBase(), trade.getTarget());
             handleClose(trade, tickerShort, tickerLong, tradeResultType);
         });
     }
@@ -223,16 +214,28 @@ public class TradeServiceImpl implements TradeService {
         }
     }
 
-    private boolean isDetrimentalSyncCondition(BigDecimal pnlShort, BigDecimal pnlLong) {
+    private boolean checkDetrimentalSyncCondition(Trade trade, BigDecimal pnlShort, BigDecimal pnlLong) {
         if (isZero(parameters.getDetrimentalCloseOnMaxPnlDiffPercentage())) {
             return false;
         }
+        // detrimental sync stays until trade is closed as SUCCESSFUL / TIMED_OUT / TEST_RUN_END
+        if (trade.isDetrimentalSync()) {
+            return true;
+        }
         BigDecimal absPnlShort = pnlShort.abs();
         BigDecimal absPnlLong = pnlLong.abs();
-        return (absPnlShort.compareTo(absPnlLong) > 0 && percentageDifference(absPnlShort, absPnlLong)
-                .compareTo(parameters.getDetrimentalCloseOnMaxPnlDiffPercentage()) > 0) || (
-                absPnlLong.compareTo(absPnlShort) > 0 && percentageDifference(absPnlLong, absPnlShort)
+        boolean isDetrimentalSyncCondition = (absPnlShort.compareTo(absPnlLong) > 0 &&
+                percentageDifferenceAbs(pnlShort, pnlLong)
+                        .compareTo(parameters.getDetrimentalCloseOnMaxPnlDiffPercentage()) > 0) || (
+                absPnlLong.compareTo(absPnlShort) > 0 && percentageDifferenceAbs(pnlLong, pnlShort)
                         .compareTo(parameters.getDetrimentalCloseOnMaxPnlDiffPercentage()) > 0);
+        if (isDetrimentalSyncCondition) {
+            log.info("#{} Trade has entered a detrimental sync condition at {}. PnL Short: {} USD | PnL Long {} USD",
+                     trade.getLocalId(), DateUtils.formatDateTime(Instant.now()), pnlShort, pnlLong);
+            trade.setDetrimentalSync(true);
+            return true;
+        }
+        return false;
     }
 
     private synchronized void handleClose(Trade trade, Ticker tickerShort, Ticker tickerLong,
@@ -259,9 +262,9 @@ public class TradeServiceImpl implements TradeService {
 
     private boolean isExistingSuccessful(BigDecimal income, Instant tradeStartTime) {
         BigDecimal amountUsd = parameters.getEntryAmount();
-        BigDecimal exitPercentage = parameters.getProfitPercentageOnExitSum(DateUtils.durationSeconds(tradeStartTime));
+        BigDecimal exitPercentage = parameters.getProfitPercentageOnExitSum(DateUtils.durationMillis(tradeStartTime));
         BigDecimal profitValue = originalValueFromPercent(amountUsd, exitPercentage);
-        return income.subtract(profitValue).compareTo(BigDecimal.ZERO) >= 0;
+        return isNotNegative(income.subtract(profitValue));
     }
 
     private boolean isExistingDetrimental(BigDecimal income) {
@@ -294,7 +297,7 @@ public class TradeServiceImpl implements TradeService {
                        expensesLong);
 
         BigDecimal entryProfitValue = originalValueFromPercent(amountUsd, parameters.getEntryProfitPercentage());
-        return income.subtract(entryProfitValue).compareTo(BigDecimal.ZERO) >= 0;
+        return isNotNegative(income.subtract(entryProfitValue));
     }
 
     private boolean isDetrimental(BigDecimal detrimentalEntryPercentage, BigDecimal income) {

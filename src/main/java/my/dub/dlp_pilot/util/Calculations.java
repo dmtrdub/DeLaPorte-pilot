@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import my.dub.dlp_pilot.Constants;
 import my.dub.dlp_pilot.model.PositionSide;
+import org.springframework.lang.NonNull;
 
 public final class Calculations {
 
@@ -18,7 +19,7 @@ public final class Calculations {
     private Calculations() {
     }
 
-    public static BigDecimal percentageDifference(BigDecimal newValue, BigDecimal origValue) {
+    public static BigDecimal percentageDifferenceAbs(@NonNull BigDecimal newValue, @NonNull BigDecimal origValue) {
         checkNotNull(newValue, "New value should not be null when calculating percentage difference!");
         checkNotNull(origValue, "Original value should not be null when calculating percentage difference!");
 
@@ -29,11 +30,11 @@ public final class Calculations {
         BigDecimal result =
                 newValue.subtract(origValue).divide(origValue, Constants.PERCENTAGE_SCALE, RoundingMode.HALF_UP)
                         .multiply(HUNDRED);
-        return origValue.compareTo(newValue) > 0 && !isNotPositive(result) ? result.negate() : result;
+        return result.abs();
     }
 
     public static BigDecimal percentageDifferencePrice(BigDecimal priceShort, BigDecimal priceLong) {
-        return percentageDifference(priceShort, priceLong);
+        return percentageDifferenceAbs(priceShort, priceLong);
     }
 
     public static BigDecimal originalValueFromPercent(BigDecimal target, BigDecimal percentage) {
@@ -72,6 +73,10 @@ public final class Calculations {
 
     public static boolean isNotPositive(BigDecimal value) {
         return value.compareTo(BigDecimal.ZERO) <= 0;
+    }
+
+    public static boolean isNotNegative(BigDecimal value) {
+        return value.compareTo(BigDecimal.ZERO) >= 0;
     }
 
     public static BigDecimal average(Collection<BigDecimal> values) {

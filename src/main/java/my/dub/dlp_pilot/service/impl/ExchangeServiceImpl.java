@@ -57,7 +57,7 @@ public class ExchangeServiceImpl implements ExchangeService {
         checkNotNull(exchangeName, "Exchange name cannot be null when searching Exchange by name!");
 
         return findAll().stream().filter(exchange -> exchangeName.equals(exchange.getName())).findFirst()
-                .orElseThrow(() -> new MissingEntityException(ExchangeName.class.getSimpleName(), exchangeName.name()));
+                .orElseThrow(() -> new MissingEntityException(ExchangeName.class, exchangeName.name()));
     }
 
     @Override

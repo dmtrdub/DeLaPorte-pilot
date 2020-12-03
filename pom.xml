@@ -33,6 +33,7 @@
         <org.glassfish.javax.el.version>3.0.1-b11</org.glassfish.javax.el.version>
         <org.apache.commons-lang3.version>3.10</org.apache.commons-lang3.version>
         <com.google.guava.version>29.0-jre</com.google.guava.version>
+        <org.aspectjweaver.version>1.9.6</org.aspectjweaver.version>
         <org.mockito.version>3.5.7</org.mockito.version>
         <org.junit.jupiter.version>5.7.0-M1</org.junit.jupiter.version>
     </properties>
@@ -200,6 +201,11 @@
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
             <version>${com.google.guava.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.aspectj</groupId>
+            <artifactId>aspectjweaver</artifactId>
+            <version>${org.aspectjweaver.version}</version>
         </dependency>
 
         <!-- Testing -->

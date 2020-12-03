@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
+import my.dub.dlp_pilot.exception.MissingEntityException;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.dto.Ticker;
 import my.dub.dlp_pilot.repository.container.TickerContainer;
@@ -45,8 +46,9 @@ public class TickerServiceImpl implements TickerService {
     }
 
     @Override
-    public Optional<Ticker> getTicker(ExchangeName exchangeName, String base, String target) {
-        return tickerContainer.getTicker(exchangeName, base, target);
+    public Ticker getTickerWithRetry(ExchangeName exchangeName, String base, String target) {
+        return tickerContainer.getTicker(exchangeName, base, target)
+                .orElseThrow(() -> new MissingEntityException(Ticker.class, exchangeName.getFullName(), base, target));
     }
 
     @Override

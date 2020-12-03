@@ -103,6 +103,8 @@ public class Trade implements Serializable {
     // for local storage
     private transient Long localId;
 
+    private transient boolean detrimentalSync;
+
     public void setPositions(Position shortPosition, Position longPosition) {
         positionShort = shortPosition;
         positionLong = longPosition;

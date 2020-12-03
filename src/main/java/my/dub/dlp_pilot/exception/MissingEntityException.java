@@ -9,17 +9,10 @@ public class MissingEntityException extends RuntimeException {
 
     private final String searchCriteria;
 
-    public MissingEntityException(String entityClassName, String searchCriterion) {
-        super(String.format("%s entity not found by the following search criterion: %s", entityClassName,
-                            searchCriterion));
-        this.entityClassName = entityClassName;
-        this.searchCriteria = searchCriterion;
-    }
-
-    public MissingEntityException(String entityClassName, String... searchCriteria) {
-        super(String.format("%s entity not found by the following search criteria: %s", entityClassName,
+    public MissingEntityException(Class<?> entityClass, String... searchCriteria) {
+        super(String.format("%s entity not found by the following search criteria: %s", entityClass.getSimpleName(),
                             String.join(" ; ", searchCriteria)));
-        this.entityClassName = entityClassName;
+        this.entityClassName = entityClass.getSimpleName();
         this.searchCriteria = String.join(" ; ", searchCriteria);
     }
 }

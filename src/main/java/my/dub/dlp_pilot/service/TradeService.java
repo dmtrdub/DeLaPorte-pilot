@@ -8,7 +8,10 @@ import my.dub.dlp_pilot.model.TestRun;
 import my.dub.dlp_pilot.model.Trade;
 import my.dub.dlp_pilot.model.TradeResultType;
 import my.dub.dlp_pilot.model.dto.Ticker;
+import org.hibernate.exception.LockAcquisitionException;
 import org.springframework.lang.NonNull;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 
 public interface TradeService {
 
@@ -16,6 +19,7 @@ public interface TradeService {
 
     void handleTrades(ExchangeName exchangeName);
 
+    @Retryable(value = LockAcquisitionException.class, backoff = @Backoff(0))
     void closeTrades(@NonNull ExchangeName exchangeName, @NonNull TradeResultType tradeResultType);
 
     Set<Trade> getCompletedTradesNotWrittenToFile(TestRun testRun);
