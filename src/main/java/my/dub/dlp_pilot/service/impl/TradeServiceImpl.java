@@ -124,8 +124,8 @@ public class TradeServiceImpl implements TradeService {
                                              positionLong.getOpenPrice(), tickerLong.getPriceBid());
                 BigDecimal pnlShort = pnlSides.getFirst();
                 BigDecimal pnlLong = pnlSides.getSecond();
-                checkExtremumPnl(trade.getPositionShort(), pnlShort);
-                checkExtremumPnl(trade.getPositionLong(), pnlLong);
+                checkExtremumPnl(positionShort, pnlShort);
+                checkExtremumPnl(positionLong, pnlLong);
                 BigDecimal income = calculateCurrentIncome(pnlShort, tickerShort.getExchangeName(), pnlLong,
                                                            tickerLong.getExchangeName());
                 if (isExistingSuccessful(income, trade.getStartTime())) {

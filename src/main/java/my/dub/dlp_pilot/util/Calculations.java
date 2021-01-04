@@ -48,13 +48,13 @@ public final class Calculations {
     }
 
     public static BigDecimal pnl(PositionSide side, BigDecimal openPrice, BigDecimal closePrice, BigDecimal amountUsd) {
-        BigDecimal amount = amountUsd.divide(openPrice, Constants.PRICE_SCALE, RoundingMode.HALF_UP);
+        BigDecimal priceDiff;
         if (PositionSide.SHORT.equals(side)) {
-            return openPrice.subtract(closePrice).multiply(amount).setScale(Constants.PRICE_SCALE, RoundingMode.HALF_UP)
-                    .stripTrailingZeros();
+            priceDiff = openPrice.subtract(closePrice);
+        } else {
+            priceDiff = closePrice.subtract(openPrice);
         }
-        return closePrice.subtract(openPrice).multiply(amount).setScale(Constants.PRICE_SCALE, RoundingMode.HALF_UP)
-                .stripTrailingZeros();
+        return pnl(priceDiff, openPrice, amountUsd);
     }
 
     public static BigDecimal pnl(BigDecimal priceDiff, BigDecimal openPrice, BigDecimal amountUsd) {

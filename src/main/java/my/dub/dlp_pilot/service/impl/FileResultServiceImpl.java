@@ -71,7 +71,7 @@ public class FileResultServiceImpl implements FileResultService {
                 tradeService.getCompletedTradesNotWrittenToFile(testRunService.getCurrentTestRun());
         if (CollectionUtils.isEmpty(completedTrades)) {
             if (testRunService.checkTestRunEnd()) {
-                checkState(tradeService.isAllTradesClosed(), "Cannot exit test run if some trades are still opened!");
+                checkState(tradeService.isAllTradesClosed(), "Cannot exit test run if trades are still opened!");
                 throw new TestRunEndException();
             }
             return;
@@ -81,7 +81,7 @@ public class FileResultServiceImpl implements FileResultService {
             Files.write(filePath, linesToWrite, StandardOpenOption.APPEND);
             completedTrades.forEach(trade -> trade.setWrittenToFile(true));
             tradeService.saveOrUpdate(completedTrades);
-            log.debug("Successfully written {} lines to test result file {}", linesToWrite.size(), filePath);
+            log.debug("{} lines written to test result file {}", linesToWrite.size(), filePath);
         } catch (IOException e) {
             log.error("Error when writing to test result file {}! Details: {}", filePath, e.getMessage());
         }
