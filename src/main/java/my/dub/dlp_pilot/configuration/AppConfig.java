@@ -19,11 +19,9 @@ import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 import org.springframework.retry.annotation.EnableRetry;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 @Configuration
 @EnableRetry
-@EnableTransactionManagement
 @EnableJpaRepositories(basePackages = "my.dub.dlp_pilot.repository")
 @ComponentScan(basePackages = "my.dub.dlp_pilot")
 @PropertySource("classpath:database/hibernate.properties")
@@ -37,7 +35,6 @@ public class AppConfig {
         this.environment = env;
     }
 
-    //TODO: consider possible optimizations
     @SneakyThrows
     @Bean
     public DataSource dataSource() {
@@ -75,7 +72,6 @@ public class AppConfig {
         return new String[] { "my.dub.dlp_pilot.model" };
     }
 
-    //TODO: consider possible optimizations
     private Properties hibernateProperties() {
         Properties properties = new Properties();
         properties.put("hibernate.dialect", environment.getRequiredProperty("hibernate.dialect"));

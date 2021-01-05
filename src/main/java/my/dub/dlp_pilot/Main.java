@@ -1,15 +1,14 @@
 package my.dub.dlp_pilot;
 
 import lombok.extern.slf4j.Slf4j;
-import my.dub.dlp_pilot.configuration.AppConfig;
-import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.context.support.AbstractApplicationContext;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @Slf4j
+@SpringBootApplication
 public class Main {
     public static void main(String[] args) {
         log.info("DeLaPorte is starting up!");
-        AbstractApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
-        context.registerShutdownHook();
+        SpringApplication.run(Main.class, args);
     }
 }
