@@ -63,7 +63,7 @@ public class Ticker extends PriceData {
     }
 
     public String toShortString() {
-        return "Ticker{base='" + base + '\'' + ", target='" + target + '\'' + "priceBid=" + priceBid + ", priceAsk="
+        return "Ticker{base='" + base + '\'' + ", target='" + target + '\'' + ", priceBid=" + priceBid + ", priceAsk="
                 + priceAsk + ", closePrice=" + closePrice + ", stale=" + stale + ", dateTime=" + dateTime
                 + ", exchangeName=" + exchangeName + '}';
     }

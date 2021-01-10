@@ -67,7 +67,7 @@ public class FileResultServiceImpl implements FileResultService {
 
     @Override
     public void write() {
-        Set<Trade> completedTrades =
+        List<Trade> completedTrades =
                 tradeService.getCompletedTradesNotWrittenToFile(testRunService.getCurrentTestRun());
         if (CollectionUtils.isEmpty(completedTrades)) {
             if (testRunService.checkTestRunEnd()) {

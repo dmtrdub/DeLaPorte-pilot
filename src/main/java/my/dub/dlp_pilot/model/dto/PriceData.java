@@ -4,6 +4,7 @@ import javax.persistence.Column;
 import javax.persistence.EnumType;
 import javax.persistence.Enumerated;
 import javax.persistence.MappedSuperclass;
+import javax.validation.constraints.NotNull;
 import lombok.Data;
 import my.dub.dlp_pilot.Constants;
 import my.dub.dlp_pilot.model.ExchangeName;
@@ -25,15 +26,18 @@ public abstract class PriceData {
         this.target = target;
     }
 
+    @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(name = "exchange_name", unique = true, nullable = false, length = 200)
+    @Column(name = "exchange_name", nullable = false, length = 200)
     protected ExchangeName exchangeName;
 
     // parsed
+    @NotNull
     @Column(nullable = false, length = 16)
     protected String base;
 
     // parsed
+    @NotNull
     @Column(nullable = false, length = 16)
     protected String target;
 

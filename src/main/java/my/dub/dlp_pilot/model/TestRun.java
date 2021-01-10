@@ -10,6 +10,7 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
+import javax.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
@@ -26,13 +27,14 @@ public class TestRun implements Serializable {
     @EqualsAndHashCode.Exclude
     private Long id;
 
+    @NotNull
     @Column(name = "config_params", nullable = false, length = 4000)
     private String configParams;
 
-    @Column(name = "time_start", nullable = false, columnDefinition = "default CURRENT_TIMESTAMP")
+    @Column(name = "time_start", nullable = false, columnDefinition = "datetime default CURRENT_TIMESTAMP")
     private LocalDateTime startTime;
 
-    @Column(name = "preload_time_start", nullable = false, columnDefinition = "default CURRENT_TIMESTAMP")
+    @Column(name = "preload_time_start", nullable = false, columnDefinition = "datetime default CURRENT_TIMESTAMP")
     private LocalDateTime preloadStartTime;
 
     @Column(name = "trades_time_start")

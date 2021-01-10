@@ -50,4 +50,7 @@ public final class Constants {
     public static final String NO_TICKERS_FOUND_IN_RESPONSE_MSG = "No tickers found in response!";
     public static final String NO_BARS_FOUND_IN_RESPONSE_MSG = "No bars found in response!";
     public static final String NO_SYMBOL_DATA_FOUND_IN_RESPONSE_MSG = "No symbol data found in response!";
+
+    public static final String NULL_ARGUMENT_MESSAGE = "Null argument %s passed!";
+    public static final String EMPTY_STRING_ARGUMENT_MESSAGE = "Empty string passed as argument %s!";
 }

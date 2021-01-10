@@ -156,10 +156,10 @@ public class TradeServiceImpl implements TradeService {
 
     @Override
     @Transactional
-    public Set<Trade> getCompletedTradesNotWrittenToFile(@NonNull TestRun testRun) {
+    public List<Trade> getCompletedTradesNotWrittenToFile(@NonNull TestRun testRun) {
         checkNotNull(testRun, "Cannot get completed trades if Test run is null!");
 
-        return repository.findByWrittenToFileFalseAndTestRunIdEqualsOrderByEndTimeAsc(testRun.getId());
+        return repository.findDistinctByWrittenToFileFalseAndTestRunIdEqualsOrderByEndTimeAsc(testRun.getId());
     }
 
     @Override
@@ -191,7 +191,7 @@ public class TradeServiceImpl implements TradeService {
             return false;
         }
         if (tradeContainer
-                .checkHasDetrimentalRecord(tickerShort.getExchangeName(), tickerLong.getExchangeName(), base, target)) {
+                .checkDetrimentalRecord(tickerShort.getExchangeName(), tickerLong.getExchangeName(), base, target)) {
             return false;
         }
         int parallelTradesNumber = parameters.getParallelTradesNumber();
@@ -241,10 +241,9 @@ public class TradeServiceImpl implements TradeService {
     private synchronized void handleClose(Trade trade, Ticker tickerShort, Ticker tickerLong,
             TradeResultType tradeResultType) {
         if (tradeContainer.isSimilarPresent(trade) && !repository
-                .checkSimilarExists(trade.getBase(), trade.getTarget(), trade.getStartTime(),
-                                    tickerShort.getExchangeName(), tickerLong.getExchangeName(),
-                                    trade.getPositionShort().getOpenPrice(), trade.getPositionLong().getOpenPrice(),
-                                    tradeResultType)) {
+                .checkSimilarExists(trade.getBase(), trade.getTarget(), tickerShort.getExchangeName(),
+                                    tickerLong.getExchangeName(), trade.getPositionShort().getOpenPrice(),
+                                    trade.getPositionLong().getOpenPrice(), tradeResultType)) {
             closeTrade(trade, tradeResultType, tickerShort, tickerLong);
             repository.save(trade);
             Long localId = trade.getLocalId();

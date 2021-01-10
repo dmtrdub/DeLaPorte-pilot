@@ -16,6 +16,7 @@ import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 import javax.validation.constraints.Digits;
+import javax.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
@@ -33,15 +34,17 @@ public class Position implements Serializable {
     @EqualsAndHashCode.Exclude
     private Long id;
 
+    @NotNull
     @Enumerated(EnumType.ORDINAL)
     @Column(nullable = false)
     private PositionSide side;
 
-    @Column(name = "open_price", nullable = false, precision = 25, scale = PRICE_SCALE, columnDefinition = "default 0")
+    @NotNull
+    @Column(name = "open_price", nullable = false, precision = 25, scale = PRICE_SCALE)
     @Digits(integer = 13, fraction = PRICE_SCALE)
     private BigDecimal openPrice;
 
-    @Column(name = "close_price", precision = 25, scale = PRICE_SCALE, columnDefinition = "default 0")
+    @Column(name = "close_price", precision = 25, scale = PRICE_SCALE)
     @Digits(integer = 13, fraction = PRICE_SCALE)
     private BigDecimal closePrice;
 
@@ -49,9 +52,10 @@ public class Position implements Serializable {
     @Digits(integer = 19, fraction = PRICE_SCALE)
     private BigDecimal minPnlUsd;
 
-    @Column(name = "min_pnl_time", columnDefinition = "default CURRENT_TIMESTAMP")
+    @Column(name = "min_pnl_time", columnDefinition = "datetime default CURRENT_TIMESTAMP")
     private Instant minPnlTime;
 
+    @NotNull
     @Column(name = "pnl_usd", nullable = false, precision = 31, scale = PRICE_SCALE)
     @Digits(integer = 19, fraction = PRICE_SCALE)
     private BigDecimal pnlUsd;
@@ -60,9 +64,10 @@ public class Position implements Serializable {
     @Digits(integer = 19, fraction = PRICE_SCALE)
     private BigDecimal maxPnlUsd;
 
-    @Column(name = "max_pnl_time", columnDefinition = "default CURRENT_TIMESTAMP")
+    @Column(name = "max_pnl_time", columnDefinition = "datetime default CURRENT_TIMESTAMP")
     private Instant maxPnlTime;
 
+    @NotNull
     @ManyToOne(optional = false)
     @JoinColumn(name = "exchange_id")
     private Exchange exchange;

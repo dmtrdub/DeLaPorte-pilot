@@ -2,7 +2,7 @@ package my.dub.dlp_pilot.service;
 
 import java.math.BigDecimal;
 import java.util.Collection;
-import java.util.Set;
+import java.util.List;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.TestRun;
 import my.dub.dlp_pilot.model.Trade;
@@ -22,7 +22,7 @@ public interface TradeService {
     @Retryable(value = LockAcquisitionException.class, backoff = @Backoff(0))
     void closeTrades(@NonNull ExchangeName exchangeName, @NonNull TradeResultType tradeResultType);
 
-    Set<Trade> getCompletedTradesNotWrittenToFile(TestRun testRun);
+    List<Trade> getCompletedTradesNotWrittenToFile(TestRun testRun);
 
     void saveOrUpdate(Collection<Trade> trades);
 
