@@ -2,6 +2,9 @@ package my.dub.dlp_pilot;
 
 import java.util.List;
 
+/**
+ * Holder class for application-wide constants.
+ */
 public final class Constants {
     private Constants() {
     }

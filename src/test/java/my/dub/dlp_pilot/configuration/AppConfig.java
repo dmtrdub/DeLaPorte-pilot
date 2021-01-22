@@ -1,16 +1,19 @@
 package my.dub.dlp_pilot.configuration;
 
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
+import static org.mockito.Mockito.mock;
+
 import java.util.Properties;
 import javax.sql.DataSource;
-import lombok.SneakyThrows;
+import my.dub.dlp_pilot.ScheduledService;
+import my.dub.dlp_pilot.service.ExchangeService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.context.annotation.PropertySource;
+import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
 import org.springframework.core.env.Environment;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.orm.hibernate5.LocalSessionFactoryBean;
@@ -21,14 +24,12 @@ import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 import org.springframework.retry.annotation.EnableRetry;
 import org.springframework.transaction.PlatformTransactionManager;
 
-@Configuration
+@Profile("test")
 @EnableRetry
+@Configuration
+@PropertySource({ "classpath:application.properties" })
 @EnableJpaRepositories(basePackages = "my.dub.dlp_pilot.repository")
-@ComponentScan(basePackages = "my.dub.dlp_pilot")
-@PropertySource("classpath:database/hibernate.properties")
-@PropertySource("classpath:application.properties")
-@Profile("!test")
-public class AppConfig {
+class AppConfig {
 
     private final Environment environment;
 
@@ -37,11 +38,33 @@ public class AppConfig {
         this.environment = env;
     }
 
-    @SneakyThrows
     @Bean
+    public ScheduledService scheduledService() {
+        return mock(ScheduledService.class);
+    }
+
+    // for ignoring @Value annotations
+    @Bean
+    public static PropertySourcesPlaceholderConfigurer propertySourcesPlaceholderConfigurer() {
+        PropertySourcesPlaceholderConfigurer test = new PropertySourcesPlaceholderConfigurer();
+        test.setIgnoreUnresolvablePlaceholders(true);
+        return test;
+    }
+
+    @Bean
+    public ParametersHolder parametersHolder() {
+        return mock(ParametersHolder.class);
+    }
+
+    @Bean
+    public ExchangeService exchangeService() {
+        return mock(ExchangeService.class);
+    }
+
+    @Bean
+    @ConfigurationProperties(prefix = "spring.datasource")
     public DataSource dataSource() {
-        HikariConfig config = new HikariConfig("/database/datasource.properties");
-        return new HikariDataSource(config);
+        return DataSourceBuilder.create().build();
     }
 
     @Bean
@@ -76,17 +99,8 @@ public class AppConfig {
 
     private Properties hibernateProperties() {
         Properties properties = new Properties();
-        properties.put("hibernate.dialect", environment.getRequiredProperty("hibernate.dialect"));
-        properties.put("hibernate.default_schema", environment.getRequiredProperty("hibernate.default_schema"));
-        properties.put("hibernate.show_sql", environment.getRequiredProperty("hibernate.show_sql"));
-        properties.put("hibernate.format_sql", environment.getRequiredProperty("hibernate.format_sql"));
-        int batchSize = Integer.parseInt(environment.getRequiredProperty("hibernate.batch_size"));
-        properties.put("hibernate.jdbc.batch_size", batchSize);
-        properties.put("hibernate.jdbc.fetch_size", batchSize);
-        properties.put("hibernate.order_inserts", true);
-        properties.put("hibernate.order_updates", true);
-        properties.put("hibernate.hbm2ddl.delimiter", ";");
-        properties.put("hibernate.jdbc.time_zone", environment.getRequiredProperty("hibernate.jdbc.time_zone"));
+        properties.put("hibernate.dialect", environment.getRequiredProperty("spring.hibernate.dialect"));
+        properties.put("hibernate.hbm2ddl.auto", environment.getRequiredProperty("spring.hibernate.hbm2ddl.auto"));
         return properties;
     }
 }

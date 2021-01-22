@@ -2,6 +2,9 @@ package my.dub.dlp_pilot.exception.client;
 
 import lombok.Getter;
 
+/**
+ * Exception indicating unexpected HTTP status response (usually 4xx).
+ */
 @Getter
 public class UnexpectedResponseStatusCodeException extends RuntimeException {
     private final String exchange;

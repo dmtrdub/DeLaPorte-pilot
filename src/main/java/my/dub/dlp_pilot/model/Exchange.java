@@ -84,9 +84,6 @@ public class Exchange implements Serializable {
     }
 
     public BigDecimal getFixedFeesUsd() {
-        if (depositFeeUsd == null || withdrawFeeUsd == null) {
-            return BigDecimal.ZERO;
-        }
         return depositFeeUsd.add(withdrawFeeUsd);
     }
 }

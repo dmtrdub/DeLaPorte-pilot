@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+  <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <charset>UTF-8</charset>
+      <pattern>%d{HH:mm:ss.SSS} [%yellow(%C{1.})] %highlight(%-5level) - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <springProfile name="prod">
+    <appender name="file" class="ch.qos.logback.core.rolling.RollingFileAppender">
+      <append>true</append>
+      <encoder>
+        <charset>UTF-8</charset>
+        <pattern>%d{HH:mm:ss.SSS} %-5level - %msg%n</pattern>
+      </encoder>
+      <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+        <fileNamePattern>logs/previous/dlp_%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+        <!-- each archived file, size max 10MB -->
+        <maxFileSize>10MB</maxFileSize>
+        <!-- total size of all archive files, if total size > 20GB, delete old archived file -->
+        <totalSizeCap>2GB</totalSizeCap>
+        <!-- 60 days to keep -->
+        <maxHistory>30</maxHistory>
+      </rollingPolicy>
+    </appender>
+
+    <logger name="my.dub.dlp_pilot" level="info" additivity="false">
+      <appender-ref ref="console"/>
+      <appender-ref ref="file"/>
+    </logger>
+    <root level="warn">
+      <appender-ref ref="console"/>
+      <appender-ref ref="file"/>
+    </root>
+  </springProfile>
+
+  <springProfile name="dev">
+    <logger name="my.dub.dlp_pilot" level="debug" additivity="false">
+      <appender-ref ref="console"/>
+    </logger>
+    <root level="info">
+      <appender-ref ref="console"/>
+    </root>
+  </springProfile>
+</configuration>

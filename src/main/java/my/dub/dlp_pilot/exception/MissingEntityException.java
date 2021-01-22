@@ -2,6 +2,9 @@ package my.dub.dlp_pilot.exception;
 
 import lombok.Getter;
 
+/**
+ * Exception indicating the absence of an entity sought by a specific criterion.
+ */
 @Getter
 public class MissingEntityException extends RuntimeException {
 

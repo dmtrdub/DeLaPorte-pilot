@@ -1,6 +1,6 @@
 package my.dub.dlp_pilot.service.impl.client;
 
-import static my.dub.dlp_pilot.util.ApiClientUtils.executeRequestParseResponse;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
@@ -26,6 +26,7 @@ import my.dub.dlp_pilot.model.dto.Ticker;
 import my.dub.dlp_pilot.service.ExchangeClientService;
 import my.dub.dlp_pilot.service.ExchangeService;
 import my.dub.dlp_pilot.service.client.AbstractExchangeClientService;
+import my.dub.dlp_pilot.service.client.ApiClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
@@ -39,8 +40,8 @@ public class BitfinexExchangeClientService extends AbstractExchangeClientService
     private static final String SYMBOL_PAIR_PREFIX = "t";
 
     @Autowired
-    public BitfinexExchangeClientService(ExchangeService exchangeService) {
-        super(exchangeService, ExchangeName.BITFINEX);
+    public BitfinexExchangeClientService(ExchangeService exchangeService, ApiClient apiClient) {
+        super(exchangeService, apiClient, ExchangeName.BITFINEX);
     }
 
     /**
@@ -48,15 +49,20 @@ public class BitfinexExchangeClientService extends AbstractExchangeClientService
      */
     @Override
     public List<SymbolPair> fetchSymbolPairs() throws IOException {
-        JsonNode parentNode = executeRequestParseResponse(exchange.getBaseEndpoint(),
-                                                          "conf/pub:map:currency:sym,pub:list:pair:exchange",
-                                                          exchangeFullName);
+        JsonNode parentNode = apiClient.executeRequestParseResponse(exchange.getBaseEndpoint(),
+                                                                    "conf/pub:map:currency:sym,pub:list:pair:exchange",
+                                                                    exchangeFullName);
         checkResponseStatus(parentNode, Constants.NO_SYMBOL_DATA_FOUND_IN_RESPONSE_MSG);
         JsonNode firstNode = parentNode.get(0);
         Map<String, String> rawCurrenciesMap = StreamSupport.stream(firstNode.spliterator(), false)
                 .filter(jsonNode -> !jsonNode.get(1).asText().contains("-")).collect(Collectors
-                .toMap(jsonNode -> jsonNode.get(0).asText().toUpperCase(), jsonNode -> jsonNode.get(1).asText()
-                .toUpperCase()));
+                                                                                             .toMap(jsonNode -> jsonNode
+                                                                                                            .get(0).asText()
+                                                                                                            .toUpperCase(),
+                                                                                                    jsonNode -> jsonNode
+                                                                                                            .get(1)
+                                                                                                            .asText()
+                                                                                                            .toUpperCase()));
         JsonNode secondNode = parentNode.get(1);
         if (secondNode == null || secondNode.isEmpty()) {
             throw new UnexpectedEndpointResponseException(exchangeFullName,
@@ -85,8 +91,10 @@ public class BitfinexExchangeClientService extends AbstractExchangeClientService
      */
     @Override
     public Set<Ticker> fetchAllTickers(@NonNull List<SymbolPair> symbolPairs) throws IOException {
-        JsonNode parentNode =
-                executeRequestParseResponse(exchange.getBaseEndpoint(), "tickers", "symbols", "ALL", exchangeFullName);
+        checkNotNull(symbolPairs, Constants.NULL_ARGUMENT_MESSAGE, "symbolPairs");
+
+        JsonNode parentNode = apiClient
+                .executeRequestParseResponse(exchange.getBaseEndpoint(), "tickers", "symbols", "ALL", exchangeFullName);
         checkResponseStatus(parentNode, Constants.NO_TICKERS_FOUND_IN_RESPONSE_MSG);
         Set<Ticker> tickers = new HashSet<>();
         for (JsonNode innerNode : parentNode) {
@@ -121,12 +129,20 @@ public class BitfinexExchangeClientService extends AbstractExchangeClientService
     @Override
     public List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame, @NonNull Instant startTime,
             @NonNull Instant endTime) throws IOException {
+        checkNotNull(symbolPair, Constants.NULL_ARGUMENT_MESSAGE, "symbolPair");
+        checkNotNull(timeFrame, Constants.NULL_ARGUMENT_MESSAGE, "timeFrame");
+        checkNotNull(startTime, Constants.NULL_ARGUMENT_MESSAGE, "startTime");
+        checkNotNull(endTime, Constants.NULL_ARGUMENT_MESSAGE, "endTime");
+
         return fetchBars(symbolPair, timeFrame, startTime, endTime, exchange.getMaxBarsPerRequest());
     }
 
     @Override
     public List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame, long barsLimit)
             throws IOException {
+        checkNotNull(symbolPair, Constants.NULL_ARGUMENT_MESSAGE, "symbolPair");
+        checkNotNull(timeFrame, Constants.NULL_ARGUMENT_MESSAGE, "timeFrame");
+
         return fetchBars(symbolPair, timeFrame, null, null, barsLimit);
     }
 
@@ -146,8 +162,8 @@ public class BitfinexExchangeClientService extends AbstractExchangeClientService
         queryParams.put("sort", "1");
         String endpointUrl = String.format("candles/trade:%s:%s/hist", timeFrame.getExchangeValue(exchangeName),
                                            symbolPair.getName());
-        JsonNode parentNode =
-                executeRequestParseResponse(exchange.getBaseEndpoint(), endpointUrl, queryParams, exchangeFullName);
+        JsonNode parentNode = apiClient
+                .executeRequestParseResponse(exchange.getBaseEndpoint(), endpointUrl, queryParams, exchangeFullName);
         checkResponseStatus(parentNode, Constants.NO_BARS_FOUND_IN_RESPONSE_MSG);
         List<Bar> bars = new ArrayList<>();
         for (JsonNode innerNode : parentNode) {

@@ -1,5 +1,7 @@
 package my.dub.dlp_pilot.service.client;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -14,19 +16,26 @@ import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.dto.SymbolPair;
 import my.dub.dlp_pilot.service.ExchangeService;
 import org.springframework.beans.factory.InitializingBean;
+import org.springframework.lang.NonNull;
 
+/**
+ * Abstract super class for exchange client service implementations.
+ */
 @Slf4j
 public abstract class AbstractExchangeClientService implements InitializingBean {
 
     protected final ExchangeService exchangeService;
+    protected final ApiClient apiClient;
 
     protected final ExchangeName exchangeName;
     protected final String exchangeFullName;
 
     protected Exchange exchange;
 
-    protected AbstractExchangeClientService(ExchangeService exchangeService, ExchangeName exchangeName) {
+    protected AbstractExchangeClientService(ExchangeService exchangeService, ApiClient apiClient,
+            ExchangeName exchangeName) {
         this.exchangeService = exchangeService;
+        this.apiClient = apiClient;
         this.exchangeName = exchangeName;
         this.exchangeFullName = exchangeName.getFullName();
     }
@@ -94,11 +103,12 @@ public abstract class AbstractExchangeClientService implements InitializingBean 
         return parseDateTime(dateTimeNode, ChronoUnit.SECONDS);
     }
 
-    protected Optional<Instant> parseDateTime(JsonNode dateTimeNode, ChronoUnit epochChronoUnit) {
+    protected Optional<Instant> parseDateTime(JsonNode dateTimeNode, @NonNull ChronoUnit epochChronoUnit) {
         if (dateTimeNode == null) {
             log.trace("Null or empty dateTime node found in response from {} exchange. Skipping...", exchangeFullName);
             return Optional.empty();
         }
+        checkNotNull(epochChronoUnit, Constants.NULL_ARGUMENT_MESSAGE, "epochChronoUnit");
         Instant dateTime;
         long epoch = dateTimeNode.asLong();
         try {
@@ -114,7 +124,11 @@ public abstract class AbstractExchangeClientService implements InitializingBean 
         return Optional.of(dateTime);
     }
 
-    protected boolean setSymbols(String input, String splitRegex, SymbolPair symbolPair) {
+    protected boolean setSymbols(@NonNull String input, @NonNull String splitRegex, @NonNull SymbolPair symbolPair) {
+        checkNotNull(input, Constants.NULL_ARGUMENT_MESSAGE, "input");
+        checkNotNull(splitRegex, Constants.NULL_ARGUMENT_MESSAGE, "splitRegex");
+        checkNotNull(symbolPair, Constants.NULL_ARGUMENT_MESSAGE, "symbolPair");
+
         String[] symbols;
         try {
             symbols = input.split(splitRegex, 2);
@@ -128,7 +142,9 @@ public abstract class AbstractExchangeClientService implements InitializingBean 
         return true;
     }
 
-    protected String parseSymbol(String rawSymbol) {
+    protected String parseSymbol(@NonNull String rawSymbol) {
+        checkNotNull(rawSymbol, Constants.NULL_ARGUMENT_MESSAGE, "rawSymbol");
+
         if (Constants.BITCOIN_SYMBOLS.contains(rawSymbol)) {
             return Constants.BITCOIN_SYMBOLS.get(0);
         }

@@ -5,6 +5,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import java.util.Collection;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
+import my.dub.dlp_pilot.Constants;
 import my.dub.dlp_pilot.model.Bar;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.TestRun;
@@ -17,10 +18,15 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * An implementation of {@link BarService} service.
+ */
 @Slf4j
 @Service
 @Transactional
 public class BarServiceImpl implements BarService {
+
+    private static final String TEST_RUN_PARAMETER = "testRun";
 
     private final BarRepository repository;
 
@@ -31,8 +37,8 @@ public class BarServiceImpl implements BarService {
 
     @Override
     public void save(@NonNull Collection<Bar> bars, @NonNull TestRun testRun) {
-        checkNotNull(bars, "Cannot save null Bar collection!");
-        checkNotNull(testRun, "Cannot save Bars if TestRun is null!");
+        checkNotNull(bars, Constants.NULL_ARGUMENT_MESSAGE, "bars");
+        checkNotNull(testRun, Constants.NULL_ARGUMENT_MESSAGE, TEST_RUN_PARAMETER);
 
         if (bars.isEmpty()) {
             return;
@@ -43,7 +49,7 @@ public class BarServiceImpl implements BarService {
 
     @Override
     public boolean deleteAll(@NonNull TestRun testRun) {
-        checkNotNull(testRun, "Cannot delete Bars if TestRun is null!");
+        checkNotNull(testRun, Constants.NULL_ARGUMENT_MESSAGE, TEST_RUN_PARAMETER);
 
         Long deletedCount = repository.deleteAllByTestRunIdEquals(testRun.getId());
         boolean deleted = deletedCount > 0L;
@@ -55,23 +61,23 @@ public class BarServiceImpl implements BarService {
 
     @Override
     public List<BarAverage> loadAllBarAverages(@NonNull TestRun testRun) {
-        checkNotNull(testRun, "Cannot load all BarAverages if TestRun is null!");
+        checkNotNull(testRun, Constants.NULL_ARGUMENT_MESSAGE, TEST_RUN_PARAMETER);
 
         return repository.getAllBarAverages(testRun.getId());
     }
 
     @Override
     public List<BarAverage> loadBarAverages(@NonNull TestRun testRun, @NonNull ExchangeName exchangeName) {
-        checkNotNull(testRun, "Cannot load BarAverages if TestRun is null!");
-        checkNotNull(exchangeName, "Cannot load BarAverages if exchangeName is null!");
+        checkNotNull(testRun, Constants.NULL_ARGUMENT_MESSAGE, TEST_RUN_PARAMETER);
+        checkNotNull(exchangeName, Constants.NULL_ARGUMENT_MESSAGE, "exchangeName");
 
         return repository.getBarAverages(exchangeName, testRun.getId());
     }
 
     @Override
-    public List<LastBar> loadExchangeLastBars(@NonNull TestRun testRun, @NonNull ExchangeName exchangeName) {
-        checkNotNull(testRun, "Cannot load LastBars if TestRun is null!");
-        checkNotNull(exchangeName, "Cannot load LastBars if exchangeName is null!");
+    public List<LastBar> loadLastBars(@NonNull TestRun testRun, @NonNull ExchangeName exchangeName) {
+        checkNotNull(testRun, Constants.NULL_ARGUMENT_MESSAGE, TEST_RUN_PARAMETER);
+        checkNotNull(exchangeName, Constants.NULL_ARGUMENT_MESSAGE, "exchangeName");
 
         return repository.getLastBars(exchangeName, testRun.getId());
     }

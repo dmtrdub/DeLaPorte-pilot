@@ -33,9 +33,14 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
+/**
+ * An implementation of {@link ClientService} service.
+ */
 @Slf4j
 @Service
 public class ClientServiceImpl implements ClientService {
+
+    private static final String EXCHANGE_NAME_PARAMETER = "exchangeName";
 
     private final SymbolPairContainer symbolPairContainer;
     private final ExchangeService exchangeService;
@@ -51,7 +56,7 @@ public class ClientServiceImpl implements ClientService {
 
     @Override
     public void loadAllSymbolPairs(@NonNull Collection<ExchangeName> exchangeNames) {
-        checkNotNull(exchangeNames, "Cannot load all SymbolPairs if exchangeNames collection is null!");
+        checkNotNull(exchangeNames, Constants.NULL_ARGUMENT_MESSAGE, "exchangeNames");
 
         List<SymbolPair> allSymbolPairs = exchangeNames.stream().map(this::loadSymbolPairs).flatMap(Collection::stream)
                 .collect(Collectors.toList());
@@ -66,21 +71,21 @@ public class ClientServiceImpl implements ClientService {
 
     @Override
     public int getSymbolPairsCount(@NonNull ExchangeName exchangeName) {
-        checkNotNull(exchangeName, "Cannot get symbol pairs count if exchangeName is null!");
-
-        return symbolPairContainer.size(exchangeName);
+        return symbolPairContainer
+                .size(checkNotNull(exchangeName, Constants.NULL_ARGUMENT_MESSAGE, EXCHANGE_NAME_PARAMETER));
     }
 
     @Override
     public void removeSymbolPair(@NonNull ExchangeName exchangeName, int index) {
-        checkNotNull(exchangeName, "Cannot remove symbol pair if exchangeName is null!");
+        checkNotNull(exchangeName, Constants.NULL_ARGUMENT_MESSAGE, EXCHANGE_NAME_PARAMETER);
         checkArgument(index >= 0, "Invalid symbol pair index passed for removal!");
+
         symbolPairContainer.remove(exchangeName, index);
     }
 
     @Override
     public Set<Ticker> fetchTickers(@NonNull ExchangeName exchangeName) {
-        checkNotNull(exchangeName, "Cannot fetch Tickers if exchangeName is null!");
+        checkNotNull(exchangeName, Constants.NULL_ARGUMENT_MESSAGE, EXCHANGE_NAME_PARAMETER);
 
         ExchangeClientService exchangeClientService = getExchangeClientService(exchangeName);
         Set<Ticker> tickers = new HashSet<>();
@@ -106,12 +111,12 @@ public class ClientServiceImpl implements ClientService {
     }
 
     @Override
-    public List<Bar> fetchBars(@NonNull ExchangeName exchangeName, @NonNull TimeFrame timeFrame,
+    public List<Bar> fetchBarsPreload(@NonNull ExchangeName exchangeName, @NonNull TimeFrame timeFrame,
             @NonNull Instant startTime, int symbolPairIndex, @NonNull Instant endTime) {
-        checkNotNull(exchangeName, "Cannot fetch Bars if exchangeName is null!");
-        checkNotNull(timeFrame, "Cannot fetch Bars if timeFrame is null!");
-        checkNotNull(startTime, "Cannot fetch Bars if startTime is null!");
-        checkNotNull(startTime, "Cannot fetch Bars if endTime is null!");
+        checkNotNull(exchangeName, Constants.NULL_ARGUMENT_MESSAGE, EXCHANGE_NAME_PARAMETER);
+        checkNotNull(timeFrame, Constants.NULL_ARGUMENT_MESSAGE, "timeFrame");
+        checkNotNull(startTime, Constants.NULL_ARGUMENT_MESSAGE, "startTime");
+        checkNotNull(endTime, Constants.NULL_ARGUMENT_MESSAGE, "endTime");
 
         ExchangeClientService exchangeClientService = getExchangeClientService(exchangeName);
         SymbolPair symbolPair = symbolPairContainer.get(exchangeName, symbolPairIndex);
@@ -134,8 +139,9 @@ public class ClientServiceImpl implements ClientService {
     @Override
     public List<Bar> fetchBars(@NonNull ExchangeName exchangeName, @NonNull TimeFrame timeFrame, int symbolPairIndex,
             @NonNull Collection<LastBar> lastBars) {
-        checkNotNull(exchangeName, "Cannot fetch single Bar if exchangeName is null!");
-        checkNotNull(timeFrame, "Cannot fetch single Bar if timeFrame is null!");
+        checkNotNull(exchangeName, Constants.NULL_ARGUMENT_MESSAGE, EXCHANGE_NAME_PARAMETER);
+        checkNotNull(timeFrame, Constants.NULL_ARGUMENT_MESSAGE, "timeFrame");
+        checkNotNull(lastBars, Constants.NULL_ARGUMENT_MESSAGE, "lastBars");
 
         ExchangeClientService exchangeClientService = getExchangeClientService(exchangeName);
         SymbolPair symbolPair = symbolPairContainer.get(exchangeName, symbolPairIndex);
@@ -164,6 +170,18 @@ public class ClientServiceImpl implements ClientService {
         return fetchedBars;
     }
 
+    @Override
+    public void updateLoadedSymbolPairs() {
+        List<SymbolPair> allSymbolPairs = symbolPairContainer.getAll();
+        Set<SymbolPair> relevantSymbolPairs = findRelevantSymbolPairs(allSymbolPairs);
+        if (CollectionUtils.isEmpty(relevantSymbolPairs)) {
+            throw new TestRunEndException("No relevant symbol pairs were found for Test Run! Exiting...");
+        }
+        symbolPairContainer.removeAll();
+        symbolPairContainer.addAll(relevantSymbolPairs);
+        log.info("Filtered {} relevant symbol pairs for Test Run", relevantSymbolPairs.size());
+    }
+
     private List<SymbolPair> loadSymbolPairs(ExchangeName exchangeName) {
         try {
             List<SymbolPair> symbolPairs = getExchangeClientService(exchangeName).fetchSymbolPairs();
@@ -178,18 +196,6 @@ public class ClientServiceImpl implements ClientService {
             log.error(e.getMessage());
             throw new TestRunEndException(e);
         }
-    }
-
-    @Override
-    public void updateSymbolPairs() {
-        List<SymbolPair> allSymbolPairs = symbolPairContainer.getAll();
-        Set<SymbolPair> relevantSymbolPairs = findRelevantSymbolPairs(allSymbolPairs);
-        if (CollectionUtils.isEmpty(relevantSymbolPairs)) {
-            throw new TestRunEndException("No relevant symbol pairs were found for Test Run! Exiting...");
-        }
-        symbolPairContainer.removeAll();
-        symbolPairContainer.addAll(relevantSymbolPairs);
-        log.info("Filtered {} relevant symbol pairs for Test Run", relevantSymbolPairs.size());
     }
 
     private Set<SymbolPair> findRelevantSymbolPairs(List<SymbolPair> symbolPairs) {

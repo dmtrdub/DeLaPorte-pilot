@@ -1,10 +1,10 @@
 package my.dub.dlp_pilot.service.impl.client;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static my.dub.dlp_pilot.Constants.BIGONE_CLIENT_SERVICE_BEAN_NAME;
 import static my.dub.dlp_pilot.Constants.NO_BARS_FOUND_IN_RESPONSE_MSG;
 import static my.dub.dlp_pilot.Constants.NO_SYMBOL_DATA_FOUND_IN_RESPONSE_MSG;
 import static my.dub.dlp_pilot.Constants.NO_TICKERS_FOUND_IN_RESPONSE_MSG;
-import static my.dub.dlp_pilot.util.ApiClientUtils.executeRequestParseResponse;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
+import my.dub.dlp_pilot.Constants;
 import my.dub.dlp_pilot.exception.client.UnexpectedEndpointResponseException;
 import my.dub.dlp_pilot.model.Bar;
 import my.dub.dlp_pilot.model.ExchangeName;
@@ -27,6 +28,7 @@ import my.dub.dlp_pilot.model.dto.Ticker;
 import my.dub.dlp_pilot.service.ExchangeClientService;
 import my.dub.dlp_pilot.service.ExchangeService;
 import my.dub.dlp_pilot.service.client.AbstractExchangeClientService;
+import my.dub.dlp_pilot.service.client.ApiClient;
 import my.dub.dlp_pilot.util.DateUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,8 +41,8 @@ public class BigoneExchangeClientService extends AbstractExchangeClientService i
     private static final String DELIMITER = "-";
 
     @Autowired
-    public BigoneExchangeClientService(ExchangeService exchangeService) {
-        super(exchangeService, ExchangeName.BIGONE);
+    public BigoneExchangeClientService(ExchangeService exchangeService, ApiClient apiClient) {
+        super(exchangeService, apiClient, ExchangeName.BIGONE);
     }
 
     /**
@@ -48,7 +50,8 @@ public class BigoneExchangeClientService extends AbstractExchangeClientService i
      */
     @Override
     public List<SymbolPair> fetchSymbolPairs() throws IOException {
-        JsonNode parentNode = executeRequestParseResponse(exchange.getBaseEndpoint(), "asset_pairs", exchangeFullName);
+        JsonNode parentNode =
+                apiClient.executeRequestParseResponse(exchange.getBaseEndpoint(), "asset_pairs", exchangeFullName);
         checkResponseStatus(parentNode);
         JsonNode dataNode = getDataNode(parentNode, NO_SYMBOL_DATA_FOUND_IN_RESPONSE_MSG);
         List<SymbolPair> symbolPairsResult = new ArrayList<>();
@@ -71,8 +74,10 @@ public class BigoneExchangeClientService extends AbstractExchangeClientService i
      */
     @Override
     public Set<Ticker> fetchAllTickers(@NonNull List<SymbolPair> symbolPairs) throws IOException {
-        JsonNode parentNode =
-                executeRequestParseResponse(exchange.getBaseEndpoint(), "asset_pairs/tickers", exchangeFullName);
+        checkNotNull(symbolPairs, Constants.NULL_ARGUMENT_MESSAGE, "symbolPairs");
+
+        JsonNode parentNode = apiClient
+                .executeRequestParseResponse(exchange.getBaseEndpoint(), "asset_pairs/tickers", exchangeFullName);
         checkResponseStatus(parentNode);
         JsonNode dataNode = getDataNode(parentNode, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
         Set<Ticker> tickers = new HashSet<>();
@@ -116,12 +121,20 @@ public class BigoneExchangeClientService extends AbstractExchangeClientService i
     @Override
     public List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame, @NonNull Instant startTime,
             @NonNull Instant endTime) throws IOException {
+        checkNotNull(symbolPair, Constants.NULL_ARGUMENT_MESSAGE, "symbolPair");
+        checkNotNull(timeFrame, Constants.NULL_ARGUMENT_MESSAGE, "timeFrame");
+        checkNotNull(startTime, Constants.NULL_ARGUMENT_MESSAGE, "startTime");
+        checkNotNull(endTime, Constants.NULL_ARGUMENT_MESSAGE, "endTime");
+
         return fetchBars(symbolPair, timeFrame, startTime, endTime, exchange.getMaxBarsPerRequest());
     }
 
     @Override
     public List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame, long barsLimit)
             throws IOException {
+        checkNotNull(symbolPair, Constants.NULL_ARGUMENT_MESSAGE, "symbolPair");
+        checkNotNull(timeFrame, Constants.NULL_ARGUMENT_MESSAGE, "timeFrame");
+
         return fetchBars(symbolPair, timeFrame, null, null, barsLimit);
     }
 
@@ -138,9 +151,10 @@ public class BigoneExchangeClientService extends AbstractExchangeClientService i
             return Collections.emptyList();
         }
         queryParams.put("period", timeFrame.getExchangeValue(exchangeName));
-        JsonNode parentNode = executeRequestParseResponse(exchange.getBaseEndpoint(),
-                                                          String.format("asset_pairs/%s/candles", symbolPair.getName()),
-                                                          queryParams, exchangeFullName);
+        JsonNode parentNode = apiClient.executeRequestParseResponse(exchange.getBaseEndpoint(),
+                                                                    String.format("asset_pairs/%s/candles",
+                                                                                  symbolPair.getName()), queryParams,
+                                                                    exchangeFullName);
         checkResponseStatus(parentNode);
         JsonNode dataNode = getDataNode(parentNode, NO_BARS_FOUND_IN_RESPONSE_MSG);
         List<Bar> bars = new ArrayList<>();

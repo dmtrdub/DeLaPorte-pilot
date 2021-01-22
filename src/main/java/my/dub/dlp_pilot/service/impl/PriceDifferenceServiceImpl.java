@@ -11,6 +11,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import my.dub.dlp_pilot.Constants;
 import my.dub.dlp_pilot.model.ExchangeName;
 import my.dub.dlp_pilot.model.TestRun;
 import my.dub.dlp_pilot.model.dto.BarAverage;
@@ -19,12 +20,15 @@ import my.dub.dlp_pilot.model.dto.Ticker;
 import my.dub.dlp_pilot.service.PriceDifferenceService;
 import my.dub.dlp_pilot.service.TickerService;
 import my.dub.dlp_pilot.service.TradeService;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
-import org.springframework.util.StringUtils;
 
+/**
+ * An implementation of {@link PriceDifferenceService} service.
+ */
 @Slf4j
 @Service
 public class PriceDifferenceServiceImpl implements PriceDifferenceService {
@@ -42,6 +46,8 @@ public class PriceDifferenceServiceImpl implements PriceDifferenceService {
 
     @Override
     public void createPriceDifferences(@NonNull List<BarAverage> barAverages) {
+        checkNotNull(barAverages, Constants.NULL_ARGUMENT_MESSAGE, "barAverages");
+
         for (int i = 0; i < barAverages.size() - 1; i++) {
             for (int j = i + 1; j < barAverages.size(); j++) {
                 BarAverage bA1 = barAverages.get(i);
@@ -62,6 +68,8 @@ public class PriceDifferenceServiceImpl implements PriceDifferenceService {
 
     @Override
     public void updatePriceDifferences(@NonNull List<BarAverage> barAverages) {
+        checkNotNull(barAverages, Constants.NULL_ARGUMENT_MESSAGE, "barAverages");
+
         barAverages.forEach(barAverage -> {
             List<PriceDifference> priceDiffs =
                     findPriceDifferences(barAverage.getBase(), barAverage.getTarget(), barAverage.getExchangeName());
@@ -79,7 +87,10 @@ public class PriceDifferenceServiceImpl implements PriceDifferenceService {
     }
 
     @Override
-    public void handlePriceDifference(ExchangeName exchangeName, TestRun testRun) {
+    public void handlePriceDifference(@NonNull ExchangeName exchangeName, @NonNull TestRun testRun) {
+        checkNotNull(exchangeName, Constants.NULL_ARGUMENT_MESSAGE, "exchangeName");
+        checkNotNull(testRun, Constants.NULL_ARGUMENT_MESSAGE, "testRun");
+
         Set<Ticker> allTickers = tickerService.getAllTickers();
         Set<Ticker> tickersToCompare = tickerService.getTickers(exchangeName);
         allTickers.removeAll(tickersToCompare);
@@ -115,6 +126,7 @@ public class PriceDifferenceServiceImpl implements PriceDifferenceService {
             if (canCheckTradeOpen(currentTickerValue, priceDifference.getAverage())) {
                 tradeService.checkTradeOpen(ticker1, ticker2, priceDifference.getAverage(), testRun);
             } else {
+                // check tickers inverted
                 currentTickerValue = getCurrentPriceDiffValue(ticker2, ticker1);
                 if (canCheckTradeOpen(currentTickerValue, priceDifference.getAverage().negate())) {
                     tradeService.checkTradeOpen(ticker2, ticker1, priceDifference.getAverage().negate(), testRun);
@@ -133,10 +145,10 @@ public class PriceDifferenceServiceImpl implements PriceDifferenceService {
 
     private Optional<PriceDifference> findPriceDifference(String base, String target, ExchangeName exchange1,
             ExchangeName exchange2) {
-        checkArgument(!StringUtils.isEmpty(base), "Base cannot be empty when searching Price Difference!");
-        checkArgument(!StringUtils.isEmpty(target), "Target cannot be empty when searching Price Difference!");
-        checkNotNull(exchange1, "Exchange 1 cannot be null when searching Price Difference!");
-        checkNotNull(exchange2, "Exchange 2 cannot be null when searching Price Difference!");
+        checkArgument(StringUtils.isNotEmpty(base), "Base cannot be empty when searching Price Difference!");
+        checkArgument(StringUtils.isNotEmpty(target), "Target cannot be empty when searching Price Difference!");
+        checkNotNull(exchange1, Constants.NULL_ARGUMENT_MESSAGE, "exchange1");
+        checkNotNull(exchange2, Constants.NULL_ARGUMENT_MESSAGE, "exchange2");
 
         return priceDifferences.stream()
                 .filter(priceDiff -> isSimilarMatch(priceDiff, base, target, exchange1, exchange2)).findFirst();

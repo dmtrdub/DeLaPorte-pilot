@@ -28,13 +28,17 @@ import my.dub.dlp_pilot.service.TestRunService;
 import my.dub.dlp_pilot.service.TradeService;
 import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
+/**
+ * An implementation of {@link FileResultService} service.
+ */
 @Slf4j
-@Component
+@Service
 public class FileResultServiceImpl implements FileResultService {
     private static final String USD = "USD";
+    private static final String EXTENSION = ".csv";
 
     private final TradeService tradeService;
     private final TestRunService testRunService;
@@ -54,14 +58,7 @@ public class FileResultServiceImpl implements FileResultService {
     @Override
     public void init() {
         double entryAmount = parameters.getEntryAmountUsdDouble();
-        String amountHeaderPrefix = String.format("_%s_%s", entryAmount, USD);
-        header = String.join(",", "Base", "Target", "Entry_Percentage_Diff", "Open_Price_Diff", "Average_Price_Diff",
-                             "Close_Price_Diff", "PnL_Min_Short" + amountHeaderPrefix, "PnL_Short_Min_Time",
-                             "PnL_Short" + amountHeaderPrefix, "PnL_Max_Short" + amountHeaderPrefix,
-                             "PnL_Short_Max_Time", "PnL_Min_Long" + amountHeaderPrefix, "PnL_Long_Min_Time",
-                             "PnL_Long" + amountHeaderPrefix, "PnL_Max_Long" + amountHeaderPrefix, "PnL_Long_Max_Time",
-                             "Expenses_" + amountHeaderPrefix, "Income_" + amountHeaderPrefix, "Time_Start", "Time_End",
-                             "Duration_(sec)", "Result_Type", "Exchange_Short", "Exchange_Long");
+        header = constructHeader(entryAmount);
         initFile();
     }
 
@@ -87,11 +84,22 @@ public class FileResultServiceImpl implements FileResultService {
         }
     }
 
+    private String constructHeader(double entryAmount) {
+        String amountHeaderPrefix = String.format("_%s_%s", entryAmount, USD);
+        return String.join(",", "Base", "Target", "Entry_Percentage_Diff", "Open_Price_Diff", "Average_Price_Diff",
+                           "Close_Price_Diff", "PnL_Min_Short" + amountHeaderPrefix, "PnL_Short_Min_Time",
+                           "PnL_Short" + amountHeaderPrefix, "PnL_Max_Short" + amountHeaderPrefix, "PnL_Short_Max_Time",
+                           "PnL_Min_Long" + amountHeaderPrefix, "PnL_Long_Min_Time", "PnL_Long" + amountHeaderPrefix,
+                           "PnL_Max_Long" + amountHeaderPrefix, "PnL_Long_Max_Time", "Expenses_" + amountHeaderPrefix,
+                           "Income_" + amountHeaderPrefix, "Time_Start", "Time_End", "Duration_(sec)", "Result_Type",
+                           "Exchange_Short", "Exchange_Long");
+    }
+
     @SneakyThrows
     private void initFile() {
         TestRun currentTestRun = testRunService.getCurrentTestRun();
         String fileName = "test-run#" + currentTestRun.getId() + "_" + DateUtils
-                .formatDateTimeShort(currentTestRun.getStartTime()) + ".csv";
+                .formatDateTimeShort(currentTestRun.getStartTime()) + EXTENSION;
         String resultDir = parameters.getPathToResultDir();
         Files.createDirectories(Path.of(resultDir));
         Path fullFilePath = Path.of(resultDir, fileName);

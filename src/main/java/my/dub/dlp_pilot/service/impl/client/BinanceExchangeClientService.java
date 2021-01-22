@@ -1,10 +1,10 @@
 package my.dub.dlp_pilot.service.impl.client;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static my.dub.dlp_pilot.Constants.BINANCE_CLIENT_SERVICE_BEAN_NAME;
 import static my.dub.dlp_pilot.Constants.NO_BARS_FOUND_IN_RESPONSE_MSG;
 import static my.dub.dlp_pilot.Constants.NO_SYMBOL_DATA_FOUND_IN_RESPONSE_MSG;
 import static my.dub.dlp_pilot.Constants.NO_TICKERS_FOUND_IN_RESPONSE_MSG;
-import static my.dub.dlp_pilot.util.ApiClientUtils.executeRequestParseResponse;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
+import my.dub.dlp_pilot.Constants;
 import my.dub.dlp_pilot.exception.client.UnexpectedEndpointResponseException;
 import my.dub.dlp_pilot.model.Bar;
 import my.dub.dlp_pilot.model.ExchangeName;
@@ -27,6 +28,7 @@ import my.dub.dlp_pilot.model.dto.Ticker;
 import my.dub.dlp_pilot.service.ExchangeClientService;
 import my.dub.dlp_pilot.service.ExchangeService;
 import my.dub.dlp_pilot.service.client.AbstractExchangeClientService;
+import my.dub.dlp_pilot.service.client.ApiClient;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.NonNull;
@@ -40,8 +42,8 @@ public class BinanceExchangeClientService extends AbstractExchangeClientService 
     private static final String SYMBOL = "symbol";
 
     @Autowired
-    public BinanceExchangeClientService(ExchangeService exchangeService) {
-        super(exchangeService, ExchangeName.BINANCE);
+    public BinanceExchangeClientService(ExchangeService exchangeService, ApiClient apiClient) {
+        super(exchangeService, apiClient, ExchangeName.BINANCE);
     }
 
     /**
@@ -51,7 +53,8 @@ public class BinanceExchangeClientService extends AbstractExchangeClientService 
      */
     @Override
     public List<SymbolPair> fetchSymbolPairs() throws IOException {
-        JsonNode parentNode = executeRequestParseResponse(exchange.getBaseEndpoint(), "exchangeInfo", exchangeFullName);
+        JsonNode parentNode =
+                apiClient.executeRequestParseResponse(exchange.getBaseEndpoint(), "exchangeInfo", exchangeFullName);
         JsonNode symbolsNode = parentNode.get("symbols");
         if (symbolsNode == null || symbolsNode.isEmpty()) {
             throw new UnexpectedEndpointResponseException(exchangeFullName, NO_SYMBOL_DATA_FOUND_IN_RESPONSE_MSG);
@@ -91,8 +94,10 @@ public class BinanceExchangeClientService extends AbstractExchangeClientService 
      */
     @Override
     public Set<Ticker> fetchAllTickers(@NonNull List<SymbolPair> symbolPairs) throws IOException {
-        JsonNode parentNode =
-                executeRequestParseResponse(exchange.getBaseEndpoint(), "ticker/bookTicker", exchangeFullName);
+        checkNotNull(symbolPairs, Constants.NULL_ARGUMENT_MESSAGE, "symbolPairs");
+
+        JsonNode parentNode = apiClient
+                .executeRequestParseResponse(exchange.getBaseEndpoint(), "ticker/bookTicker", exchangeFullName);
         checkResponseStatus(parentNode, NO_TICKERS_FOUND_IN_RESPONSE_MSG);
         Set<Ticker> tickers = new HashSet<>();
         for (JsonNode innerNode : parentNode) {
@@ -123,12 +128,20 @@ public class BinanceExchangeClientService extends AbstractExchangeClientService 
     @Override
     public List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame, @NonNull Instant startTime,
             @NonNull Instant endTime) throws IOException {
+        checkNotNull(symbolPair, Constants.NULL_ARGUMENT_MESSAGE, "symbolPair");
+        checkNotNull(timeFrame, Constants.NULL_ARGUMENT_MESSAGE, "timeFrame");
+        checkNotNull(startTime, Constants.NULL_ARGUMENT_MESSAGE, "startTime");
+        checkNotNull(endTime, Constants.NULL_ARGUMENT_MESSAGE, "endTime");
+
         return fetchBars(symbolPair, timeFrame, startTime, endTime, exchange.getMaxBarsPerRequest());
     }
 
     @Override
     public List<Bar> fetchBars(@NonNull SymbolPair symbolPair, @NonNull TimeFrame timeFrame, long barsLimit)
             throws IOException {
+        checkNotNull(symbolPair, Constants.NULL_ARGUMENT_MESSAGE, "symbolPair");
+        checkNotNull(timeFrame, Constants.NULL_ARGUMENT_MESSAGE, "timeFrame");
+
         return fetchBars(symbolPair, timeFrame, null, null, barsLimit);
     }
 
@@ -146,8 +159,8 @@ public class BinanceExchangeClientService extends AbstractExchangeClientService 
         }
         queryParams.put("interval", timeFrame.getExchangeValue(exchangeName));
         queryParams.put(SYMBOL, symbolPair.getName());
-        JsonNode parentNode =
-                executeRequestParseResponse(exchange.getBaseEndpoint(), "klines", queryParams, exchangeFullName);
+        JsonNode parentNode = apiClient
+                .executeRequestParseResponse(exchange.getBaseEndpoint(), "klines", queryParams, exchangeFullName);
         checkResponseStatus(parentNode, NO_BARS_FOUND_IN_RESPONSE_MSG);
         List<Bar> bars = new ArrayList<>();
         for (JsonNode innerNode : parentNode) {

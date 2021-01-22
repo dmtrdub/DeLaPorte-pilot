@@ -20,15 +20,15 @@ import my.dub.dlp_pilot.service.impl.FileResultServiceImpl;
 import my.dub.dlp_pilot.util.DateUtils;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Scope;
-import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.scheduling.support.TaskUtils;
 import org.springframework.stereotype.Service;
 
+/**
+ * Service for initiating core scheduled tasks.
+ */
 @Slf4j
 @Service
-@Scope(proxyMode = ScopedProxyMode.TARGET_CLASS)
 public class ScheduledService implements InitializingBean {
 
     private final ExchangeService exchangeService;
@@ -124,7 +124,7 @@ public class ScheduledService implements InitializingBean {
             if (finished) {
                 taskSchedulerLoadFutures.remove(exchangeName).cancel(true);
                 testRunService.onRefreshLoadComplete(exchangeName, preloadCountDownLatch.getCount() == 0);
-                if(testRunService.checkTradeStopped() || testRunService.checkTestRunEnd()) {
+                if (testRunService.checkTradeStopped() || testRunService.checkTestRunEnd()) {
                     return;
                 }
                 setNextLoadTask(exchange);

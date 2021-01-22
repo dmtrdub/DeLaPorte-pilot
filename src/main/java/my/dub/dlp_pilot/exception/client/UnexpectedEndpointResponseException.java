@@ -2,6 +2,9 @@ package my.dub.dlp_pilot.exception.client;
 
 import lombok.Getter;
 
+/**
+ * Exception indicating unexpected HTTP response payload (usually empty response).
+ */
 @Getter
 public class UnexpectedEndpointResponseException extends RuntimeException {
     private final String exchange;

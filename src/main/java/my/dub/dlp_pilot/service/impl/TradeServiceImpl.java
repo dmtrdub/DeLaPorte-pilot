@@ -37,15 +37,17 @@ import my.dub.dlp_pilot.service.TickerService;
 import my.dub.dlp_pilot.service.TradeService;
 import my.dub.dlp_pilot.util.Calculations;
 import my.dub.dlp_pilot.util.DateUtils;
-import org.hibernate.exception.LockAcquisitionException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.util.Pair;
 import org.springframework.lang.NonNull;
-import org.springframework.retry.annotation.Retryable;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
+/**
+ * Implementation of {@link TradeService} service.
+ */
 @Slf4j
 @Service
 public class TradeServiceImpl implements TradeService {
@@ -67,22 +69,28 @@ public class TradeServiceImpl implements TradeService {
     }
 
     @Override
-    public void checkTradeOpen(Ticker tickerShort, Ticker tickerLong, BigDecimal averagePriceDifference,
-            TestRun testRun) {
-        checkState(tickerShort.getPriceBid().compareTo(tickerLong.getPriceAsk()) > 0,
+    public void checkTradeOpen(@NonNull Ticker tickerShort, @NonNull Ticker tickerLong,
+            @NonNull BigDecimal averagePriceDifference, @NonNull TestRun testRun) {
+        checkNotNull(tickerShort, Constants.NULL_ARGUMENT_MESSAGE, "tickerShort");
+        checkNotNull(tickerLong, Constants.NULL_ARGUMENT_MESSAGE, "tickerLong");
+        checkNotNull(averagePriceDifference, Constants.NULL_ARGUMENT_MESSAGE, "averagePriceDifference");
+        checkNotNull(testRun, Constants.NULL_ARGUMENT_MESSAGE, "testRun");
+
+        BigDecimal shortPrice = tickerShort.getPriceBid();
+        BigDecimal longPrice = tickerLong.getPriceAsk();
+        checkState(shortPrice.compareTo(longPrice) > 0,
                    "BID price of SHORT ticker should be greater than ASK price of LONG ticker!");
 
         if (!canEnterTrade(tickerShort, tickerLong)) {
             return;
         }
 
-        BigDecimal currentPercentageDiff =
-                percentageDifferencePrice(tickerShort.getPriceBid(), tickerLong.getPriceAsk());
+        BigDecimal currentPercentageDiff = percentageDifferencePrice(shortPrice, longPrice);
         if (currentPercentageDiff.compareTo(parameters.getEntryMinPercentageDiff()) < 0
                 || currentPercentageDiff.compareTo(parameters.getEntryMaxPercentageDiff()) > 0) {
             return;
         }
-        BigDecimal currentPriceDifference = tickerShort.getPriceBid().subtract(tickerLong.getPriceAsk());
+        BigDecimal currentPriceDifference = shortPrice.subtract(longPrice);
         if (isOpenDetrimental(tickerShort, tickerLong) || !isOpenProfitable(tickerShort, tickerLong,
                                                                             averagePriceDifference,
                                                                             currentPriceDifference)) {
@@ -104,8 +112,9 @@ public class TradeServiceImpl implements TradeService {
 
     @Override
     @Transactional
-    @Retryable(LockAcquisitionException.class)
-    public void handleTrades(ExchangeName exchangeName) {
+    public void handleTrades(@NonNull ExchangeName exchangeName) {
+        checkNotNull(exchangeName, Constants.NULL_ARGUMENT_MESSAGE, "exchangeName");
+
         Set<Trade> tradesInProgress = tradeContainer.getTrades(exchangeName);
         tradesInProgress.forEach(trade -> {
             Position positionShort = trade.getPositionShort();
@@ -140,8 +149,8 @@ public class TradeServiceImpl implements TradeService {
     @Override
     @Transactional
     public void closeTrades(@NonNull ExchangeName exchangeName, @NonNull TradeResultType tradeResultType) {
-        checkNotNull(exchangeName, "Cannot close trades if exchangeName is null!");
-        checkNotNull(tradeResultType, "Cannot close trades if tradeResultType is null!");
+        checkNotNull(exchangeName, Constants.NULL_ARGUMENT_MESSAGE, "exchangeName");
+        checkNotNull(tradeResultType, Constants.NULL_ARGUMENT_MESSAGE, "tradeResultType");
 
         tradeContainer.getTrades(exchangeName).forEach(trade -> {
             Position positionShort = trade.getPositionShort();
@@ -157,14 +166,14 @@ public class TradeServiceImpl implements TradeService {
     @Override
     @Transactional
     public List<Trade> getCompletedTradesNotWrittenToFile(@NonNull TestRun testRun) {
-        checkNotNull(testRun, "Cannot get completed trades if Test run is null!");
+        checkNotNull(testRun, Constants.NULL_ARGUMENT_MESSAGE, "testRun");
 
         return repository.findDistinctByWrittenToFileFalseAndTestRunIdEqualsOrderByEndTimeAsc(testRun.getId());
     }
 
     @Override
     @Transactional
-    public void saveOrUpdate(Collection<Trade> trades) {
+    public void saveOrUpdate(@Nullable Collection<Trade> trades) {
         if (CollectionUtils.isEmpty(trades)) {
             return;
         }

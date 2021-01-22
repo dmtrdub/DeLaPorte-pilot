@@ -21,6 +21,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
+/**
+ * Container class with parsed application parameters.
+ */
 @Component
 @Getter
 @Slf4j
